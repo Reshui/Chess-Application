@@ -1,21 +1,34 @@
 namespace Pieces;
 using System.Numerics;
+
 public class GameEnvironment
 {
     private ChessPiece?[,] GameBoard = new ChessPiece[8, 8];
     private ChessPiece _whiteKing;
     private ChessPiece _blackKing;
 
+    private Player _whitePlayer;
+    private Player _blackPlayer;
+
     private Dictionary<Team, List<ChessPiece>> _teamPieces;
+
     public ChessPiece this[int x, int y]
     {
         get => GameBoard[x, y]!;
         set => GameBoard[x, y] = value;
     }
 
-    public GameEnvironment()
+    public GameEnvironment(Player playerOne, Player playerTwo)
     {
         _teamPieces = GenerateBoard();
+        var playerList = new List<Player> { playerOne, playerTwo };
+        var rf = new Random();
+
+        int playerID = rf.Next(1);
+        _whitePlayer = playerList[playerID];
+
+        playerID = playerID == 0 ? 1 : 0;
+        _blackPlayer = playerList[playerID];
 
     }
     /// <summary>
@@ -32,9 +45,9 @@ public class GameEnvironment
             piecesPerTeam.Add(currentTeam, new List<ChessPiece>());
         }
         // 2nd row from the top and bottom.
-        var pawnRows = new int[] { 1, GameBoard.GetLength(1) - 2 };
+        var pawnRows = new int[] { 1, GameBoard.GetUpperBound(0) - 1 };
 
-        for (int columnIndex = 0; columnIndex < GameBoard.GetLength(1); columnIndex++)
+        for (int columnIndex = 0; columnIndex < GameBoard.GetUpperBound(1) + 1; columnIndex++)
         {
             foreach (int pawnRow in pawnRows)
             {
@@ -62,8 +75,8 @@ public class GameEnvironment
                         break;
                 }
                 // C# arrays start with [0,0] in the top left corner.
-                // I've opted to start white at the top.
-                int mainRow = (currentTeam == Team.White) ? 0 : GameBoard.GetLength(1) - 1;
+                // I've opted to start white at row 0.
+                int mainRow = (currentTeam == Team.White) ? 0 : GameBoard.GetUpperBound(0);
 
                 var pawnPiece = new ChessPiece(PieceType.Pawn, new Coords(pawnRow, columnIndex), currentTeam);
                 var specialPiece = new ChessPiece(currentPiece, new Coords(mainRow, columnIndex), currentTeam);
@@ -77,8 +90,14 @@ public class GameEnvironment
 
                 if (currentPiece == PieceType.King)
                 {
-                    if (currentTeam == Team.White) _whiteKing = GameBoard[mainRow, columnIndex]!;
-                    else _blackKing = GameBoard[mainRow, columnIndex]!;
+                    if (currentTeam == Team.White)
+                    {
+                        _whiteKing = specialPiece;
+                    }
+                    else
+                    {
+                        _blackKing = specialPiece;
+                    }
                 }
             }
         }
@@ -88,7 +107,7 @@ public class GameEnvironment
     /// <summary>
     /// Determine if a given space is empty or not.
     /// </summary>
-    /// <returns>A boolean value that represents  if a null value exists at a certain location within the current game.</returns >
+    /// <returns>A boolean value that represents  if a null value exists at a certain location within the current game.</returns>
     public bool IsSpaceEmpty(int row, int column)
     {
         return GameBoard[row, column] == null;
@@ -113,11 +132,16 @@ public class GameEnvironment
             }
         }
     }
-
-    public bool IsKingChecked(ChessPiece kingToCheck, Dictionary<Team, Vector2[]> possibleMoves)
+    /// <summary>
+    /// Determines if a given king is checked based on opponent moves.
+    /// </summary>
+    /// <returns>A boolean value for whether or not a king is checked.</returns>
+    public static bool IsKingChecked(ChessPiece kingToCheck, Dictionary<Team, Vector2[]> possibleMoves)
     {
+        Team oppositeTeam = kingToCheck.PieceTeam == Team.White ? Team.Black : Team.White;
+
         List<Vector2> opposingChecks =
-                (from oppositeMoves in possibleMoves[kingToCheck.PieceTeam == Team.White ? Team.Black : Team.White]
+                (from oppositeMoves in possibleMoves[oppositeTeam]
                  where oppositeMoves.Equals(kingToCheck.currentLocation)
                  select oppositeMoves).ToList();
 
@@ -130,10 +154,10 @@ public class GameEnvironment
     /// <returns>A boolean represntation for if a given king is check-mated.</returns>
     public bool IsKingCheckMated(ChessPiece kingToCheck, Dictionary<Team, Vector2[]> possibleMoves)
     {
-        // It isn't possible to be checkmated without being in check.
+        // It isn't possible to be checkmated without being in check first.
         if (!IsKingChecked(kingToCheck, possibleMoves)) return false;
 
-        ChessPiece?[,] mainBoardCopy = CopyBoard();
+        ChessPiece[,] mainBoardCopy = CopyBoard();
         // Determine if there are any moves that can be done to prevent the current check.
         foreach (var friendlyChessPiece in _teamPieces[kingToCheck.PieceTeam])
         {
@@ -144,37 +168,49 @@ public class GameEnvironment
             friendlyChessPiece.currentLocation.CopyTo(originalPosition);
 
             foreach (Vector2 movement in movesAvailableToQueriedPiece)
-            {
-                ChangePieceLocation(mainBoardCopy, movement, friendlyChessPiece);
+            {   // Move the piece within the board and check if the king is still checked.
+                ChangePieceLocation(mainBoardCopy, movement, friendlyChessPiece, movementHasBeenFinalized: false);
 
                 if (!IsKingChecked(kingToCheck, AllPossibleMovesPerTeam(mainBoardCopy)))
                 {
                     return false;
                 }
             }
-            ChangePieceLocation(mainBoardCopy, new Vector2(originalPosition[0], originalPosition[1]), friendlyChessPiece);
+            // Move the piece back to its original position.
+            ChangePieceLocation(mainBoardCopy, new Vector2(originalPosition[0], originalPosition[1]), friendlyChessPiece, movementHasBeenFinalized: false);
         }
-
+        // Previous checks have failed. Return true.
         return true;
     }
+    /// <summary>
+    /// When given a 2D ChessPiece array, copy any objects to a new array.
+    /// </summary>
+    /// <returns> A ChessPiece[,] array that contains a copy of every ChessPiece.</returns>
     private ChessPiece[,] CopyBoard()
     {
-        ChessPiece[,] copy2d = new ChessPiece[8, 8];
+        int arrayRowCount = GameBoard.GetUpperBound(0) + 1;
+        int arrayColumnCount = GameBoard.GetUpperBound(1) + 1;
 
-        for (int row = 0; row < GameBoard.GetLength(0); row++)
+        ChessPiece[,] copy2d = new ChessPiece[arrayRowCount, arrayColumnCount];
+
+        for (int row = 0; row < arrayRowCount; row++)
         {
-            for (int column = 0; row < GameBoard.GetLength(1); column++)
+            for (int column = 0; row < arrayColumnCount; column++)
             {
-                copy2d[row, column] = GameBoard[row, column]!.Copy();
+                if (GameBoard[row, column] != null)
+                {
+                    copy2d[row, column] = GameBoard[row, column]!.Copy();
+                }
             }
         }
         return copy2d;
     }
+
     /// <summary>
     /// Generates an array of Vectors represnting all moves for a given team.
     /// </summary>
     /// <returns>A dictionary of possible moves keyed to a team.</returns>
-    public Dictionary<Team, Vector2[]> AllPossibleMovesPerTeam(ChessPiece?[,] queriedBoard)
+    public static Dictionary<Team, Vector2[]> AllPossibleMovesPerTeam(ChessPiece?[,] queriedBoard)
     {
         var availableTeams = new Team[] { Team.Black, Team.White };
 
@@ -189,7 +225,7 @@ public class GameEnvironment
             {
                 if (chessPiece != null && !chessPiece.Captured && chessPiece.PieceTeam == queriedTeam)
                 {
-                    teamMoves.Add(chessPiece.AvailableMoves(GameBoard));
+                    teamMoves.Add(chessPiece.AvailableMoves(queriedBoard!));
                 }
             }
 
@@ -201,6 +237,7 @@ public class GameEnvironment
         }
         return currentlyAvailableMoves;
     }
+
     private void DesignatePieceAsCaptured(ChessPiece chessItem)
     {
         chessItem.Captured = true;
@@ -208,9 +245,13 @@ public class GameEnvironment
         GameBoard[(int)chessItem.currentLocation.X, (int)chessItem.currentLocation.Y] = null;
     }
     /// <summary>
-    /// Removes chess piece from the board and replaces or moves it.
+    /// Replaces or moves ChessPiece object within a given chess board.
     /// </summary>
-    private static void ChangePieceLocation(ChessPiece?[,] queriedBoard, Vector2 newLocation, ChessPiece pieceToChange)
+    /// <param name ="queriedBoard">2D nullable ChessPiece array.</param>
+    /// <param name ="newLocation">Vector2 object that contains the location to move the piece to.</param>
+    /// <param name ="pieceToChange">ChessPiece object to be moved within the <paramref name="queriedBoard"/> array.</param>
+    /// <param name ="movementHasBeenFinalized">Boolean value that tells the code that this movemnet has been finalized and passes all checks.</param>
+    public static void ChangePieceLocation(ChessPiece?[,] queriedBoard, Vector2 newLocation, ChessPiece pieceToChange, bool movementHasBeenFinalized)
     {
 
         int oldRowCoord = (int)pieceToChange.currentLocation.X;
@@ -222,11 +263,11 @@ public class GameEnvironment
             int newColumnCoord = (int)newLocation.Y;
 
             queriedBoard[oldRowCoord, oldColumnCoord] = null;
-
             queriedBoard[newRowCoord, newColumnCoord] = pieceToChange;
 
             pieceToChange.currentLocation = newLocation;
 
+            if (movementHasBeenFinalized) pieceToChange.IncreaseMovemntCount();
         }
         else
         {
@@ -235,5 +276,4 @@ public class GameEnvironment
         }
 
     }
-
 }
