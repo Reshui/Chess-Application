@@ -63,6 +63,7 @@ public class ChessPiece
                 directions = PawnDirectionVectors();
                 break;
             case PieceType.Knight:
+                // L shaped movement.
                 directions = KnightDirectionVectors();
                 break;
             case PieceType.Bishop:
@@ -102,21 +103,16 @@ public class ChessPiece
                 bool enterBishop = (Piece == PieceType.Bishop) && (horizontalScalar != 0 && verticalScalar != 0);
 
                 // Exclude the current space.
-                if (!(horizontalScalar == 0 & verticalScalar == 0) && (enterBishop || enterRook || defaultEntry))
+                if (!(horizontalScalar == 0 && verticalScalar == 0) && (enterBishop || enterRook || defaultEntry))
                 {
                     directions.Add(new Vector2(horizontalScalar, verticalScalar));
 
-                    if (Piece == PieceType.King && verticalScalar == 0)
-                    {   // This vector will allow the king to castle.
-                        directions.Add(new Vector2(2 * horizontalScalar, verticalScalar));
+                    if (Piece == PieceType.King && verticalScalar == 0 && horizontalScalar!=0)
+                    {   // This vector will allow the king to castle in either direction.
+                        directions.Add(new Vector2( verticalScalar, 2 * horizontalScalar));
                     }
                 }
             }
-        }
-
-        if (Piece == PieceType.King)
-        {
-            directions.Add(new Vector2(2, 0));
         }
 
         return directions;
@@ -166,21 +162,25 @@ public class ChessPiece
         if (piecetoCompare is null) return false;
         return this.PieceTeam != piecetoCompare.PieceTeam;
     }
+
     /// <summary>
-    /// Determine the available moves for a given chess piece.
+    /// Determine the available moves for a given chess piece. Moves that will place a friendly king in check will be filtered.
     /// </summary>
     /// <returns> Returns a List(Vector2) object of available movements/attacks for a given chess piece.</returns>
-    public List<Vector2> AvailableMoves(ChessPiece[,] gameBoard, bool kingIsChecked = false)
+    /// <param name="ignoreChecks">If true then checking to see if this piece's movements will unintenionally create a check on a friendly king.</param>
+    public List<Vector2> AvailableMoves(ChessPiece?[,] gameBoard, bool ignoreChecks)
     {
         var moves = new List<Vector2>();
         bool spaceIsEmpty = true;
         bool canAttackSquare = false;
+        bool kingIsChecked = false;
 
         foreach (Vector2 movementVector in directionVectors)
         {
             // If this is a castling vector determine if castling is possible.
-            if (Piece == PieceType.King && Math.Abs(movementVector.Y) > 1)
-            {   // First ensure that the king hasn't been moved and isn't in check.
+            if (this.Piece == PieceType.King && Math.Abs(movementVector.Y) > 1)
+            {
+                // A castleDirection of -1 means that it is towards the left side of the board.
                 int castleDirection = movementVector.Y < 0 ? -1 : 1;
                 int friendlySpecialLine = PieceTeam == Team.White ? 0 : gameBoard.GetUpperBound(0);
 
@@ -188,47 +188,50 @@ public class ChessPiece
 
                 ChessPiece? pairedRook = gameBoard[friendlySpecialLine, rookColumn];
 
+                // Ensure that the king hasn't been moved and isn't already in check.
                 if (this._timesMoved == 0 && !kingIsChecked && pairedRook != null && pairedRook._timesMoved == 0)
                 {   // Now check to make sure that all spaces between the king and that rook are clear.
-                    int lesserColumnIndex = Math.Min(castleDirection, (int)this.currentLocation.Y);
-                    int greaterColumnIndex = Math.Max(castleDirection, (int)this.currentLocation.Y);
-                    bool piecesInTheWay = false;
+                    int lesserColumnIndex = Math.Min(rookColumn, (int)this.currentLocation.Y);
+                    int greaterColumnIndex = Math.Max(rookColumn, (int)this.currentLocation.Y);
+                    bool squaresBetweenKingAndRookNotNull = false;
 
-                    for (int columnIndex = lesserColumnIndex + 1; columnIndex <= greaterColumnIndex - 1; columnIndex++)
-                    {
+                    for (int columnIndex = lesserColumnIndex + 1; columnIndex < greaterColumnIndex; columnIndex++)
+                    {   // Checking that squares between the king and rook are empty.
                         if (gameBoard[friendlySpecialLine, columnIndex] != null)
                         {
-                            piecesInTheWay = true;
+                            squaresBetweenKingAndRookNotNull = true;
                             break;
                         }
                     }
-                    if (piecesInTheWay) continue;
-                    // Now check if the king would be moving into check at either of the squares it would need to move through. 
-                    float[] originalKingLocation = new float[2];
-                    this.currentLocation.CopyTo(originalKingLocation);
-                    // There are 3 positions to check.
 
-                    Vector2 singleSquareMovement = new Vector2(0, castleDirection);
+                    if (squaresBetweenKingAndRookNotNull) continue;
 
-                    var movement = this.currentLocation;
                     bool cannotCastleInThisDirection = false;
 
-                    for (int i = 1; i <= 3; i++)
+                    if (!ignoreChecks)
                     {
-                        var movementScaled = Vector2.Multiply(singleSquareMovement, i);
-                        movement = Vector2.Add(movement, movementScaled);
+                        // Vector: move 1 square towards the selected pawn.
+                        Vector2 singleSquareMovement = new Vector2(0, castleDirection);
+                        // Initialize at the current location.
+                        Vector2 movement = this.currentLocation;
 
-                        GameEnvironment.ChangePieceLocation(gameBoard, movement, this, movementHasBeenFinalized: false);
+                        //float[] originalPosition = new float[2];
+                        //movement.CopyTo(originalPosition);
 
-                        Dictionary<Team, Vector2[]> possibleMoves = GameEnvironment.AllPossibleMovesPerTeam(gameBoard);
-
-                        if (GameEnvironment.IsKingChecked(this, possibleMoves))
+                        // Ensure that the King will not be moving into or through check.
+                        for (int i = 0; i < 2; i++)
                         {
-                            cannotCastleInThisDirection = true;
-                            break;
+                            movement = Vector2.Add(movement, singleSquareMovement);
+
+                            if (GameEnvironment.WillChangeResultInFriendlyCheck(this, movement, gameBoard))
+                            {
+                                cannotCastleInThisDirection = true;
+                                break;
+                            }
                         }
+                        //this.currentLocation = new Vector2(originalPosition[0], originalPosition[1]);
+
                     }
-                    GameEnvironment.ChangePieceLocation(gameBoard, new Vector2(originalKingLocation[0], originalKingLocation[1]), this, movementHasBeenFinalized: false);
 
                     if (!cannotCastleInThisDirection)
                     {
@@ -236,50 +239,57 @@ public class ChessPiece
                     }
 
                 }
-                continue;
             }
-
-            for (float i = 1; i < 8; i++)
-            {   // This loop serves the purpose of calculating possible movements for pieces that can move multiple squares in a given direction.
+            else
+            {
+                // This loop serves the purpose of calculating possible movements for pieces that can move multiple squares in a given direction.
                 // Loop at most 7 times to account for any piece moving across the board.
                 // Start at 1 for multiplication purposes.
-                var movementScaled = Vector2.Multiply(movementVector, i);
-                var movement = Vector2.Add(currentLocation, movementScaled);
+                for (float i = 1; i < 8; i++)
+                {  
+                    var movementScaled = Vector2.Multiply(movementVector, i);
+                    var movement = Vector2.Add(currentLocation, movementScaled);
 
-                int xCoord = (int)movement.X;
-                int yCoord = (int)movement.Y;
-
-                if (xCoord is >= 0 and <= 7 && yCoord is >= 0 and <= 7)
-                {
-                    spaceIsEmpty = gameBoard[xCoord, yCoord] == null;
-                    canAttackSquare = this.CanAttackSquare(gameBoard[xCoord, yCoord]);
-                    bool disableDiagonalMovement = false;
-
-                    if (Piece == PieceType.Pawn)
+                    int xCoord = (int)movement.X;
+                    int yCoord = (int)movement.Y;
+                    // If coordinate isnt ot of bounds on the chess board then propagate the vector.
+                    if (xCoord is >= 0 and <= 7 && yCoord is >= 0 and <= 7)
                     {
-                        if (movementVector.Y == 0)
-                        {   // Disable attacking to the front.
-                            canAttackSquare = false;
+                        spaceIsEmpty = gameBoard[xCoord, yCoord] == null;
+                        canAttackSquare = this.CanAttackSquare(gameBoard[xCoord, yCoord]);
+                        bool disableDiagonalMovement = false;
+
+                        bool validMovement = ignoreChecks || !GameEnvironment.WillChangeResultInFriendlyCheck(this, movement, gameBoard);
+
+                        if (Piece == PieceType.Pawn)
+                        {
+                            if (movementVector.Y == 0)
+                            {   // Disable attacking to the front.
+                                canAttackSquare = false;
+                            }
+                            else
+                            {   // Ignore moving to diagonals if nothing to attack
+                                disableDiagonalMovement = true;
+                            }
+                            // Disable the starting move of moving 2 spaces forward if the pawn has already been moved.
+                            if (Math.Abs(movementVector.X) == 2 & _timesMoved > 0) break;
                         }
-                        else
-                        {   // Ignore moving to diagonals if nothing to attack
-                            disableDiagonalMovement = true;
+
+                        if (validMovement && ((spaceIsEmpty & !disableDiagonalMovement) || canAttackSquare))
+                        {
+                            moves.Add(movement);
                         }
-                        // Disable the starting move of moving 2 spaces forward if the pawn has already been moved.
-                        if (Math.Abs(movementVector.X) == 2 & _timesMoved > 0) break;
+
+                        if (!spaceIsEmpty || !_canMoveAcrossBoard || !validMovement)
+                        {
+                            break;
+                        }
                     }
-
-                    if ((spaceIsEmpty & !disableDiagonalMovement) || canAttackSquare) moves.Add(movement);
-
-                    if (!spaceIsEmpty || !_canMoveAcrossBoard)
+                    else
                     {
+                        // Further multiplication of the vector will result in out of bounds values.
                         break;
                     }
-                }
-                else
-                {
-                    // Further multiplication of the vector will result in out of bounds values.
-                    break;
                 }
             }
         }
@@ -297,7 +307,6 @@ public class ChessPiece
 
     public void PromotePawn()
     {
-
         // Get user to select what type of chess piece they want.
 
         directionVectors = DetermineDirectionVectors();
