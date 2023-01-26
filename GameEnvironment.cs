@@ -1,4 +1,6 @@
 namespace Pieces;
+
+using System.Net.NetworkInformation;
 using System.Numerics;
 using System.Timers;
 
@@ -9,8 +11,8 @@ public class GameEnvironment
     private ChessPiece _whiteKing;
     private ChessPiece _blackKing;
 
-    private Player _whitePlayer;
-    private Player _blackPlayer;
+    public Player WhitePlayer;
+    public Player BlackPlayer;
 
     private Dictionary<Team, List<ChessPiece>> _teamPieces;
 
@@ -23,13 +25,18 @@ public class GameEnvironment
     public GameEnvironment(Player playerOne, Player playerTwo)
     {
         _teamPieces = GenerateBoard();
+
         var playerList = new List<Player> { playerOne, playerTwo };
         var rf = new Random();
-
         int playerID = rf.Next(1);
-        _whitePlayer = playerList[playerID];
+        WhitePlayer = playerList[playerID];
         playerID = playerID == 0 ? 1 : 0;
-        _blackPlayer = playerList[playerID];
+        BlackPlayer = playerList[playerID];
+
+        WhitePlayer.CurrentTeam = Team.White;
+        BlackPlayer.CurrentTeam = Team.Black;
+
+
 
         _whiteKing = AssignKing(Team.White);
         _blackKing = AssignKing(Team.Black);
@@ -153,9 +160,9 @@ public class GameEnvironment
 
                 Vector2 vectorDirection = new Vector2(verticalScalar, horizontalScalar);
                 // Propagate the vector at most 7 times to get from the current space to the opposite side of the board.
-                for (int i = 1; i < 8; i++)
+                for (int propagationCount = 1; propagationCount < 8; propagationCount++)
                 {
-                    var locationToCheck = Vector2.Add(queriedKing.currentLocation, Vector2.Multiply(vectorDirection, i));
+                    var locationToCheck = Vector2.Add(queriedKing.currentLocation, Vector2.Multiply(vectorDirection, propagationCount));
                     int rowCoord = (int)locationToCheck.X;
                     int columnCoord = (int)locationToCheck.Y;
 
@@ -172,8 +179,8 @@ public class GameEnvironment
                                 // Certain captures are only available to specific combinations of vector scalars and piece types.
                                 bool enemyRookFound = pieceType == PieceType.Rook && (horizontalScalar == 0 || verticalScalar == 0);
                                 bool enemyBishopFound = pieceType == PieceType.Bishop && (horizontalScalar != 0 && verticalScalar != 0);
-                                bool enemyPawnFound = pieceType == PieceType.Pawn && (horizontalScalar != 0 && verticalScalar != 0) && ((kingRow > rowCoord && piece.PieceTeam == Team.White) || (kingRow < rowCoord && piece.PieceTeam == Team.Black));
-                                bool enemyQueenOrKingFound = pieceType == PieceType.Queen|| (pieceType == PieceType.King && i == 1);
+                                bool enemyPawnFound = pieceType == PieceType.Pawn && propagationCount == 1 && (horizontalScalar != 0 && verticalScalar != 0) && ((kingRow > rowCoord && piece.PieceTeam == Team.White) || (kingRow < rowCoord && piece.PieceTeam == Team.Black));
+                                bool enemyQueenOrKingFound = pieceType == PieceType.Queen || (pieceType == PieceType.King && propagationCount == 1);
 
                                 if (enemyBishopFound || enemyQueenOrKingFound || enemyPawnFound || enemyRookFound)
                                 {
@@ -196,18 +203,17 @@ public class GameEnvironment
         foreach (var knightVector in ChessPiece.KnightDirectionVectors())
         {
             var locationToCheck = Vector2.Add(queriedKing.currentLocation, knightVector);
-            try
+
+            int row = (int)locationToCheck.X, column = (int)locationToCheck.Y;
+
+            if ((row is >= 0 and <= 7) && (column is >= 0 and <= 7))
             {
-                ChessPiece? piece = board[(int)locationToCheck.X, (int)locationToCheck.Y];
+                ChessPiece? piece = board[row, column];
 
                 if (piece != null && piece.PieceTeam != queriedKing.PieceTeam && piece.ReturnPieceType() == PieceType.Knight)
                 {
                     return true;
                 }
-            }
-            catch (IndexOutOfRangeException)
-            {
-
             }
         }
         return false;
@@ -242,41 +248,32 @@ public class GameEnvironment
     /// Determins if the king is checked and if so, determines if any move can undo the check.
     /// </summary>
     /// <returns>A boolean represntation for if a given king is check-mated.</returns>
-    public bool IsKingCheckMated(ChessPiece kingToCheck, Dictionary<ChessPiece, List<MovementInformation>> opposingMoves)
+    /// <param name ="kingToCheck">ChessPiece object of type King for which this function is executed against.</param>
+    public bool IsKingCheckMated(ChessPiece kingToCheck)
     {
         // It isn't possible to be checkmated without being in check first.
         if (!IsKingChecked(kingToCheck, GameBoard)) return false;
 
         ChessPiece?[,] mainBoardCopy = CopyBoard(GameBoard);
-        Team oppositeTeam = kingToCheck.PieceTeam == Team.White ? Team.Black : Team.White;
 
         // Determine if there are any moves that can be done to prevent the current check.
         foreach (var friendlyChessPiece in _teamPieces[kingToCheck.PieceTeam])
         {
-            // ignoreFriendlyInducedChecks: true  to avoid recursive stack overflow. King is already in check. Generate a list of all available moves. 
-            List<MovementInformation> movesAvailableToQueriedPiece = friendlyChessPiece.AvailableMoves(mainBoardCopy, ignoreFriendlyInducedChecks: true, disableCastling: true);
-            // Move the piece within the board and check if the king is still checked.
-            foreach (var movement in movesAvailableToQueriedPiece)
+            if (friendlyChessPiece.Captured == false)
             {
-                ChangePieceLocation(mainBoardCopy, movement, movementHasBeenFinalized: false);
-
-                if (!IsKingChecked(kingToCheck, mainBoardCopy))
+                // ignoreFriendlyInducedChecks: true  to avoid recursive stack overflow. King is already in check. Generate a list of all available moves. 
+                List<MovementInformation> movesAvailableToQueriedPiece = friendlyChessPiece.AvailableMoves(mainBoardCopy, ignoreFriendlyInducedChecks: true, disableCastling: true);
+                // Move the piece within the board and check if the king is still checked.
+                foreach (var movement in movesAvailableToQueriedPiece)
                 {
-                    return false;
-                }
+                    ChangePieceLocation(mainBoardCopy, movement, movementHasBeenFinalized: false);
 
-                mainBoardCopy[movement.MainPiece.ReturnLocation(0), movement.MainPiece.ReturnLocation(1)] = movement.MainPiece.Copy();
-
-                mainBoardCopy[(int)movement.MainNewLocation.X, (int)movement.MainNewLocation.Y] = null;
-
-                if (movement.SecondaryPiece != null)
-                {
-                    mainBoardCopy[movement.SecondaryPiece.ReturnLocation(0), movement.SecondaryPiece.ReturnLocation(1)] = movement.SecondaryPiece.Copy();
-                    // If this is a castling vector.
-                    if (!Vector2.Equals(movement.SecondaryNewLocation, ChessPiece.DefaultLocation))
+                    if (!IsKingChecked(kingToCheck, mainBoardCopy))
                     {
-                        mainBoardCopy[(int)movement.SecondaryNewLocation.X, (int)movement.SecondaryNewLocation.Y] = null;
+                        return false;
                     }
+
+                    UndoChange(movement, mainBoardCopy);
                 }
             }
 
@@ -362,7 +359,7 @@ public class GameEnvironment
 
             secondaryOnBoard.currentLocation = movementDetails.SecondaryNewLocation;
 
-            if (!Vector2.Equals(movementDetails.SecondaryNewLocation, ChessPiece.DefaultLocation))
+            if (movementDetails.CapturingSecondary == false)
             {
                 queriedBoard[(int)movementDetails.SecondaryNewLocation.X, (int)movementDetails.SecondaryNewLocation.Y] = secondaryOnBoard;
             }
@@ -385,9 +382,45 @@ public class GameEnvironment
         }
 
     }
+    private static void UndoChange(MovementInformation move, ChessPiece?[,] board)
+    {
+        ChessPiece? pieceOne = board[(int)move.MainNewLocation.X, (int)move.MainNewLocation.Y];
+        board[pieceOne!.ReturnLocation(0), pieceOne.ReturnLocation(1)] = null;
+        board[move.MainPiece.ReturnLocation(0), move.MainPiece.ReturnLocation(1)] = pieceOne;
+        pieceOne.currentLocation = move.MainPiece.currentLocation;
+
+        if (move.CastlingWithSecondary)
+        {
+            ChessPiece? pieceTwo = board[(int)move.SecondaryNewLocation.X, (int)move.SecondaryNewLocation.Y];
+            board[pieceTwo!.ReturnLocation(0), pieceTwo.ReturnLocation(1)] = null;
+
+            board[move.SecondaryPiece!.ReturnLocation(0), move.SecondaryPiece.ReturnLocation(1)] = pieceTwo;
+            pieceTwo!.currentLocation = move.SecondaryPiece.currentLocation;
+        }
+        else if (move.CapturingSecondary)
+        {
+            board[(int)move.MainNewLocation.X, (int)move.MainNewLocation.Y] = move.SecondaryPiece!.Copy();
+        }
+    }
     private void PrintBoard()
     {
 
+    }
+    public void SubmitChange(MovementInformation newMove)
+    {
+        if (newMove.EnPassantCapturePossible) newMove.MainPiece.EnableEnPassantCaptures();
+
+        ChangePieceLocation(this.GameBoard, newMove, true);
+    }
+    /// <summary>
+    /// This method is run whenever a player regains control of which piece is moved.
+    /// </summary>
+    public void DisablePlayerVulnerabilityToEnPassant(Team teamColor)
+    {
+        foreach ( var chessPiece in _teamPieces[teamColor])
+        {
+            chessPiece.DisableEnPassantCaptures();
+        }
     }
 
 }

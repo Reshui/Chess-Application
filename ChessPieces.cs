@@ -25,19 +25,25 @@ public struct Coords
 
 public readonly struct MovementInformation
 {
-    public MovementInformation(ChessPiece mainPiece, ChessPiece? secondaryPiece, Vector2 mainNewLocation, Vector2 secondaryNewLocation, bool enPassantCapturePossible)
-    {
+    public MovementInformation(ChessPiece mainPiece, ChessPiece? secondaryPiece, Vector2 mainNewLocation, Vector2 secondaryNewLocation, bool enPassantCapturePossible, bool capturingSecondary, bool castlingWithSecondary)
+    {//capturingSecondaryViaEnPassant
         SecondaryPiece = secondaryPiece;
         MainPiece = mainPiece;
         MainNewLocation = mainNewLocation;
         SecondaryNewLocation = secondaryNewLocation;
         EnPassantCapturePossible = enPassantCapturePossible;
+        CapturingSecondary = capturingSecondary;
+        CastlingWithSecondary = castlingWithSecondary;
+        //CapturingSecondaryViaEnPassant = capturingSecondaryViaEnPassant;
     }
     public ChessPiece MainPiece { get; init; }
     public ChessPiece? SecondaryPiece { get; init; }
     public Vector2 MainNewLocation { get; init; }
     public Vector2 SecondaryNewLocation { get; init; }
     public bool EnPassantCapturePossible { get; init; }
+    public bool CapturingSecondary { get; init; }
+    public bool CastlingWithSecondary { get; init; }
+    //public bool CapturingSecondaryViaEnPassant { get; init; }
 }
 
 public class ChessPiece
@@ -198,12 +204,12 @@ public class ChessPiece
     /// </summary>
     /// <returns> Returns a List(Vector2) object of available movements/attacks for a given chess piece.</returns>
     /// <param name="ignoreFriendlyInducedChecks">If true then checking to see if this piece's movements will unintenionally create a check on a friendly king are ignored.</param>
-    public List<MovementInformation> AvailableMoves(ChessPiece?[,] gameBoard, bool ignoreFriendlyInducedChecks,bool disableCastling)
+    public List<MovementInformation> AvailableMoves(ChessPiece?[,] gameBoard, bool ignoreFriendlyInducedChecks, bool disableCastling)
     {
         var moves = new List<MovementInformation>();
         bool spaceIsEmpty;
         //bool kingIsChecked = false;
-        
+
         foreach (Vector2 movementVector in directionVectors)
         {
             // If this is a castling vector determine if castling is possible.
@@ -211,10 +217,11 @@ public class ChessPiece
             {
                 // A castleDirection of -1 means that it is towards the left side of the board.
                 int castleDirection = movementVector.Y < 0 ? -1 : 1;
+                // Row that pieces like the King or Queen are originally placed on.
                 int friendlySpecialLine = PieceTeam == Team.White ? 0 : gameBoard.GetUpperBound(0);
                 Team opposingTeam = PieceTeam == Team.White ? Team.Black : Team.White;
 
-                bool kingIsChecked =  GameEnvironment.IsKingChecked(this, gameBoard);
+                bool kingIsChecked = GameEnvironment.IsKingChecked(this, gameBoard);
 
                 int rookColumn = castleDirection == -1 ? 0 : gameBoard.GetUpperBound(1);
 
@@ -239,12 +246,7 @@ public class ChessPiece
                     if (squaresBetweenKingAndRookNotNull) continue;
 
                     bool cannotCastleInThisDirection = false;
-
-                    Vector2 newRookLocation = this.currentLocation;
-                    newRookLocation.Y += castleDirection;
-
-                    var moveInfo = new MovementInformation(this, pairedRook, movementVector, newRookLocation, false);
-
+                    
                     if (!ignoreFriendlyInducedChecks)
                     {
                         Vector2 singleSquareMovement = new Vector2(0, castleDirection);
@@ -256,7 +258,7 @@ public class ChessPiece
                         {
                             movement = Vector2.Add(movement, singleSquareMovement);
 
-                            var singleSquareMovementInfo = new MovementInformation(this, null, movement, DefaultLocation, false);
+                            var singleSquareMovementInfo = new MovementInformation(this, null, movement, DefaultLocation, false, capturingSecondary: false, castlingWithSecondary: false);
 
                             if (GameEnvironment.WillChangeResultInFriendlyCheck(singleSquareMovementInfo, gameBoard))
                             {
@@ -268,6 +270,11 @@ public class ChessPiece
 
                     if (!cannotCastleInThisDirection)
                     {
+                        var newKingLocation = Vector2.Add(this.currentLocation, new Vector2(0, 2 * castleDirection));
+                        var newRookLocation = Vector2.Add(this.currentLocation, new Vector2(0, castleDirection));
+
+                        var moveInfo = new MovementInformation(this, pairedRook, newKingLocation, newRookLocation, false, capturingSecondary: false, castlingWithSecondary: true);
+
                         moves.Add(moveInfo);
                     }
                 }
@@ -319,7 +326,7 @@ public class ChessPiece
                                     if (captureablePawn != null && captureablePawn._pieceType == PieceType.Pawn
                                     && captureablePawn._enPassantCapturePossible == true)
                                     {
-                                        var enPassantCapture = new MovementInformation(this, captureablePawn, calculatedPosition, DefaultLocation, movementWillExposeToEnPassant);
+                                        var enPassantCapture = new MovementInformation(this, captureablePawn, calculatedPosition, DefaultLocation, movementWillExposeToEnPassant, capturingSecondary: true, castlingWithSecondary: false);
 
                                         if (ignoreFriendlyInducedChecks || !GameEnvironment.WillChangeResultInFriendlyCheck(enPassantCapture, gameBoard))
                                         {
@@ -334,7 +341,7 @@ public class ChessPiece
 
                         if ((spaceIsEmpty && !disablePawnDiagonalWithoutEnemy) || canAttackSquare)
                         {
-                            var moveInfo = new MovementInformation(this, captureablePiece, calculatedPosition, DefaultLocation, movementWillExposeToEnPassant);
+                            var moveInfo = new MovementInformation(this, captureablePiece, calculatedPosition, DefaultLocation, movementWillExposeToEnPassant, capturingSecondary: canAttackSquare, castlingWithSecondary: false);
 
                             validMovement = ignoreFriendlyInducedChecks || !GameEnvironment.WillChangeResultInFriendlyCheck(moveInfo, gameBoard);
 
@@ -380,10 +387,18 @@ public class ChessPiece
     {
         _timesMoved++;
     }
+    public void EnableEnPassantCaptures()
+    {
+        this._enPassantCapturePossible = true;
+    }
     public void DisableEnPassantCaptures()
     {
-        _enPassantCapturePossible = false;
+        this._enPassantCapturePossible = false;
     }
+    /// <summary>
+    /// Using the currentLocation property return an X or Y coordinate cast to an integer.
+    /// </summary>
+    /// <returns>An integer between 0 and 7.</returns>
     public int ReturnLocation(int dimension)
     {
         if (dimension == 0)
@@ -401,6 +416,38 @@ public class ChessPiece
     public PieceType ReturnPieceType()
     {
         return _pieceType;
+    }
+    public string ReturnPieceTypeName()
+    {
+        string methodValue;
+
+        switch (_pieceType)
+        {
+            case PieceType.King:
+                methodValue = "King";
+                break;
+            case PieceType.Pawn:
+                methodValue = "Pawn";
+                break;
+            case PieceType.Rook:
+                methodValue = "Rook";
+                break;
+            case PieceType.Bishop:
+                methodValue = "Bishop";
+                break;
+            case PieceType.Knight:
+                methodValue = "Knight";
+                break;
+            case PieceType.Queen:
+                methodValue = "Queen";
+                break;
+            default:
+                methodValue = "Unknown";
+                break;
+        }
+
+        string teamDesignation = PieceTeam == Team.White ? "< W >" : "|||";
+        return methodValue += $"\n{teamDesignation}";
     }
 }
 
