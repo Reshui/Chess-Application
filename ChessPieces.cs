@@ -26,7 +26,7 @@ public struct Coords
 public readonly struct MovementInformation
 {
     public MovementInformation(ChessPiece mainPiece, ChessPiece? secondaryPiece, Vector2 mainNewLocation, Vector2 secondaryNewLocation, bool enPassantCapturePossible, bool capturingSecondary, bool castlingWithSecondary)
-    {//capturingSecondaryViaEnPassant
+    {
         SecondaryPiece = secondaryPiece;
         MainPiece = mainPiece;
         MainNewLocation = mainNewLocation;
@@ -34,7 +34,6 @@ public readonly struct MovementInformation
         EnPassantCapturePossible = enPassantCapturePossible;
         CapturingSecondary = capturingSecondary;
         CastlingWithSecondary = castlingWithSecondary;
-        //CapturingSecondaryViaEnPassant = capturingSecondaryViaEnPassant;
     }
     public ChessPiece MainPiece { get; init; }
     public ChessPiece? SecondaryPiece { get; init; }
@@ -43,7 +42,6 @@ public readonly struct MovementInformation
     public bool EnPassantCapturePossible { get; init; }
     public bool CapturingSecondary { get; init; }
     public bool CastlingWithSecondary { get; init; }
-    //public bool CapturingSecondaryViaEnPassant { get; init; }
 }
 
 public class ChessPiece
@@ -202,7 +200,7 @@ public class ChessPiece
     /// <summary>
     /// Determine the available moves for a given chess piece. Moves that will place a friendly king in check will be filtered.
     /// </summary>
-    /// <returns> Returns a List(Vector2) object of available movements/attacks for a given chess piece.</returns>
+    /// <returns>A List(MovementInformation) object of available movements/attacks for a given chess piece.</returns>
     /// <param name="ignoreFriendlyInducedChecks">If true then checking to see if this piece's movements will unintenionally create a check on a friendly king are ignored.</param>
     public List<MovementInformation> AvailableMoves(ChessPiece?[,] gameBoard, bool ignoreFriendlyInducedChecks, bool disableCastling)
     {
@@ -246,7 +244,7 @@ public class ChessPiece
                     if (squaresBetweenKingAndRookNotNull) continue;
 
                     bool cannotCastleInThisDirection = false;
-                    
+
                     if (!ignoreFriendlyInducedChecks)
                     {
                         Vector2 singleSquareMovement = new Vector2(0, castleDirection);
@@ -421,6 +419,8 @@ public class ChessPiece
     {
         string methodValue;
 
+        string teamDesignation = PieceTeam == Team.White ? "White" : "Black";
+
         switch (_pieceType)
         {
             case PieceType.King:
@@ -446,8 +446,8 @@ public class ChessPiece
                 break;
         }
 
-        string teamDesignation = PieceTeam == Team.White ? "< W >" : "|||";
-        return methodValue += $"\n{teamDesignation}";
+
+        return teamDesignation + "_" + methodValue;
     }
 }
 

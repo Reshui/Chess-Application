@@ -5,16 +5,15 @@ namespace Chess_GUi
 {
     public readonly struct OriginalBackColor
     {
-        public OriginalBackColor(Label square)
+        public OriginalBackColor(PictureBox square)
         {
             SquareChanged = square;
+            //OriginalImage = square.Image;
             OriginalColor = square.BackColor;
-            ForeColor = square.ForeColor;
         }
-        public Label SquareChanged { get; init; }
+        public PictureBox SquareChanged { get; init; }
+        //public Image? OriginalImage { get; init; }
         public Color OriginalColor { get; init; }
-        public Color ForeColor { get; init; }
-
     }
     public partial class Form1 : Form
     {
@@ -37,7 +36,7 @@ namespace Chess_GUi
 
             int squaresToCreate = _currentGame.GameBoard.GetUpperBound(0) + 1;
 
-            pictureSquares = new Label[squaresToCreate, squaresToCreate];
+            pictureSquares = new PictureBox[squaresToCreate, squaresToCreate];
 
             int squareLength = MainBoard.Width / squaresToCreate;
 
@@ -46,7 +45,9 @@ namespace Chess_GUi
 
             // Initialize as whiteColor so that the fisrt square made will be blackColor.
             Color squareColor = whiteColor;
-            int top = 0, left = 0;
+            int top = MainBoard.Height - squareLength, left = 0;
+
+            string imageFolder = Path.GetFullPath(@"..\..\..\Resources\");
 
             for (int row = 0; row < squaresToCreate; row++)
             {
@@ -56,15 +57,15 @@ namespace Chess_GUi
 
                     ChessPiece? currentPiece = _currentGame[row, column];
 
-                    pictureSquares[row, column] = new Label()
+                    pictureSquares[row, column] = new PictureBox()
                     {
                         Name = $"{row}{column}",
                         BackColor = squareColor,
                         Size = new Size(squareLength, squareLength),
                         Location = new Point(left, top),
                         Text = currentPiece != null ? currentPiece.ReturnPieceTypeName() : String.Empty,
-                        TextAlign = ContentAlignment.MiddleCenter,
-                        ForeColor = squareColor == blackColor ? Color.White : Color.Black
+                        Image = currentPiece == null ? null : Image.FromFile(imageFolder+ $"{currentPiece.ReturnPieceTypeName()}.jpg"),
+                        SizeMode = PictureBoxSizeMode.CenterImage
                     };
 
                     pictureSquares[row, column].Click += new EventHandler(this.SquareClickedEvent!);
@@ -74,7 +75,7 @@ namespace Chess_GUi
                     left += squareLength;
                 }
                 left = 0;
-                top += squareLength;
+                top -= squareLength;
                 // Alternate here so that the first square in the new row will be different than the one in the previous row.
                 squareColor = squareColor.Equals(whiteColor) ? blackColor : whiteColor;
             }
@@ -85,18 +86,18 @@ namespace Chess_GUi
             // First determine if a piece friendly to the player has been selected.
             // If not do nothing, Else display available moves.
 
-            if (this._resetSquareAssignments)
+            if (_resetSquareAssignments)
             {
-                this._targetSquare = null;
-                this._friendlySelectedSquare = null;
-                this._resetSquareAssignments = false;
+                _targetSquare = null;
+                _friendlySelectedSquare = null;
+                _resetSquareAssignments = false;
             }
 
-            var selectedSquare = sender as Label;
+            var selectedSquare = sender as PictureBox;
 
             string availableMovesHex = "#B7AEC5";
             string selectedSquareHex = "#D6B8FF";
-            // Label Name is a string containging the row and colrumn coordinates: {row}{column}
+            // PictureBox Name is a string containging the row and colrumn coordinates: {row}{column}
             int[] coords = (from cc in selectedSquare!.Name.ToCharArray()
                             select Int32.Parse(cc.ToString())).ToArray();
 
@@ -108,7 +109,7 @@ namespace Chess_GUi
                 if (_targetSquare != null)
                 {
                     // _set targetSquare to null so that it isn't changed unnecessarily by the if statemnt that changes squares back to the avalailbleMovesHex..
-                    this.TemporaryTextReversal();
+                    TemporaryTextReversal();
                     _targetSquare = null;
                 }
 
@@ -116,13 +117,11 @@ namespace Chess_GUi
 
                 _movesAvailableToPiece = selectedPiece.AvailableMoves(_currentGame.GameBoard, false, false);
 
+                ResetSquareColors();
                 // List of squares that can be moved to. 
                 _validSquares = (from move in _movesAvailableToPiece
                                  let labelName = $"{(int)move.MainNewLocation.X}{(int)move.MainNewLocation.Y}"
-                                 select MainBoard.Controls[labelName] as Label).ToList();
-
-                this.ResetSquareColors();
-
+                                 select MainBoard.Controls[labelName] as PictureBox).ToList();
 
                 // Create a list of structs that will be used to revert any changes in borderstyle or backColor.
                 _changedSquares = (from square in _validSquares
@@ -142,7 +141,7 @@ namespace Chess_GUi
 
                 ConfirmMove.Visible = false;
 
-                _friendlyText = _friendlySelectedSquare.Text;
+                _friendlyImage = _friendlySelectedSquare.Image;
 
             }
             else if (_validSquares.Contains(selectedSquare))
@@ -153,30 +152,28 @@ namespace Chess_GUi
                     _targetSquare.BackColor = ColorTranslator.FromHtml(availableMovesHex);
 
                     // Undo changes.
-                    if (_friendlySelectedSquare != null && _targetSquare != null)
+                    if (_friendlySelectedSquare != null)
                     {
-                        _targetSquare.Text = _targetText;
+                        _targetSquare.Image = _targetImage;
                     }
                 }
-
-                selectedSquare.BackColor = ColorTranslator.FromHtml(selectedSquareHex);
-
                 _targetSquare = selectedSquare;
 
-                _friendlySelectedSquare!.Text = string.Empty;
+                _targetSquare.BackColor = ColorTranslator.FromHtml(selectedSquareHex);
 
-                _targetText = _targetSquare.Text;
-                _targetSquare.Text = _friendlyText;
+                _friendlySelectedSquare!.Image = null;
+
+                _targetImage = _targetSquare.Image;
+                _targetSquare.Image = _friendlyImage;
 
                 ConfirmMove.Visible = true;
                 // Change label visuals.
             }
             else if (!selectedSquare.Equals(_friendlySelectedSquare))
-            {
+            {// An invalid square has been selected.
+                TemporaryTextReversal();
 
-                this.TemporaryTextReversal();
-
-                this.ResetSquareColors();
+                ResetSquareColors();
                 _resetSquareAssignments = true;
                 _validSquares.Clear();
                 ConfirmMove.Visible = false;
@@ -188,55 +185,57 @@ namespace Chess_GUi
 
             _resetSquareAssignments = true;
             _validSquares.Clear();
-            this.ResetSquareColors();
+            ResetSquareColors();
 
             // Get coordinates from selected square. Move has been validated if this event is available.
             int[] coords = (from cc in _targetSquare!.Name.ToCharArray()
                             select Int32.Parse(cc.ToString())).ToArray();
 
-            MovementInformation submitedMovement = (from cm in this._movesAvailableToPiece
+            MovementInformation submitedMovement = (from cm in _movesAvailableToPiece
                                                     let newSquareVector = new Vector2(coords[0], coords[1])
-                                                    where Vector2.Equals(cm.MainNewLocation, newSquareVector)
+                                                    where Equals(cm.MainNewLocation, newSquareVector)
                                                     select cm).First();
 
             if (submitedMovement.SecondaryPiece != null)
             {
-                int secondPieceRow = (int)submitedMovement.SecondaryPiece.ReturnLocation(0);
-                int secondPieceColumn = (int)submitedMovement.SecondaryPiece.ReturnLocation(1);
+                ChessPiece secondPiece = submitedMovement.SecondaryPiece;
+
+                int secondPieceRow = secondPiece.ReturnLocation(0);
+                int secondPieceColumn = secondPiece.ReturnLocation(1);
 
                 if (submitedMovement.CastlingWithSecondary)
                 {
                     int newColumn = (int)submitedMovement.SecondaryNewLocation.Y;
 
-                    pictureSquares[secondPieceRow, newColumn].Text = pictureSquares[secondPieceRow, secondPieceColumn].Text;
+                    pictureSquares[secondPieceRow, newColumn].Image = pictureSquares[secondPieceRow, secondPieceColumn].Image;
 
-                    pictureSquares[secondPieceRow, secondPieceColumn].Text = string.Empty;
+                    pictureSquares[secondPieceRow, secondPieceColumn].Image = null;
 
                 }
-                else if (submitedMovement.CapturingSecondary && !Vector2.Equals(submitedMovement.MainNewLocation, submitedMovement.SecondaryPiece.currentLocation))
+                else if (submitedMovement.CapturingSecondary && !Equals(submitedMovement.MainNewLocation, secondPiece.currentLocation))
                 {
-                    // En Passant Capture.
-                    pictureSquares[secondPieceRow, secondPieceColumn].Text = string.Empty;
+                    // En Passant Capture conditions met.
+                    pictureSquares[secondPieceRow, secondPieceColumn].Image = null;
                 }
             }
 
             // Send change to the GameEnviroment instance.
-            this._currentGame.SubmitChange(submitedMovement);
+            _currentGame.SubmitChange(submitedMovement);
 
             /// Change the _activePlayer variable and remove its vunerability to En Passant.
             Team newActivePlayerTeamColor;
 
             if (_activePlayer == _currentGame.WhitePlayer)
             {
-                this._activePlayer = _currentGame.BlackPlayer;
+                _activePlayer = _currentGame.BlackPlayer;
                 newActivePlayerTeamColor = Team.Black;
             }
             else
             {
-                this._activePlayer = _currentGame.WhitePlayer;
+                _activePlayer = _currentGame.WhitePlayer;
                 newActivePlayerTeamColor = Team.White;
             }
-            // Disable the newly active players vulnerability to En Passant.
+            // Disables the newly active players vulnerability to En Passant.
             _currentGame.DisablePlayerVulnerabilityToEnPassant(newActivePlayerTeamColor);
 
         }
@@ -250,12 +249,16 @@ namespace Chess_GUi
             {
                 squareInfo.SquareChanged.BackColor = squareInfo.OriginalColor;
                 squareInfo.SquareChanged.BorderStyle = BorderStyle.None;
+                //squareInfo.SquareChanged.Image = 
             }
         }
+        /// <summary>
+        /// Reverts _friendlySelectedSquare and _targetSquare text to their pre-clck values.
+        /// </summary>
         private void TemporaryTextReversal()
         {
-            if (_friendlySelectedSquare != null) _friendlySelectedSquare.Text = _friendlyText;
-            if (_targetSquare != null) _targetSquare.Text = _targetText;
+            if (_friendlySelectedSquare != null) _friendlySelectedSquare.Image = _friendlyImage;
+            if (_targetSquare != null) _targetSquare.Image = _targetImage;
         }
     }
 }
