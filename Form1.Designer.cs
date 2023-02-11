@@ -1,5 +1,4 @@
-﻿using System.Data.Common;
-using Pieces;
+﻿
 namespace Chess_GUi
 {
     partial class Form1
@@ -31,65 +30,72 @@ namespace Chess_GUi
         /// </summary>
         private void InitializeComponent()
         {
-            this.MainBoard = new System.Windows.Forms.Panel();
-            this.ConfirmMove = new System.Windows.Forms.Button();
+            this.flowLayoutPanel1 = new System.Windows.Forms.FlowLayoutPanel();
+            this.StartServer = new System.Windows.Forms.Button();
+            this.JoinServer = new System.Windows.Forms.Button();
+            this.MainView = new System.Windows.Forms.Panel();
             this.SuspendLayout();
             // 
-            // MainBoard
+            // flowLayoutPanel1
             // 
-            this.MainBoard.Location = new System.Drawing.Point(16, 15);
-            this.MainBoard.Name = "MainBoard";
-            this.MainBoard.Size = new System.Drawing.Size(640, 640);
-            this.MainBoard.TabIndex = 0;
+            this.flowLayoutPanel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.flowLayoutPanel1.Location = new System.Drawing.Point(0, 0);
+            this.flowLayoutPanel1.Name = "flowLayoutPanel1";
+            this.flowLayoutPanel1.Size = new System.Drawing.Size(187, 688);
+            this.flowLayoutPanel1.TabIndex = 0;
             // 
-            // ConfirmMove
+            // StartServer
             // 
-            this.ConfirmMove.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(153)))), ((int)(((byte)(218)))), ((int)(((byte)(56)))));
-            this.ConfirmMove.Location = new System.Drawing.Point(898, 157);
-            this.ConfirmMove.Name = "ConfirmMove";
-            this.ConfirmMove.Size = new System.Drawing.Size(322, 75);
-            this.ConfirmMove.TabIndex = 1;
-            this.ConfirmMove.Text = "Confirm Selection";
-            this.ConfirmMove.UseVisualStyleBackColor = false;
-            this.ConfirmMove.Visible = false;
+            this.StartServer.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(34)))), ((int)(((byte)(82)))), ((int)(((byte)(57)))));
+            this.StartServer.ForeColor = System.Drawing.Color.White;
+            this.StartServer.Location = new System.Drawing.Point(0, 0);
+            this.StartServer.Name = "StartServer";
+            this.StartServer.Size = new System.Drawing.Size(187, 50);
+            this.StartServer.TabIndex = 1;
+            this.StartServer.Text = "Start Server";
+            this.StartServer.UseVisualStyleBackColor = false;
+            // 
+            // JoinServer
+            // 
+            this.JoinServer.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(34)))), ((int)(((byte)(82)))), ((int)(((byte)(57)))));
+            this.JoinServer.ForeColor = System.Drawing.Color.White;
+            this.JoinServer.Location = new System.Drawing.Point(0, 50);
+            this.JoinServer.Name = "JoinServer";
+            this.JoinServer.Size = new System.Drawing.Size(187, 50);
+            this.JoinServer.TabIndex = 2;
+            this.JoinServer.Text = "Join Server";
+            this.JoinServer.UseVisualStyleBackColor = false;
+            // 
+            // MainView
+            // 
+            this.MainView.Location = new System.Drawing.Point(187, 0);
+            this.MainView.Name = "MainView";
+            this.MainView.Size = new System.Drawing.Size(1040, 688);
+            this.MainView.TabIndex = 3;
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.BackColor = System.Drawing.Color.SaddleBrown;
-            this.ClientSize = new System.Drawing.Size(1332, 686);
-            this.Controls.Add(this.ConfirmMove);
-            this.Controls.Add(this.MainBoard);
+            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(39)))), ((int)(((byte)(46)))), ((int)(((byte)(68)))));
+            this.ClientSize = new System.Drawing.Size(1432, 686);
+            this.Controls.Add(this.MainView);
+            this.Controls.Add(this.JoinServer);
+            this.Controls.Add(this.StartServer);
+            this.Controls.Add(this.flowLayoutPanel1);
             this.Name = "Form1";
-            this.Text = "Form1";
+            this.Text = "Chess";
             this.ResumeLayout(false);
 
         }
 
+
+
         #endregion
 
-        private Button ConfirmMove;
-        private Panel MainBoard;
-
-        private Label[,] pictureSquares;
-        private GameEnvironment _currentGame;
-        private List<Label> _validSquares = new List<Label>();
-
-        private Label? _targetSquare = null;
-        private Label? _friendlySelectedSquare = null;
-
-        private Player playerOne;
-        private Player playerTwo;
-
-        private Player _activePlayer;
-
-        private List<OriginalBackColor> _changedSquares = new List<OriginalBackColor>();
-        private List<MovementInformation> _movesAvailableToPiece;
-        private string _targetText;
-        private string _friendlyText;
-
-        private bool _resetSquareAssignments;
-        
+        private FlowLayoutPanel flowLayoutPanel1;
+        private Button StartServer;
+        private Button JoinServer;
+        private Panel MainView;
     }
 }

@@ -1,12 +1,23 @@
 
 using Pieces;
+using System.Net.Sockets;
 
 public class Player
 {
-    public int CurrentTurnNumber = 0;
     public Team CurrentTeam;
-    public void IncrementTurnCount()
+    public TcpClient Client;
+    public bool OpponentIsWaiting = false;
+    public bool WaitingForOpponent = false;
+    public Player(TcpClient connectedClient)
     {
-        CurrentTurnNumber++;
+        Client = connectedClient;
+    }
+    public void SendServerMessage(string message)
+    {
+        throw new NotImplementedException();
+    }
+    public void AssignTeam(Team newTeam)
+    {
+        CurrentTeam = newTeam;
     }
 }
