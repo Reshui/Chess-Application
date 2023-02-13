@@ -1,24 +1,36 @@
+namespace Pieces;
+
 using System.Net.Sockets;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 using System;
 
-namespace Pieces;
 public class Server
 {
-
+    public enum CommandType
+    {
+        ClientDisconnected,
+        NewMove,
+        DisconnectClient,
+        StartGameInstance,
+        Defeat,
+        Winner,
+        Draw,
+        ServerAvailabilityTest,
+        RegisterForGame
+    }
     public class ServerCommand
     {
         /// <value><c>CommandType</c> enum that specifies what this ServerCommand is intended to do.</value>
         public CommandType CMD;
-
         /// <value>Optional class field used when <c>CMD</c> == <c>CommandType.newMove</c>.</value>
         public MovementInformation? MoveDetails = null;
-
+        /// <value>Optional field used to assign a client to a given team.</value>
         public Team? AssignedTeam = null;
+        /// <value>Specifies which instance of the <c>Server</c> is being communicated with.</value>
         public int GameIdentifier;
-        public ServerCommand(CommandType cmdType, int gameID, MovementInformation? moveDetails = null, Team? assignedTeam = null)
+        public ServerCommand(CommandType cmdType, int gameID=0, MovementInformation? moveDetails = null, Team? assignedTeam = null)
         {
             CMD = cmdType;
             GameIdentifier = gameID;
@@ -35,55 +47,46 @@ public class Server
         }
     }
 
-    public enum CommandType
-    {
-        ClientDisconnected, NewMove, DisconnectClient, StartGameInstance, Defeat, Winner, Draw
-    }
-
     /// <value>Boolean representation of whether or not the <c>Server</c> instance is accepting new clients.</value>
     private bool _acceptingNewClients = false;
-
     /// <value>List of connected <c>TcpClients</c> to the current <c>Server</c> instance. Limited to 2.</value>
     private List<TcpClient> _connectedClients = new();
-
+    /// <value>The <c>GameEnvironment</c> inatance used with the current server.</value>
     private GameEnvironment? _newGame;
-
+    /// <value>Integer used to specify which instance of the <c>Server</c> is being targeted.</value>
     private static int _gameID = 0;
-
-    private int GameID = 0;
-
-    private void StartServerEvent(object sender, EventArgs evnt)
+    /// <value>The current <c>Server</c> instance.</value>
+    public int GameID = 0;
+    /// <value>Listens for user responses and connections.</value>
+    private TcpListener _gameServer;
+    public Server()
     {
-        TcpListener server = null;
-
+        // Set the TcpListener on port 13000.
+        int port = 13000;
+        IPAddress localAddr = IPAddress.Parse("127.0.0.1");
+        // TcpListener server = new TcpListener(port);
+        _gameServer = new TcpListener(localAddr, port);
+        (_acceptingNewClients, GameID) = (true, ++_gameID);
+    }
+    public async Task<bool> StartServerAsync()
+    {
         try
         {
-            // Set the TcpListener on port 13000.
-            int port = 13000;
-            IPAddress localAddr = IPAddress.Parse("127.0.0.1");
-
-            // TcpListener server = new TcpListener(port);
-            server = new TcpListener(localAddr, port);
-
             // Start listening for client requests.
-            server.Start();
-            (_acceptingNewClients, GameID) = (true, ++_gameID);
-
+            _gameServer.Start();
+            
+            var userHandler = new List<Task<bool>>();
             // Enter the listening loop.
-            while (true)
+            for (int i = 0; i < 2; i++)
             {
                 if (_acceptingNewClients)
                 {
-                    Console.Write("Waiting for a connection... ");
-
                     // Perform a blocking call to accept requests.
                     // You could also use server.AcceptSocket() here.
 
-                    using TcpClient client = server.AcceptTcpClient();
+                    using TcpClient client = _gameServer.AcceptTcpClient();
 
                     _connectedClients.Add(client);
-
-                    Console.WriteLine("Connected!");
 
                     if (_connectedClients.Count == 2)
                     {
@@ -98,30 +101,33 @@ public class Server
 
                         _newGame = new GameEnvironment(playerOne, playerTwo);
 
-                        foreach (var player in new Player[] { _newGame.BlackPlayer, _newGame.WhitePlayer })
+                        foreach (var player in new Player[] { playerOne, playerTwo })
                         {
-                            InitiateGameWithClientAsync(player);
+                            userHandler.Add(InitiateGameWithClientAsync(player));
                         }
-
                     }
                 }
 
             }
+            await Task.WhenAny(userHandler);
         }
-
         catch (SocketException e)
         {
             Console.WriteLine("SocketException: {0}", e);
         }
         finally
         {
-            server.Stop();
+             _gameServer.Stop();
         }
 
-        Console.WriteLine("\nHit enter to continue...");
-        Console.Read();
+        return true;
     }
 
+    /// <summary>
+    /// Sends a given <paramref name="client"/> a message.
+    /// </summary>
+    /// <param name="client"><c>TcpClient</c> that is sent a message.</param>
+    /// <param name="message">Message to be sent to <paramref name="client"/>.</param>
     private static void SendClientMessage(string message, TcpClient client)
     {
         NetworkStream stream = client.GetStream();
@@ -129,22 +135,25 @@ public class Server
         byte[] msg = Encoding.ASCII.GetBytes(message);
 
         stream.WriteAsync(msg, 0, msg.Length);
-
     }
 
+    /// <summary>
+    /// Handles responses from a <paramref name="user"/> asynchronously.
+    /// </summary>
     private async Task<bool> InitiateGameWithClientAsync(Player user)
     {
         var clientCommand = new ServerCommand(CommandType.StartGameInstance, GameID, assignedTeam: user.CurrentTeam);
 
-        SendClientMessage(JsonSerializer.Serialize(clientCommand), user.Client);
+        SendClientMessage(JsonSerializer.Serialize(clientCommand), user.Client!);
 
-        Player opposingUser = user == _newGame!.WhitePlayer ? _newGame.BlackPlayer : _newGame.WhitePlayer;
+        Player opposingUser = (user == _newGame!.WhitePlayer) ? _newGame.BlackPlayer! : _newGame.WhitePlayer!;
 
         string data;
 
-        NetworkStream stream = user.Client.GetStream();
+        NetworkStream stream = user.Client!.GetStream();
 
         bool clientDisconnected = false, gameFinished = false;
+
         while (true)
         {
             byte[] bytes = new byte[256];
@@ -201,9 +210,7 @@ public class Server
                         {
                             // Disconnect the other connected client.                      
                             clientCommand = new ServerCommand(CommandType.DisconnectClient, GameID);
-
                             SendClientMessage(JsonSerializer.Serialize(clientCommand), opposingUser.Client);
-
                             clientDisconnected = true;
                             break;
                         }

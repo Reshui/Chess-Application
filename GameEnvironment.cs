@@ -2,7 +2,7 @@ namespace Pieces;
 
 using System.Numerics;
 using System.Linq;
-
+using System.Diagnostics.CodeAnalysis;
 
 public class GameEnvironment
 {
@@ -12,29 +12,42 @@ public class GameEnvironment
     private readonly ChessPiece _whiteKing;
     private readonly ChessPiece _blackKing;
 
-    public Player WhitePlayer;
-    public Player BlackPlayer;
+    public Player? WhitePlayer;
+    public Player? BlackPlayer;
 
     /// <value>Dictionary of <c>ChessPiece</c> objects keyed to a team color.</value>
     private Dictionary<Team, List<ChessPiece>> _teamPieces;
 
     ///<value>If over 50 then a Draw is determined.</value>
     private int _movesSinceLastCapture = 0;
+
     /// <value>List of submitted moves within the current <c>GameEnvironment</c> instance.</value>
     private List<MovementInformation> _gameMoves = new();
+
+    public bool GameEnded =false;
     public ChessPiece this[int x, int y]
     {
         get => GameBoard[x, y]!;
         set => GameBoard[x, y] = value;
     }
 
+    public GameEnvironment()
+    {
+        _teamPieces = GenerateBoard();
+        _whiteKing = AssignKing(Team.White);
+        _blackKing = AssignKing(Team.Black);
+    }
+
+    /// <summary>
+    /// Constructor used for server - side code.
+    /// </summary>
     public GameEnvironment(Player playerOne, Player playerTwo)
     {
         _teamPieces = GenerateBoard();
 
         var playerList = new List<Player> { playerOne, playerTwo };
-        var rf = new Random();
-        int playerID = rf.Next(1);
+        var rand = new Random();
+        int playerID = rand.Next(1);
         WhitePlayer = playerList[playerID];
         playerID = playerID == 0 ? 1 : 0;
         BlackPlayer = playerList[playerID];
@@ -44,8 +57,8 @@ public class GameEnvironment
 
         _whiteKing = AssignKing(Team.White);
         _blackKing = AssignKing(Team.Black);
-
     }
+
     /// <summary>
     /// Returns a <c>ChessPiece</c> object of type King. Call this during the initialization of the <c>GameEnvironment</c> class.
     /// </summary>
@@ -121,7 +134,7 @@ public class GameEnvironment
     /// </summary>
     /// <param name="queriedKing">King that has its checked status tested.</param>
     /// <param name="board">2D board of <c>ChessPiece</c> Objects.</param>
-    /// <returns>A boolean value for whether or not a king is checked.</returns>
+    /// <returns>true if <paramref name="queriedKing"/> is checked; else false.</returns>
     public static bool IsKingChecked(ChessPiece queriedKing, ChessPiece?[,] board)
     {
         // This variable is needed to determine if a king can be attacked by an enemy pawn(pawns can only attack towards on side of the board.).

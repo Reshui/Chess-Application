@@ -30,37 +30,37 @@ namespace Chess_GUi
         /// <value>A <c>GameEnvironment</c> instance that is mapped to the GUI.</value>
         private readonly GameEnvironment _currentGame;
 
-        /// <value>List of squares that a piece friendly to <paramref name="_activePlayer"/> can move to.</value>
+        /// <value>List of squares that a piece friendly to <paramref name="User"/> can move to.</value>
         private List<PictureBox> _validSquares = new();
 
         /// <value>Valid square that a chess piece can move to.</value>
         private PictureBox? _targetSquare = null;
 
-        /// <value>A <c>PictureBox</c> that represents a square containing a piece friendly to <paramref name="_activePlayer"/>.</value>
+        /// <value>A <c>PictureBox</c> that represents a square containing a piece friendly to <paramref name="User"/>.</value>
         private PictureBox? _friendlySelectedSquare = null;
 
         /// <value>Player whose turn it currently is.</value>
-        private Player _activePlayer;
+        private Player User;
 
         /// <value>List of squares within <paramref name="pictureSquares""/> that have undergone a temporary visual change.</value>
         private List<OriginalBackColor> _changedSquares = new();
 
-        /// <value>List of available moves to the currently selected piece friendly to the <paramref name="_activePlayer"/>.</value>
+        /// <value>List of available moves to the currently selected piece friendly to the <paramref name="User"/>.</value>
         private List<MovementInformation>? _movesAvailableToPiece;
 
         /// <value>Stores a temporary reference to an image when selecting an available movement.</value>
         private Image? _targetImage;
 
-        /// <value>Stores a temporary reference to the friendly piece selected by <paramref name="_activePlayer"/></value>
+        /// <value>Stores a temporary reference to the friendly piece selected by <paramref name="User"/></value>
         private Image? _friendlyImage;
 
         /// <value>If set to true then references to temp images and previously selected squares will be set to null.</value>
         private bool _resetSquareAssignments;
 
-        public BoardGUI(GameEnvironment currentGame)
+        public BoardGUI(Player user)
         {
-            _currentGame = currentGame;
-            _activePlayer = _currentGame.WhitePlayer;
+            _currentGame = user.CurrentGame!;
+            User = user;
             InitializeComponent();
         }
 
@@ -109,7 +109,19 @@ namespace Chess_GUi
             Color blackColor = ColorTranslator.FromHtml("#300d21");
             Color whiteColor = ColorTranslator.FromHtml("#C79F67");
 
-            int top = MainBoard.Height - squareLength, left = 0;
+            int top = 0, heightIncrementer = squareLength;
+
+            if (User.CurrentTeam == Team.White)
+            {
+                top = MainBoard.Height - squareLength;
+            }
+            else if (User.CurrentTeam == Team.Black)
+            {
+                top = 0;
+                heightIncrementer *= -1;
+            }
+
+            int left = 0;
 
             string imageFolder = Path.GetFullPath(@"..\..\..\Resources\");
 
@@ -136,8 +148,9 @@ namespace Chess_GUi
                     left += squareLength;
                 }
                 left = 0;
-                top -= squareLength;
+                top += heightIncrementer;
             }
+            User.Squares = pictureSquares;
         }
         /// <summary>
         /// This event handler is used to handle click events on squares within the current board.
@@ -154,6 +167,8 @@ namespace Chess_GUi
                 _resetSquareAssignments = false;
             }
 
+            if (User.CanMakeMove == false) return;
+
             var selectedSquare = sender as PictureBox;
 
             Color availableMovesColorLight = ColorTranslator.FromHtml("#FF4935");//#FF6A35
@@ -168,7 +183,7 @@ namespace Chess_GUi
 
             ChessPiece? selectedPiece = _currentGame[coords[0], coords[1]];
 
-            if (selectedPiece != null && selectedPiece.PieceTeam == _activePlayer.CurrentTeam && !selectedSquare.Equals(_friendlySelectedSquare))
+            if (selectedPiece != null && selectedPiece.PieceTeam == User.CurrentTeam && !selectedSquare.Equals(_friendlySelectedSquare))
             {   // Display available movements for the ChessPiece
 
                 if (_targetSquare != null)
@@ -293,11 +308,7 @@ namespace Chess_GUi
 
             // Send change to the GameEnviroment instance and switch to the next player.
             _currentGame.SubmitFinalizedChange(submitedMovement);
-
-            if (_currentGame.IsKingCheckMated(_currentGame.ReturnKing(_activePlayer.CurrentTeam)))
-            {
-
-            }
+            User.SubmitMoveToServer(submitedMovement);
         }
 
         /// <summary>
