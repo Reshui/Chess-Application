@@ -9,47 +9,11 @@ public class Player
     /// <value>Visual representation of <paramref name="CurrentGame"/>. Given value during constructo of <c>BoardGUI</c>.</value>
     public PictureBox?[,]? Squares;
 
-    /// <value> Team enum:Black or White.</value>
-    public Team CurrentTeam
-    {
-        get { return _currentTeam; }
-        set
-        {
-            bool teamIsValid = (from num in (Team[])Enum.GetValues(typeof(Team)) where num == value select num).Any();
-            if (teamIsValid) _currentTeam = value;
-        }
-    }
-    private Team _currentTeam;
-
     /// <value>IP address of host server.</value>
     private readonly string _hostAddress;
 
     /// <value>Port to connect to the server on.</value>
     private readonly int _hostPort;
-
-    /// <value>This value is used for instance targeting.</value>
-    public int GameID
-    {
-        get => _gameID;
-        set => _gameID = value;
-    }
-    private int _gameID;
-
-    /// <value>Publicly accessible property that represents if the current game is still playable.</value>
-    public bool GameEnded
-    {
-        get
-        {
-            if (CurrentGame != null) return CurrentGame.GameEnded;
-            else return false;
-        }
-        set => CurrentGame!.GameEnded = value;
-    }
-
-    /// <value>Publicly accessible property that represents whether the <c>Player</c> instance is allowed to make a move.</value>
-    public bool CanMakeMove = false;
-
-    public GameEnvironment? CurrentGame;
 
     /// <value>Connection to the server if it exists used by the <c>Server</c> class.</value>
     public TcpClient Client
@@ -62,15 +26,23 @@ public class Player
         set => _client = value;
     }
     private TcpClient? _client;
-    
+
     /// <value>Server connected to the current instance of the <c>Player</c> class.</value>
     private readonly TcpClient? _connectedServer;
+    private Dictionary<int, GameEnvironment> _activeGames = new();
     private bool _serverIsConnected = false;
+
+    /// <summary>
+    /// Constructor used by clients connected to a host server.
+    /// </summary>
     public Player()
     {
         _hostPort = 13000;
         _hostAddress = "127.0.0.1";
     }
+    /// <summary>
+    /// Constructor used by the Server class to track clients.
+    /// </summary>
     public Player(TcpClient client)
     {
         _hostPort = 13000;
@@ -78,6 +50,7 @@ public class Player
         Client = client;
     }
 
+    /// <summary>Asynchonously connects to a server and starts waiting for server responses.</summary>
     public async void StartListening()
     {
         var newCommand = new ServerCommand(CommandType.RegisterForGame);
@@ -108,44 +81,39 @@ public class Player
 
                     if (response != null)
                     {
+                        int serverSideGameID = response.GameIdentifier;
+
                         if (response.CMD == CommandType.StartGameInstance)
                         {
-                            CurrentGame = new GameEnvironment();
-                            CurrentTeam = (Team)response.AssignedTeam!;
-                            GameID = response.GameIdentifier;
-                            if (CurrentTeam == Team.White) CanMakeMove = true;  
+                            var newGame = new GameEnvironment(serverSideGameID, (Team)response.AssignedTeam!);
+                            _activeGames.Add(serverSideGameID, newGame);
+
                         }
-                        else if (response.CMD == CommandType.DisconnectClient && CurrentGame != null)
+                        else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames[serverSideGameID] != null)
                         {
-                            GameEnded = true;
-                            CanMakeMove = false;
+
                         }
-                        else if (response.CMD == CommandType.NewMove && CurrentGame != null)
+                        else if (response.CMD == CommandType.NewMove && _activeGames[serverSideGameID] != null)
                         {
-                            UpdateOpponentMove((MovementInformation)response.MoveDetails!);
-                            CanMakeMove = true;
+                            UpdateOpponentMove((MovementInformation)response.MoveDetails!, serverSideGameID);
+
                         }
-                        else if (response.CMD == CommandType.Defeat && CurrentGame != null)
+                        else if (response.CMD == CommandType.Defeat && _activeGames[serverSideGameID] != null)
                         {
-                            GameEnded = true;
-                            CanMakeMove = false;
+
                         }
-                        else if (response.CMD == CommandType.Winner && CurrentGame != null)
+                        else if (response.CMD == CommandType.Winner && _activeGames[serverSideGameID] != null)
                         {
-                            GameEnded = true;
-                            CanMakeMove = false;
+
                         }
-                        else if (response.CMD == CommandType.Draw && CurrentGame != null)
+                        else if (response.CMD == CommandType.Draw && _activeGames[serverSideGameID] != null)
                         {
-                            GameEnded = true;
-                            CanMakeMove = false;
+
                         }
                     }
 
-                    if (GameEnded) break;
                 }
 
-                if (GameEnded) break;
             }
         }
         catch (SocketException e)
@@ -155,16 +123,23 @@ public class Player
         finally
         {
             _serverIsConnected = false;
-            CanMakeMove = false;
-            GameEnded = true;
+
         }
     }
-    public void SubmitMoveToServer(MovementInformation move)
+    /// <summary>
+    /// Submits a chess movement <paramref name="move"/> to the <paramref name="_connectedServer"/>.
+    /// </summary>
+    /// <param name="move">Chess movement to submit to the server.</param>
+    public void SubmitMoveToServer(MovementInformation move, int serverSideGameID)
     {
-        if (CanMakeMove && _connectedServer != null && _serverIsConnected && !GameEnded)
+        GameEnvironment targetedGameInstance = _activeGames[serverSideGameID];
+
+        if (targetedGameInstance.CanBeInteractedWith && _connectedServer != null && _serverIsConnected && !targetedGameInstance.GameEnded)
         {
-            CanMakeMove = false;
-            var submissionCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.NewMove, GameID, move));
+            targetedGameInstance.CanBeInteractedWith = false;
+
+            var submissionCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.NewMove, serverSideGameID, move));
+
             byte[] data = Encoding.ASCII.GetBytes(submissionCommand);
 
             try
@@ -181,17 +156,22 @@ public class Player
 
             }
         }
-        else if (_connectedServer!.Connected == false || _serverIsConnected == false || GameEnded)
+        else if (_connectedServer!.Connected == false || _serverIsConnected == false || targetedGameInstance.GameEnded)
         {
             throw new Exception("Server is no longer connected.");
         }
     }
-
-    public void UpdateOpponentMove(MovementInformation enemyMove)
+    /// <summary>
+    /// Updates the GUI and <paramref name ="CurrentGame"/> when a movement is recieved from <paramref name="_connectedServer"/>.
+    /// </summary>
+    /// <param name="enemyMove">Board movement used to update the GUI and <paramref name="CurrentGame"/>.</param>
+    public void UpdateOpponentMove(MovementInformation enemyMove, int serverSideGameID)
     {
-        if (CurrentGame != null && Squares != null)
+        GameEnvironment targetedGameInstance = _activeGames[serverSideGameID];
+
+        if (targetedGameInstance != null && Squares != null)
         {
-            CurrentGame.SubmitFinalizedChange(enemyMove);
+            targetedGameInstance.SubmitFinalizedChange(enemyMove);
 
             if (enemyMove.SecondaryPiece != null)
             {
@@ -221,9 +201,8 @@ public class Player
                 mainBox.Image = null;
             }
         }
-        else throw new NullReferenceException("Player.CurrentGame is null");
+        else throw new NullReferenceException("Player.targetedGameInstance is null");
     }
-
     public void SendServerMessage(string message)
     {
         throw new NotImplementedException();

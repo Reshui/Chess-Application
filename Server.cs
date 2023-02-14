@@ -21,7 +21,7 @@ public class Server
     ConcurrentDictionary<int, GameEnvironment> _startedGames = new();
 
     /// <value>Data structure used to store players that are currently waiting for a game.</value>
-    ConcurrentQueue<Player> _waitingLobby = new();
+    ConcurrentQueue<Player> _waitingForGameLobby = new();
     public enum CommandType
     {
         ClientDisconnected,
@@ -90,40 +90,32 @@ public class Server
 
             while (true)
             {
-                if (_acceptingNewClients)
+                if (_waitingForGameLobby.Count > 0)
                 {
-                    if (_waitingLobby.Count > 0)
+                    if (_waitingForGameLobby.TryDequeue(out Player? waitingPlayer) && await IsClientActiveAsync(waitingPlayer.Client.Client))
                     {
-                        for (int i = 0; i < 2; i++)
+                        matchedPlayers.Add(waitingPlayer);
+                    }
+                    else if (waitingPlayer != null && waitingPlayer.Client.Client.Connected == false)
+                    {
+                        _connectedPlayers.Remove(waitingPlayer);
+                    }
+
+                    if (matchedPlayers.Count == 2)
+                    {
+                        var newGame = new GameEnvironment(matchedPlayers[0], matchedPlayers[1]);
+
+                        _startedGames.TryAdd(newGame.GameID, newGame);
+
+                        foreach (var playerDetail in newGame.AssociatedPlayers)
                         {
-                            if (_waitingLobby.TryDequeue(out Player? waitingPlayer) && await IsClientActiveAsync(waitingPlayer.Client.Client))
-                            {
-                                matchedPlayers.Add(waitingPlayer);
-                            }
-                            else if (waitingPlayer != null && waitingPlayer.Client.Client.Connected == false)
-                            {
-                                _connectedPlayers.Remove(waitingPlayer);
-                            }
+                            var clientCommand = new ServerCommand(CommandType.StartGameInstance, newGame.GameID, assignedTeam: playerDetail.Key);
+                            SendClientMessage(JsonSerializer.Serialize(clientCommand), playerDetail.Value.Client!);
                         }
-
-                        if (matchedPlayers.Count == 2)
-                        {
-                            var newGame = new GameEnvironment(matchedPlayers[0], matchedPlayers[1]);
-
-                            _startedGames.TryAdd(newGame.GameID, newGame);
-
-                            foreach (var player in matchedPlayers)
-                            {
-                                var clientCommand = new ServerCommand(CommandType.StartGameInstance, newGame.GameID, assignedTeam: player.CurrentTeam);
-
-                                SendClientMessage(JsonSerializer.Serialize(clientCommand), player.Client!);
-
-
-                            }
-                            matchedPlayers.Clear();
-                        }
+                        matchedPlayers.Clear();
                     }
                 }
+
                 await Task.Delay(1000);
             }
         }
@@ -144,13 +136,16 @@ public class Server
         return true;
     }
 
+    /// <summary>
+    /// Asynchronously waits for client connections.
+    /// </summary>
     private async Task WaitForClientsAsync(CancellationToken token)
     {
         List<Task> listeningTasks = new();
 
         while (token.IsCancellationRequested == false)
         {
-            if (_gameServer.Pending())
+            if (_gameServer.Pending() && _acceptingNewClients)
             {
                 Player newPlayer = new Player(await _gameServer.AcceptTcpClientAsync());
 
@@ -242,19 +237,19 @@ public class Server
                 {
                     if (deserializedData.CMD == CommandType.LookingForGame)
                     {
-                        _waitingLobby.Enqueue(user);
+                        _waitingForGameLobby.Enqueue(user);
                     }
                     else if (deserializedData.CMD == CommandType.NewMove && deserializedData.MoveDetails != null)
                     {
                         GameEnvironment currentGame = _startedGames[deserializedData.GameIdentifier];
 
-                        Player opposingUser = (user == currentGame!.WhitePlayer) ? currentGame.BlackPlayer! : currentGame.WhitePlayer!;
+                        (Player opposingUser, Team opposingTeamColor) = (user == currentGame.AssociatedPlayers[Team.White]) ? (currentGame.AssociatedPlayers[Team.Black], Team.Black) : (currentGame.AssociatedPlayers[Team.White], Team.White);
 
                         currentGame.SubmitFinalizedChange((MovementInformation)deserializedData.MoveDetails);
                         // Send back a response to the opposing player.
                         opposingUser.Client.GetStream().Write(bytes, 0, bytes.Length);
 
-                        if (currentGame.IsKingCheckMated(currentGame.ReturnKing(opposingUser.CurrentTeam)))
+                        if (currentGame.IsKingCheckMated(currentGame.ReturnKing(opposingTeamColor)))
                         {
                             var clients = new[] { opposingUser.Client, user.Client };
                             var linkedCommands = new[] { CommandType.Defeat, CommandType.Winner };
@@ -286,15 +281,14 @@ public class Server
                     else if (deserializedData.CMD == CommandType.ClientDisconnected)
                     {
                         // Disconnect the other clients that this user is involved with.
-
                         List<GameEnvironment> gamesToDisconnect = (from gameKeyValue in _startedGames
                                                                    let game = gameKeyValue.Value
-                                                                   where game.WhitePlayer == user || game.BlackPlayer == user
+                                                                   where game.AssociatedPlayers[Team.White] == user || game.AssociatedPlayers[Team.Black] == user
                                                                    select game).ToList();
                         foreach (var game in gamesToDisconnect)
                         {
                             clientCommand = new ServerCommand(CommandType.OpponentClientDisconnected, game.GameID);
-                            Player opposingUser = (user == game!.WhitePlayer) ? game.BlackPlayer! : game.WhitePlayer!;
+                            Player opposingUser = (user == game.AssociatedPlayers[Team.White]) ? game.AssociatedPlayers[Team.Black] : game.AssociatedPlayers[Team.White];
                             SendClientMessage(JsonSerializer.Serialize(clientCommand), opposingUser.Client);
 
                             _startedGames.TryRemove(new KeyValuePair<int, GameEnvironment>(game.GameID, game));

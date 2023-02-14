@@ -8,13 +8,9 @@ public class GameEnvironment
 {
     ///<value>Array used to hold ChessPiece objects and their locations withn the current game.</value>
     public ChessPiece?[,] GameBoard = new ChessPiece[8, 8];
-
     private readonly ChessPiece _whiteKing;
     private readonly ChessPiece _blackKing;
-
-    public Player? WhitePlayer;
-    public Player? BlackPlayer;
-
+    public Dictionary<Team, Player> AssociatedPlayers = new();
     /// <value>Dictionary of <c>ChessPiece</c> objects keyed to a team color.</value>
     private Dictionary<Team, List<ChessPiece>> _teamPieces;
 
@@ -24,18 +20,41 @@ public class GameEnvironment
     /// <value>List of submitted moves within the current <c>GameEnvironment</c> instance.</value>
     private List<MovementInformation> _gameMoves = new();
 
-    public bool GameEnded =false;
+    public bool GameEnded = false;
+    public bool CanBeInteractedWith = false;
+
+    /// <value>Server-Side integer used to identify the current <c>GameEnvironment</c> instance.</value>
+    private static int _instanceNumber;
+    public int GameID
+    {
+        get => _gameID;
+        init => _gameID = value;
+    }
+    private readonly int _gameID = 0;
+    public readonly Team PlayerTeam;
+    private readonly bool _initializedByServer = false;
+    private readonly bool _initializedByClient = false;
     public ChessPiece this[int x, int y]
     {
         get => GameBoard[x, y]!;
         set => GameBoard[x, y] = value;
     }
 
-    public GameEnvironment()
+    /// <summary>
+    /// Constructor used for client - side code.
+    /// <summary>
+    public GameEnvironment(int serversideID, Team playerTeam)
     {
+        GameID = serversideID;
+        PlayerTeam = playerTeam;
+
+        CanBeInteractedWith = PlayerTeam == Team.White ? true : false;
+
         _teamPieces = GenerateBoard();
         _whiteKing = AssignKing(Team.White);
         _blackKing = AssignKing(Team.Black);
+
+        _initializedByClient = true;
     }
 
     /// <summary>
@@ -44,19 +63,20 @@ public class GameEnvironment
     public GameEnvironment(Player playerOne, Player playerTwo)
     {
         _teamPieces = GenerateBoard();
+        GameID = ++_instanceNumber;
 
         var playerList = new List<Player> { playerOne, playerTwo };
-        var rand = new Random();
-        int playerID = rand.Next(1);
-        WhitePlayer = playerList[playerID];
-        playerID = playerID == 0 ? 1 : 0;
-        BlackPlayer = playerList[playerID];
 
-        WhitePlayer.AssignTeam(Team.White);
-        BlackPlayer.AssignTeam(Team.Black);
+        var rand = new Random();
+        int playerID = rand.Next(2);
+
+        AssociatedPlayers.Add(Team.White, playerList[playerID]);
+        AssociatedPlayers.Add(Team.Black, playerList[playerID == 0 ? 1 : 0]);
 
         _whiteKing = AssignKing(Team.White);
         _blackKing = AssignKing(Team.Black);
+
+        _initializedByServer = true;
     }
 
     /// <summary>
@@ -282,18 +302,18 @@ public class GameEnvironment
     /// <returns>true if a stalemate has been reached and false otherwise.</returns>
     public bool IsStalemate()
     {
-        throw new NotImplementedException("Game Draw not implemented.");
-
         if (_movesSinceLastCapture >= 50) return true;
 
         #region Count Pieces on Board
-        int piecesRemaining =(from pieces in _teamPieces.Values
-                              from piece in pieces
-                              where piece.Captured == false
-                              select piece).Count();
+        int piecesRemaining = (from pieces in _teamPieces.Values
+                               from piece in pieces
+                               where piece.Captured == false
+                               select piece).Count();
 
         if (piecesRemaining == 2) return true;
         #endregion
+
+        return false;
     }
 
     /// <summary>
@@ -428,7 +448,7 @@ public class GameEnvironment
     /// This method is used to submite finalized changes to the current game and return the next <c>Player</c> via <paramref name="currentlyActivePlayer"/>.
     /// </summary>
     /// <param name="newMove">Movement information to submit to the current instance of the <c>GameEnvironment</c> class.</param>
-     public void SubmitFinalizedChange(MovementInformation newMove)
+    public void SubmitFinalizedChange(MovementInformation newMove)
     {
         ChangePieceLocation(this.GameBoard, newMove, true);
         // Determine whose turn it is.

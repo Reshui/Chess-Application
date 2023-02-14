@@ -16,7 +16,7 @@ namespace Chess_GUi
         public PictureBox SquareChanged { get; init; }
         public Color OriginalColor { get; init; }
     }
-    internal class BoardGUI : UserControl
+    public class BoardGUI : UserControl
     {
         /// <value>Button that appears when a valid move has been selected.</value>
         private Button ConfirmMove;
@@ -40,9 +40,9 @@ namespace Chess_GUi
         private PictureBox? _friendlySelectedSquare = null;
 
         /// <value>Player whose turn it currently is.</value>
-        private Player User;
+        private readonly Player User;
 
-        /// <value>List of squares within <paramref name="pictureSquares""/> that have undergone a temporary visual change.</value>
+        /// <value>List of squares within <paramref name="pictureSquares"/> that have undergone a temporary visual change.</value>
         private List<OriginalBackColor> _changedSquares = new();
 
         /// <value>List of available moves to the currently selected piece friendly to the <paramref name="User"/>.</value>
@@ -57,9 +57,9 @@ namespace Chess_GUi
         /// <value>If set to true then references to temp images and previously selected squares will be set to null.</value>
         private bool _resetSquareAssignments;
 
-        public BoardGUI(Player user)
+        public BoardGUI(Player user, GameEnvironment newGame)
         {
-            _currentGame = user.CurrentGame!;
+            _currentGame = newGame;
             User = user;
             InitializeComponent();
         }
@@ -67,7 +67,6 @@ namespace Chess_GUi
         [MemberNotNull(nameof(MainBoard), nameof(ConfirmMove), nameof(pictureSquares))]
         private void InitializeComponent()
         {
-
             MainBoard = new Panel()
             {
                 Location = new Point(16, 15),
@@ -111,11 +110,11 @@ namespace Chess_GUi
 
             int top = 0, heightIncrementer = squareLength;
 
-            if (User.CurrentTeam == Team.White)
+            if (_currentGame.PlayerTeam == Team.White)
             {
                 top = MainBoard.Height - squareLength;
             }
-            else if (User.CurrentTeam == Team.Black)
+            else if (_currentGame.PlayerTeam == Team.Black)
             {
                 top = 0;
                 heightIncrementer *= -1;
@@ -167,11 +166,11 @@ namespace Chess_GUi
                 _resetSquareAssignments = false;
             }
 
-            if (User.CanMakeMove == false) return;
+            if (_currentGame.CanBeInteractedWith == false) return;
 
             var selectedSquare = sender as PictureBox;
 
-            Color availableMovesColorLight = ColorTranslator.FromHtml("#FF4935");//#FF6A35
+            Color availableMovesColorLight = ColorTranslator.FromHtml("#FF4935");
             Color availableMovesColorDark = ColorTranslator.FromHtml("#7A130F");
 
             Color moveablePieceColor = ColorTranslator.FromHtml("#58871C");
@@ -183,7 +182,7 @@ namespace Chess_GUi
 
             ChessPiece? selectedPiece = _currentGame[coords[0], coords[1]];
 
-            if (selectedPiece != null && selectedPiece.PieceTeam == User.CurrentTeam && !selectedSquare.Equals(_friendlySelectedSquare))
+            if (selectedPiece != null && selectedPiece.PieceTeam == _currentGame.PlayerTeam && !selectedSquare.Equals(_friendlySelectedSquare))
             {   // Display available movements for the ChessPiece
 
                 if (_targetSquare != null)
@@ -308,7 +307,7 @@ namespace Chess_GUi
 
             // Send change to the GameEnviroment instance and switch to the next player.
             _currentGame.SubmitFinalizedChange(submitedMovement);
-            User.SubmitMoveToServer(submitedMovement);
+            User.SubmitMoveToServer(submitedMovement, _currentGame.GameID);
         }
 
         /// <summary>
@@ -324,7 +323,7 @@ namespace Chess_GUi
             }
         }
         /// <summary>
-        /// Reverts <paramref name="_friendlySelectedSquare"/> and <paramref name="_targetSquare"/> to their pre-click .Image values.
+        /// Reverts <paramref name="_friendlySelectedSquare"/> and <paramref name="_targetSquare"/> to their pre-click Image values.
         /// </summary>
         private void RevertPictureDisplay()
         {
