@@ -111,11 +111,11 @@ namespace Chess_GUi
             int top = 0, heightIncrementer = squareLength;
 
             if (_currentGame.PlayerTeam == Team.White)
-            {
+            {   // Starts generating on the last row of the board.
                 top = MainBoard.Height - squareLength;
             }
             else if (_currentGame.PlayerTeam == Team.Black)
-            {
+            {   // Starts generating at the top of the board.
                 top = 0;
                 heightIncrementer *= -1;
             }
@@ -149,7 +149,7 @@ namespace Chess_GUi
                 left = 0;
                 top += heightIncrementer;
             }
-            User.Squares = pictureSquares;
+            _currentGame.Squares = pictureSquares;
         }
         /// <summary>
         /// This event handler is used to handle click events on squares within the current board.
@@ -269,7 +269,7 @@ namespace Chess_GUi
         /// This event submits a movement to the <c>GameEnvironment</c> instance.
         /// </summary>
         /// <param name="sender"><c>PictureBox</c> object that has been clicked.</param>
-        public void ConfirmMoveClickedEvent(object sender, EventArgs e)
+        public async void ConfirmMoveClickedEvent(object sender, EventArgs e)
         {
             ConfirmMove.Visible = false;
 
@@ -305,9 +305,8 @@ namespace Chess_GUi
                 }
             }
 
-            // Send change to the GameEnviroment instance and switch to the next player.
-            _currentGame.SubmitFinalizedChange(submitedMovement);
-            User.SubmitMoveToServer(submitedMovement, _currentGame.GameID);
+            // Send change to the server and update on local client.
+            await User.SubmitMoveToServerAsync(submitedMovement, _currentGame.GameID, _currentGame.PlayerAffiliatedCancellationSource!.Token);
         }
 
         /// <summary>

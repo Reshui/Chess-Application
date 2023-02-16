@@ -6,34 +6,44 @@ using System.Diagnostics.CodeAnalysis;
 
 public class GameEnvironment
 {
-    ///<value>Array used to hold ChessPiece objects and their locations withn the current game.</value>
+    /// <value>Array used to hold ChessPiece objects and their locations withn the current game.</value>
     public ChessPiece?[,] GameBoard = new ChessPiece[8, 8];
-    private readonly ChessPiece _whiteKing;
-    private readonly ChessPiece _blackKing;
+    /// <value>Array used to store visual information about <paramref name="GameBoard"/>.</value>
+    public PictureBox[,]? Squares { get; set; }
+    private ChessPiece _whiteKing { get; init; }
+    private ChessPiece _blackKing { get; init; }
     public Dictionary<Team, Player> AssociatedPlayers = new();
     /// <value>Dictionary of <c>ChessPiece</c> objects keyed to a team color.</value>
     private Dictionary<Team, List<ChessPiece>> _teamPieces;
-
     ///<value>If over 50 then a Draw is determined.</value>
-    private int _movesSinceLastCapture = 0;
-
+    private int _movesSinceLastCapture { get; set; } = 0;
     /// <value>List of submitted moves within the current <c>GameEnvironment</c> instance.</value>
     private List<MovementInformation> _gameMoves = new();
-
-    public bool GameEnded = false;
-    public bool CanBeInteractedWith = false;
+    public bool GameEnded { get; set; } = false;
+    /// <value>Boolean represents whether or not the instance can be interacted with by a local <c>Player</c>.</value>
+    public CancellationTokenSource? PlayerAffiliatedCancellationSource;
+    public bool CanBeInteractedWith
+    {
+        get
+        {
+            if (_initializedByClient) return _canBeInteractedWith;
+            else return false;
+        }
+        set
+        {
+            _canBeInteractedWith = value;
+        }
+    }
+    private bool _canBeInteractedWith = false;
 
     /// <value>Server-Side integer used to identify the current <c>GameEnvironment</c> instance.</value>
     private static int _instanceNumber;
-    public int GameID
-    {
-        get => _gameID;
-        init => _gameID = value;
-    }
-    private readonly int _gameID = 0;
-    public readonly Team PlayerTeam;
-    private readonly bool _initializedByServer = false;
-    private readonly bool _initializedByClient = false;
+    public int GameID { get; init; }
+
+    /// <value>Variable used by the client-side <c>GameEnvironment</c> instance to Assign a team to the user.</value>
+    public Team PlayerTeam { get; init; }
+    private bool _initializedByServer { get; init; } = false;
+    private bool _initializedByClient { get; init; } = false;
     public ChessPiece this[int x, int y]
     {
         get => GameBoard[x, y]!;
@@ -43,10 +53,12 @@ public class GameEnvironment
     /// <summary>
     /// Constructor used for client - side code.
     /// <summary>
-    public GameEnvironment(int serversideID, Team playerTeam)
+    public GameEnvironment(int serverSideID, Team playerTeam)
     {
-        GameID = serversideID;
+        GameID = serverSideID;
         PlayerTeam = playerTeam;
+
+        PlayerAffiliatedCancellationSource = new();
 
         CanBeInteractedWith = PlayerTeam == Team.White ? true : false;
 

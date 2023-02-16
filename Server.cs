@@ -9,19 +9,19 @@ using System.Collections.Concurrent;
 public class Server
 {
     /// <value>Boolean representation of whether or not the <c>Server</c> instance is accepting new clients.</value>
-    private bool _acceptingNewClients = false;
-
+    private bool _acceptingNewClients { get; set; } = false;
     /// <value>List of connected <c>TcpClients</c> to the current <c>Server</c> instance. Limited to 2.</value>
-    private List<Player> _connectedPlayers = new();
-
+    private ConcurrentDictionary<int, Player> _connectedPlayers = new();
     /// <value>Listens for user responses and connections.</value>
-    private TcpListener _gameServer;
-
+    private TcpListener _gameServer { get; init; }
     /// <value>Dictionary of <c>GameEnvironment</c> instances that have been started.</value>
-    ConcurrentDictionary<int, GameEnvironment> _startedGames = new();
-
+    private ConcurrentDictionary<int, GameEnvironment> _startedGames = new();
     /// <value>Data structure used to store players that are currently waiting for a game.</value>
-    ConcurrentQueue<Player> _waitingForGameLobby = new();
+    private ConcurrentQueue<Player> _waitingForGameLobby = new();
+    /// <value>Stores Tasks that listen for <c>Player</c> responses.</value>
+    private ConcurrentDictionary<int, Task> _clientListeningTasks = new();
+    /// <value>Dictionary of Cancellation Tokens keyed to a given user</value>
+    private ConcurrentDictionary<int, CancellationTokenSource> _clientListeningCancellationTokens = new();
     public enum CommandType
     {
         ClientDisconnected,
@@ -35,19 +35,21 @@ public class Server
         RegisterForGame,
         LookingForGame,
         ServerIsShuttingDown,
-        TestingForResponse
+        TestingForResponse,
+        PrepareBuffer
     }
     public class ServerCommand
     {
         /// <value><c>CommandType</c> enum that specifies what this ServerCommand is intended to do.</value>
-        public CommandType CMD;
+        public CommandType CMD { get; init; }
         /// <value>Optional class field used when <c>CMD</c> == <c>CommandType.newMove</c>.</value>
-        public MovementInformation? MoveDetails = null;
+        public MovementInformation? MoveDetails { get; init; } = null;
         /// <value>Optional field used to assign a client to a given team.</value>
-        public Team? AssignedTeam = null;
+        public Team? AssignedTeam { get; init; } = null;
         /// <value>Specifies which instance of the <c>Server</c> is being communicated with.</value>
-        public int GameIdentifier;
-        public ServerCommand(CommandType cmdType, int gameID = 0, MovementInformation? moveDetails = null, Team? assignedTeam = null)
+        public int GameIdentifier { get; init; } = 0;
+        public int BufferSizeToPrepare { get; init; } = 0;
+        public ServerCommand(CommandType cmdType, int gameID = 0, MovementInformation? moveDetails = null, Team? assignedTeam = null, int bufferSizeToPrepare = 0)
         {
             CMD = cmdType;
             GameIdentifier = gameID;
@@ -60,6 +62,10 @@ public class Server
             else if (cmdType == CommandType.StartGameInstance)
             {
                 AssignedTeam = assignedTeam;
+            }
+            else if (cmdType == CommandType.PrepareBuffer)
+            {
+                BufferSizeToPrepare = bufferSizeToPrepare;
             }
         }
     }
@@ -84,8 +90,6 @@ public class Server
 
             Task clientListener = WaitForClientsAsync(waitingToken);
 
-            var userHandler = new List<Task>();
-
             List<Player> matchedPlayers = new() { Capacity = 2 };
 
             while (true)
@@ -98,7 +102,7 @@ public class Server
                     }
                     else if (waitingPlayer != null && waitingPlayer.Client.Client.Connected == false)
                     {
-                        _connectedPlayers.Remove(waitingPlayer);
+                        await ClientRemovalAsync(waitingPlayer);
                     }
 
                     if (matchedPlayers.Count == 2)
@@ -110,13 +114,16 @@ public class Server
                         foreach (var playerDetail in newGame.AssociatedPlayers)
                         {
                             var clientCommand = new ServerCommand(CommandType.StartGameInstance, newGame.GameID, assignedTeam: playerDetail.Key);
-                            SendClientMessage(JsonSerializer.Serialize(clientCommand), playerDetail.Value.Client!);
+
+                            if (_clientListeningCancellationTokens.ContainsKey(playerDetail.Value.ServerAssignedID))
+                            {
+                                await SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), playerDetail.Value.Client!, _clientListeningCancellationTokens[playerDetail.Value.ServerAssignedID].Token);
+                            }
                         }
                         matchedPlayers.Clear();
                     }
                 }
-
-                await Task.Delay(1000);
+                await Task.Delay(500);
             }
         }
         catch (SocketException e)
@@ -135,43 +142,40 @@ public class Server
 
         return true;
     }
-
     /// <summary>
     /// Asynchronously waits for client connections.
     /// </summary>
     private async Task WaitForClientsAsync(CancellationToken token)
     {
-        List<Task> listeningTasks = new();
-
         while (token.IsCancellationRequested == false)
         {
-            if (_gameServer.Pending() && _acceptingNewClients)
+            TcpClient? newClient = await _gameServer.AcceptTcpClientAsync(token);
+
+            if (token.IsCancellationRequested == false && newClient != null)
             {
-                Player newPlayer = new Player(await _gameServer.AcceptTcpClientAsync());
-
-                _connectedPlayers.Add(newPlayer);
-
-                listeningTasks.Add(ProcessClientDataAsync(newPlayer));
+                Player newPlayer = new Player(newClient);
+                var cancellationSource = new CancellationTokenSource();
+                _connectedPlayers.TryAdd(newPlayer.ServerAssignedID, newPlayer);
+                _clientListeningCancellationTokens.TryAdd(newPlayer.ServerAssignedID, cancellationSource);
+                _clientListeningTasks.TryAdd(newPlayer.ServerAssignedID, ProcessClientDataAsync(newPlayer, cancellationSource.Token));
             }
-
-            await Task.Delay(2000);
         }
     }
     /// <summary>
     /// Tests if a given Socket recieves a response.
     /// <summary>
     /// <returns>true if socket is still connected; false otherwise.</returns>
-    private static async Task<bool> IsClientActiveAsync(Socket client)
+    private static async Task<bool> IsClientActiveAsync(Socket clientSocket)
     {
         var command = new ServerCommand(CommandType.TestingForResponse);
         string message = JsonSerializer.Serialize(command);
         byte[] data = Encoding.ASCII.GetBytes(message);
-        bool blockingState = client.Blocking;
+        bool blockingState = clientSocket.Blocking;
 
         try
         {
-            client.Blocking = false;
-            await client.SendAsync(data, 0);
+            clientSocket.Blocking = false;
+            await clientSocket.SendAsync(data, 0);
         }
         catch (SocketException e)
         {
@@ -187,10 +191,10 @@ public class Server
         }
         finally
         {
-            client.Blocking = blockingState;
+            clientSocket.Blocking = blockingState;
         }
 
-        return client.Connected;
+        return clientSocket.Connected;
     }
 
     /// <summary>
@@ -198,109 +202,129 @@ public class Server
     /// </summary>
     /// <param name="client"><c>TcpClient</c> that is sent a message.</param>
     /// <param name="message">Message to be sent to <paramref name="client"/>.</param>
-    /// <exception cref=""></exception>
-    private static void SendClientMessage(string message, TcpClient client)
+    private static async Task SendClientMessageAsync(string message, TcpClient client, CancellationToken token)
     {
+        byte[] msg = Encoding.ASCII.GetBytes(message);
         NetworkStream stream = client.GetStream();
 
-        byte[] msg = Encoding.ASCII.GetBytes(message);
-
-        stream.WriteAsync(msg, 0, msg.Length);
+        await stream.WriteAsync(msg, 0, msg.Length, token);
     }
 
     /// <summary>
     /// Handles responses from a <paramref name="user"/> client asynchronously.
     /// </summary>
-    private async Task ProcessClientDataAsync(Player user)
+    /// <param name="user"><c>Player</c> instance that is monitored for its responses.</param>
+    private async Task ProcessClientDataAsync(Player user, CancellationToken token)
     {
-        string data;
-
         NetworkStream stream = user.Client.GetStream();
         ServerCommand clientCommand;
 
-        bool clientDisconnected = false, gameFinished = false;
+        bool clientDisconnected = false;
 
-        while (true)
+        while (token.IsCancellationRequested == false)
         {
+            var builder = new StringBuilder();
+            int responseByteCount;
             byte[] bytes = new byte[256];
-            int i;
 
-            // Loop to receive all the data sent by the client.
-            while ((i = await stream.ReadAsync(bytes)) != 0)
+            do
+            {   // Loop to receive all the data sent by the client.
+                responseByteCount = await stream.ReadAsync(bytes, token);
+                if (responseByteCount > 0) builder.Append(Encoding.ASCII.GetString(bytes, 0, responseByteCount));
+            } while (token.IsCancellationRequested == false && responseByteCount > 0);
+
+            if (token.IsCancellationRequested) return;
+
+            ServerCommand? deserializedData = JsonSerializer.Deserialize<ServerCommand>(builder.ToString());
+
+            if (deserializedData != null)
             {
-                // Translate data bytes to a ASCII string.
-                data = Encoding.ASCII.GetString(bytes, 0, i);
-
-                ServerCommand? deserializedData = JsonSerializer.Deserialize<ServerCommand>(data);
-
-                if (deserializedData != null)
+                if (deserializedData.CMD == CommandType.LookingForGame)
                 {
-                    if (deserializedData.CMD == CommandType.LookingForGame)
+                    // Only add the user to the queue if they aren't already in it.
+                    if (!_waitingForGameLobby.Contains(user)) _waitingForGameLobby.Enqueue(user);
+                }
+                else if (deserializedData.CMD == CommandType.NewMove && deserializedData.MoveDetails != null)
+                {
+                    GameEnvironment currentGame = _startedGames[deserializedData.GameIdentifier];
+
+                    (Player opposingUser, Team opposingTeamColor) = (user == currentGame.AssociatedPlayers[Team.White]) ? (currentGame.AssociatedPlayers[Team.Black], Team.Black) : (currentGame.AssociatedPlayers[Team.White], Team.White);
+
+                    currentGame.SubmitFinalizedChange((MovementInformation)deserializedData.MoveDetails);
+                    // Send back a response to the opposing player.
+                    opposingUser.Client.GetStream().Write(bytes, 0, bytes.Length);
+
+                    if (currentGame.IsKingCheckMated(currentGame.ReturnKing(opposingTeamColor)))
                     {
-                        _waitingForGameLobby.Enqueue(user);
-                    }
-                    else if (deserializedData.CMD == CommandType.NewMove && deserializedData.MoveDetails != null)
-                    {
-                        GameEnvironment currentGame = _startedGames[deserializedData.GameIdentifier];
+                        var clients = new[] { opposingUser.Client, user.Client };
+                        var linkedCommands = new[] { CommandType.Defeat, CommandType.Winner };
+                        var clientCommands = clients.Zip(linkedCommands, (c, lc) => new { Client = c, Command = lc });
 
-                        (Player opposingUser, Team opposingTeamColor) = (user == currentGame.AssociatedPlayers[Team.White]) ? (currentGame.AssociatedPlayers[Team.Black], Team.Black) : (currentGame.AssociatedPlayers[Team.White], Team.White);
-
-                        currentGame.SubmitFinalizedChange((MovementInformation)deserializedData.MoveDetails);
-                        // Send back a response to the opposing player.
-                        opposingUser.Client.GetStream().Write(bytes, 0, bytes.Length);
-
-                        if (currentGame.IsKingCheckMated(currentGame.ReturnKing(opposingTeamColor)))
+                        foreach (var msg in clientCommands)
                         {
-                            var clients = new[] { opposingUser.Client, user.Client };
-                            var linkedCommands = new[] { CommandType.Defeat, CommandType.Winner };
-                            var clientCommands = clients.Zip(linkedCommands, (c, lc) => new { Client = c, Command = lc });
-
-                            foreach (var msg in clientCommands)
-                            {
-                                clientCommand = new ServerCommand(msg.Command, currentGame.GameID);
-                                SendClientMessage(JsonSerializer.Serialize(clientCommand), msg.Client);
-                            }
-
-                            gameFinished = true;
-                            break;
-                        }
-                        else if (currentGame.IsStalemate())
-                        {
-                            // Send both connected clients a Draw command.
-                            clientCommand = new ServerCommand(CommandType.Draw, currentGame.GameID);
-
-                            foreach (var player in new Player[] { user, opposingUser })
-                            {
-                                SendClientMessage(JsonSerializer.Serialize(clientCommand), player.Client);
-                            }
-
-                            gameFinished = true;
-                            break;
-                        }
-                    }
-                    else if (deserializedData.CMD == CommandType.ClientDisconnected)
-                    {
-                        // Disconnect the other clients that this user is involved with.
-                        List<GameEnvironment> gamesToDisconnect = (from gameKeyValue in _startedGames
-                                                                   let game = gameKeyValue.Value
-                                                                   where game.AssociatedPlayers[Team.White] == user || game.AssociatedPlayers[Team.Black] == user
-                                                                   select game).ToList();
-                        foreach (var game in gamesToDisconnect)
-                        {
-                            clientCommand = new ServerCommand(CommandType.OpponentClientDisconnected, game.GameID);
-                            Player opposingUser = (user == game.AssociatedPlayers[Team.White]) ? game.AssociatedPlayers[Team.Black] : game.AssociatedPlayers[Team.White];
-                            SendClientMessage(JsonSerializer.Serialize(clientCommand), opposingUser.Client);
-
-                            _startedGames.TryRemove(new KeyValuePair<int, GameEnvironment>(game.GameID, game));
+                            clientCommand = new ServerCommand(msg.Command, currentGame.GameID);
+                            await SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), msg.Client, token);
                         }
 
-                        clientDisconnected = true;
+                        currentGame.GameEnded = true;
                         break;
                     }
+                    else if (currentGame.IsStalemate())
+                    {
+                        // Send both connected clients a Draw command.
+                        clientCommand = new ServerCommand(CommandType.Draw, currentGame.GameID);
+
+                        foreach (var player in new Player[] { user, opposingUser })
+                        {
+                            await SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), player.Client, token);
+                        }
+
+                        currentGame.GameEnded = true;
+                        break;
+                    }
+
+                    if (currentGame.GameEnded)
+                    {   // Stop tracking the game.
+                        _startedGames.TryRemove(new KeyValuePair<int, GameEnvironment>(currentGame.GameID, currentGame));
+                    }
+                }
+                else if (deserializedData.CMD == CommandType.ClientDisconnected)
+                {
+                    // Notify the opponent.
+                    List<GameEnvironment> gamesToDisconnect = (from gameKeyValue in _startedGames
+                                                               let game = gameKeyValue.Value
+                                                               where game.AssociatedPlayers[Team.White] == user || game.AssociatedPlayers[Team.Black] == user
+                                                               select game).ToList();
+
+                    foreach (GameEnvironment game in gamesToDisconnect)
+                    {
+                        clientCommand = new ServerCommand(CommandType.OpponentClientDisconnected, game.GameID);
+                        Player opposingUser = (user == game.AssociatedPlayers[Team.White]) ? game.AssociatedPlayers[Team.Black] : game.AssociatedPlayers[Team.White];
+
+                        await SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), opposingUser.Client, token);
+
+                        _startedGames.TryRemove(new KeyValuePair<int, GameEnvironment>(game.GameID, game));
+                    }
+
+                    _connectedPlayers.TryRemove(new KeyValuePair<int, Player>(user.ServerAssignedID, user));
+                    clientDisconnected = true;
+                    break;
                 }
             }
 
-            if (clientDisconnected || gameFinished) break;
+            if (clientDisconnected) return;
         }
+    }
+    /// <summary>
+    /// Removes <paramref name="user"/> from <paramref name="_clientListeningTasks"/> and <paramref name="_connectedPlayers"/>. 
+    /// </summary>
+    /// <param name="user">Player that has its references removed.</param>
+    private async Task ClientRemovalAsync(Player user)
+    {
+        _clientListeningCancellationTokens[user.ServerAssignedID].Cancel();
+        await _clientListeningTasks[user.ServerAssignedID];
+        _clientListeningCancellationTokens[user.ServerAssignedID].Dispose();
+
+        _connectedPlayers.TryRemove(new KeyValuePair<int, Player>(user.ServerAssignedID, user));
     }
 }
