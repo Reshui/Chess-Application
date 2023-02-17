@@ -6,24 +6,25 @@ using System.Text;
 using static Pieces.Server;
 public class Player
 {
-    /// <value>IP address of host server.</value>
+    /// <summary>IP address of host server.</summary>
     private readonly string _hostAddress;
-    /// <value>Port to connect to the server on.</value>
+    /// <summary>Port to connect to the server on.</summary>
     private readonly int _hostPort;
 
-    /// <value>Connection to the server if it exists used by the <c>Server</c> class.</value>
+    /// <summary>Connection to the server if it exists used by the <see cref="Server"/> class.</summary>
     public TcpClient Client
     {
-        get
-        {
-            if (_client != null) return _client;
-            else throw new NullReferenceException(nameof(Client));
-        }
+        get { return _client ?? throw new NullReferenceException(nameof(Client)); }
         init => _client = value;
     }
     private TcpClient? _client;
 
-    /// <value>Server connected to the current instance of the <c>Player</c> class.</value>
+    public Socket UnderlyingSocket
+    {
+        get => Client.Client ?? throw new NullReferenceException(nameof(_client));
+    }
+
+    /// <summary>Server connected to the current instance of the <c>Player</c> class.</summary>
     private readonly TcpClient? _connectedServer;
     private Dictionary<int, GameEnvironment> _activeGames = new();
     private bool _serverIsConnected { get; set; } = false;
@@ -51,7 +52,7 @@ public class Player
     /// <summary>
     /// Asynchonously connects to a server and starts waiting for server responses.
     /// </summary>
-    public async void StartListening(CancellationToken token)
+    public async void StartListeningAsync(CancellationToken token)
     {
         try
         {
@@ -65,7 +66,7 @@ public class Player
             byte[] initialCommandBytes = Encoding.ASCII.GetBytes(JsonSerializer.Serialize(markAsLFGCommand));
             stream.Write(initialCommandBytes, 0, initialCommandBytes.Length);
 
-            while (true)
+            while (!token.IsCancellationRequested)
             {
                 byte[] bytes = new byte[256];
                 var builder = new StringBuilder();
@@ -77,7 +78,8 @@ public class Player
                     if (bytesRead > 0) builder.Append(Encoding.ASCII.GetString(bytes, 0, bytesRead));
                 } while (!token.IsCancellationRequested && bytesRead > 0);
 
-                if (token.IsCancellationRequested) return;
+                if (token.IsCancellationRequested) break;
+                else if (builder.Length == 0) continue;
 
                 ServerCommand? response = JsonSerializer.Deserialize<ServerCommand>(builder.ToString());
 
@@ -90,31 +92,42 @@ public class Player
                         var newGame = new GameEnvironment(serverSideGameID, (Team)response.AssignedTeam!);
                         _activeGames.Add(serverSideGameID, newGame);
                     }
+                    else if (response.CMD == CommandType.ServerIsShuttingDown)
+                    {
+                        throw new NotImplementedException();
+                    }
+                    else if (response.CMD == CommandType.OpponentClientDisconnected)
+                    {
+
+                    }
                     else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames[serverSideGameID] != null)
                     {
                         throw new NotImplementedException("Opponent disconnection hasn't been implemented.");
                         //_activeGames.Remove(serverSideGameID);
                     }
-                    else if (response.CMD == CommandType.NewMove && _activeGames[serverSideGameID] != null)
+                    else if (response.CMD == CommandType.NewMove)
                     {
                         UpdateOpponentMove((MovementInformation)response.MoveDetails!, serverSideGameID);
                     }
                     else if (response.CMD == CommandType.Defeat && _activeGames[serverSideGameID] != null)
                     {
-
+                        _activeGames[serverSideGameID].GameEnded = true;
+                        throw new NotImplementedException();
                     }
                     else if (response.CMD == CommandType.Winner && _activeGames[serverSideGameID] != null)
                     {
-
+                        _activeGames[serverSideGameID].GameEnded = true;
+                        throw new NotImplementedException();
                     }
                     else if (response.CMD == CommandType.Draw && _activeGames[serverSideGameID] != null)
                     {
-
+                        _activeGames[serverSideGameID].GameEnded = true;
+                        throw new NotImplementedException();
                     }
                 }
             }
         }
-        catch (SocketException e)
+        catch (IOException e)
         {
             Console.WriteLine("Host has disconnected. " + e);
         }
@@ -124,10 +137,10 @@ public class Player
         }
     }
     /// <summary>
-    /// Submits a chess movement <paramref name="move"/> to the <paramref name="_connectedServer"/> as well as updating the local version of the game.
+    /// Submits a chess movement <paramref name="move"/> to the <see cref="_connectedServer"/> and updates the relevant <see cref="GameEnvironment"/> instance.
     /// </summary>
     /// <param name="move">Chess movement to submit to the server.</param>
-    /// <param name="serverSideGameID">ID used to target a specific <c>GameEnvironment</c> instance.</param>
+    /// <param name="serverSideGameID">ID used to target a specific <see cref="GameEnvironment"/> instance.</param>
     public async Task SubmitMoveToServerAsync(MovementInformation move, int serverSideGameID, CancellationToken token)
     {
         GameEnvironment targetedGameInstance = _activeGames[serverSideGameID];
@@ -149,10 +162,10 @@ public class Player
         }
     }
     /// <summary>
-    /// Updates a client-side <c>GameEnvironment</c> instance when a movement is recieved from <paramref name="_connectedServer"/>.
+    /// Updates a client-side <see cref="GameEnvironment"/> instance when a movement is recieved from <see cref="_connectedServer"/>.
     /// </summary>
-    /// <param name="enemyMove">Board movement used to update a <c>GameEnvironment</c> instance.</param>
-    /// <param name="serverSideGameID">ID number used to target a specific <c>GameEnvironment</c> instance within <paramref name="_activeGames"/>.</param>
+    /// <param name="enemyMove">Board movement used to update a <see cref="GameEnvironment"/> instance.</param>
+    /// <param name="serverSideGameID">ID number used to target a specific <see cref="GameEnvironment"/> instance within <see cref="_activeGames"/>.</param>
     public void UpdateOpponentMove(MovementInformation enemyMove, int serverSideGameID)
     {
         try
@@ -197,6 +210,11 @@ public class Player
             throw new NullReferenceException($"{nameof(serverSideGameID)} couldn't be found within {nameof(_activeGames)}.", e);
         }
     }
+
+    /// <summary>
+    /// Sends <see cref="_connectedServer"/> a given <paramref name="message"/> asynchronously.
+    /// </summary>
+    /// <param name="message">Serialized <c>ServerCommand</c> to send.</param>
     public async Task SendServerMessageAsync(string message, CancellationToken token)
     {
         if (_connectedServer != null)

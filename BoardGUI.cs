@@ -18,43 +18,43 @@ namespace Chess_GUi
     }
     public class BoardGUI : UserControl
     {
-        /// <value>Button that appears when a valid move has been selected.</value>
+        /// <summary>Button that appears when a valid move has been selected.</summary>
         private Button ConfirmMove;
 
-        /// <value>Container for all <c>PictureBox</c> objects contained within <paramref name="pictureSquares"/>.</value>
+        /// <summary>Container for all <see cref="PictureBox"/> objects contained within <see cref="_pictureSquares"/>.</summary>
         private Panel MainBoard;
 
-        /// <value>2D array of <c>PictureBox</c> objects that represent the visible board.</value>
-        private PictureBox[,] pictureSquares;
+        /// <summary>2D array of <see cref="PictureBox"/> objects that represent the visible board.</summary>
+        private PictureBox[,] _pictureSquares;
 
-        /// <value>A <c>GameEnvironment</c> instance that is mapped to the GUI.</value>
+        /// <summary>A <see cref="GameEnvironment"/> instance that is mapped to the GUI.</summary>
         private readonly GameEnvironment _currentGame;
 
-        /// <value>List of squares that a piece friendly to <paramref name="User"/> can move to.</value>
+        /// <summary>List of squares that a piece friendly to <see cref="User"/> can move to.</summary>
         private List<PictureBox> _validSquares = new();
 
-        /// <value>Valid square that a chess piece can move to.</value>
+        /// <summary>Valid square that a chess piece can move to.</summary>
         private PictureBox? _targetSquare = null;
 
-        /// <value>A <c>PictureBox</c> that represents a square containing a piece friendly to <paramref name="User"/>.</value>
+        /// <summary>A <see cref="PictureBox"/> that represents a square containing a piece friendly to <see cref="User"/>.</summary>
         private PictureBox? _friendlySelectedSquare = null;
 
-        /// <value>Player whose turn it currently is.</value>
+        /// <summary>Player whose turn it currently is.</summary>
         private readonly Player User;
 
-        /// <value>List of squares within <paramref name="pictureSquares"/> that have undergone a temporary visual change.</value>
+        /// <summary>List of squares within <see cref="_pictureSquares"/> that have undergone a temporary visual change.</summary>
         private List<OriginalBackColor> _changedSquares = new();
 
-        /// <value>List of available moves to the currently selected piece friendly to the <paramref name="User"/>.</value>
+        /// <summary>List of available moves to the currently selected piece friendly to the <see cref="User"/>.</summary>
         private List<MovementInformation>? _movesAvailableToPiece;
 
-        /// <value>Stores a temporary reference to an image when selecting an available movement.</value>
+        /// <summary>Stores a temporary reference to an image when selecting an available movement.</summary>
         private Image? _targetImage;
 
-        /// <value>Stores a temporary reference to the friendly piece selected by <paramref name="User"/></value>
+        /// <summary>Stores a temporary reference to the friendly piece selected by <see cref="User"/></summary>
         private Image? _friendlyImage;
 
-        /// <value>If set to true then references to temp images and previously selected squares will be set to null.</value>
+        /// <summary>If set to true then references to temp images and previously selected squares will be set to null.</summary>
         private bool _resetSquareAssignments;
 
         public BoardGUI(Player user, GameEnvironment newGame)
@@ -64,7 +64,7 @@ namespace Chess_GUi
             InitializeComponent();
         }
 
-        [MemberNotNull(nameof(MainBoard), nameof(ConfirmMove), nameof(pictureSquares))]
+        [MemberNotNull(nameof(MainBoard), nameof(ConfirmMove), nameof(_pictureSquares))]
         private void InitializeComponent()
         {
             MainBoard = new Panel()
@@ -96,12 +96,12 @@ namespace Chess_GUi
         /// <summary>
         /// Creates the visual representation of game board squares.
         /// </summary>
-        [MemberNotNull(nameof(pictureSquares))]
+        [MemberNotNull(nameof(_pictureSquares))]
         private void CreateBoard()
         {
             int squaresToCreate = _currentGame.GameBoard.GetUpperBound(0) + 1;
 
-            pictureSquares = new PictureBox[squaresToCreate, squaresToCreate];
+            _pictureSquares = new PictureBox[squaresToCreate, squaresToCreate];
 
             int squareLength = MainBoard.Width / squaresToCreate;
 
@@ -130,7 +130,7 @@ namespace Chess_GUi
                 {
                     ChessPiece? currentPiece = _currentGame[row, column];
 
-                    pictureSquares[row, column] = new PictureBox()
+                    _pictureSquares[row, column] = new PictureBox()
                     {
                         Name = $"{row}{column}",
                         BackColor = (row + column) % 2 == 0 ? blackColor : whiteColor,
@@ -140,16 +140,16 @@ namespace Chess_GUi
                         SizeMode = PictureBoxSizeMode.CenterImage
                     };
 
-                    pictureSquares[row, column].Click += new EventHandler(this.SquareClickedEvent!);
+                    _pictureSquares[row, column].Click += new EventHandler(this.SquareClickedEvent!);
 
-                    MainBoard.Controls.Add(pictureSquares[row, column]);
+                    MainBoard.Controls.Add(_pictureSquares[row, column]);
 
                     left += squareLength;
                 }
                 left = 0;
                 top += heightIncrementer;
             }
-            _currentGame.Squares = pictureSquares;
+            _currentGame.Squares = _pictureSquares;
         }
         /// <summary>
         /// This event handler is used to handle click events on squares within the current board.
@@ -166,7 +166,7 @@ namespace Chess_GUi
                 _resetSquareAssignments = false;
             }
 
-            if (_currentGame.CanBeInteractedWith == false) return;
+            if (_currentGame.CanBeInteractedWith == false || _currentGame.GameEnded) return;
 
             var selectedSquare = sender as PictureBox;
 
@@ -266,9 +266,9 @@ namespace Chess_GUi
         }
 
         /// <summary>
-        /// This event submits a movement to the <c>GameEnvironment</c> instance.
+        /// This event submits a movement to the <see cref="GameEnvironment"/> instance.
         /// </summary>
-        /// <param name="sender"><c>PictureBox</c> object that has been clicked.</param>
+        /// <param name="sender"><see cref="PictureBox"/> object that has been clicked.</param>
         public async void ConfirmMoveClickedEvent(object sender, EventArgs e)
         {
             ConfirmMove.Visible = false;
@@ -296,12 +296,12 @@ namespace Chess_GUi
                 if (submitedMovement.CastlingWithSecondary)
                 {
                     int newColumn = (int)submitedMovement.SecondaryNewLocation.Y;
-                    pictureSquares[secondPieceRow, newColumn].Image = pictureSquares[secondPieceRow, secondPieceColumn].Image;
-                    pictureSquares[secondPieceRow, secondPieceColumn].Image = null;
+                    _pictureSquares[secondPieceRow, newColumn].Image = _pictureSquares[secondPieceRow, secondPieceColumn].Image;
+                    _pictureSquares[secondPieceRow, secondPieceColumn].Image = null;
                 }
                 else if (submitedMovement.CapturingSecondary && !Equals(submitedMovement.MainNewLocation, secondPiece.CurrentLocation))
                 {   // En Passant Capture conditions met.
-                    pictureSquares[secondPieceRow, secondPieceColumn].Image = null;
+                    _pictureSquares[secondPieceRow, secondPieceColumn].Image = null;
                 }
             }
 
@@ -310,7 +310,7 @@ namespace Chess_GUi
         }
 
         /// <summary>
-        /// Changes a <c>PictureBox</c>c found in <paramref name="_changedSquares"/> back to their original backColor and borderStyle.
+        /// Changes a <see cref="PictureBox"/> found in <see cref="_changedSquares"/> back to their original backColor and borderStyle.
         /// </summary>
         private void ResetSquareColors()
         {
@@ -322,7 +322,7 @@ namespace Chess_GUi
             }
         }
         /// <summary>
-        /// Reverts <paramref name="_friendlySelectedSquare"/> and <paramref name="_targetSquare"/> to their pre-click Image values.
+        /// Reverts <see cref="_friendlySelectedSquare"/> and <see cref="_targetSquare"/> to their pre-click <see cref="PictureBox.Image"/> values.
         /// </summary>
         private void RevertPictureDisplay()
         {

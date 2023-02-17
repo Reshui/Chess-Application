@@ -34,56 +34,64 @@ public readonly struct MovementInformation
         CapturingSecondary = capturingSecondary;
         CastlingWithSecondary = castlingWithSecondary;
     }
-    /// <value>Primary ChessPiece that the struct describes.</value>
+    /// <summary>Primary ChessPiece that is moved.</summary>
     public ChessPiece MainPiece { get; init; }
 
-    /// <value>Nullable property that refrences any secondary pieces involved in the given movement.</value>
+    /// <summary>Nullable property that refrences any secondary chess pieces involved in the given movement.
+    /// For example: A rook being castled with or an opponent chess piece that's being captured.</summary>
     public ChessPiece? SecondaryPiece { get; init; }
 
-    /// <value>New location to place <paramref name="MainPiece"/></value>
+    /// <summary>New location to place <see cref="MainPiece"/></summary>
     public Vector2 MainNewLocation { get; init; }
 
-    /// <value>New location to place <paramref name="SecondaryPiece"/>.</value>
+    /// <summary>New location to place <see cref="SecondaryPiece"/>.</summary>
     public Vector2 SecondaryNewLocation { get; init; }
 
-    /// <value>true if <paramref name="MainPiece"/> is vulnerable to En Passant; false otherwise.</value>
+    /// <summary> Gets a value indicating if <see cref="MainPiece"/> is vulnerable to En Passant.</summary>
+    /// <value><see langword="true"/> if <see cref="MainPiece"/> is vulnerable to En Passant; otherwise, <see langword="false"/></value>
     public bool EnPassantCapturePossible { get; init; }
 
-    ///<value> true if movement describes a capture of <paramref name="SecondaryPiece"/>; false otherwise.</value>
+    /// <summary> Gets a value indicating if <see cref="MainPiece"/> is capturing <see cref="SecondaryPiece"/>.</summary>
+    /// <value><see langword="true"/> if <see cref="MainPiece"/> is capturing <see cref="SecondaryPiece"/>; otherwise, <see langword="false"/></value>
     public bool CapturingSecondary { get; init; }
 
-    ///<value> true if movement describes a king castling with friendly rook <paramref name="SecondaryPiece"/>; false otherwise.</value>
+    /// <summary> Gets a value indicating if <see cref="MainPiece"/> is castling with <see cref="SecondaryPiece"/>.</summary>
+    /// <value><see langword="true"/> if <see cref="MainPiece"/> is castling with <see cref="SecondaryPiece"/>; otherwise, <see langword="false"/></value>
     public bool CastlingWithSecondary { get; init; }
 }
 
 public class ChessPiece
 {
-    /// <value>List of default movement vectors for a given <c>ChessPiece</c> instance.</value>
-    private List<Vector2> directionVectors;
+    /// <summary>List of default movement vectors for a given <see cref="ChessPiece"/> instance.</summary>
+    private List<Vector2> directionVectors { get; set; }
 
-    /// <value>Current location of this <c>ChessPiece</c> instance within the current board.</value>
-    public Vector2 CurrentLocation;
+    /// <summary>Current location of this <see cref="ChessPiece"/> instance within the current board.</summary>
+    public Vector2 CurrentLocation { get; set; }
 
-    /// <value>Enum to determine piece type. One of (King,Pawn,Queen,Bishop,Rook,Knight)</value>
-    private PieceType _pieceType;
+    /// <summary>Enum to determine piece type. One of (King,Pawn,Queen,Bishop,Rook,Knight)</summary>
+    private PieceType _pieceType { get; set; }
 
-    /// <value>Enum to determine which team a given piece is on. Must be either Team.(White/Black)</value>
-    public Team PieceTeam;
-    
-    /// <value>true if a pawn can be captured via En Passant else false.</value>
-    private bool _enPassantCapturePossible = false;
-    
-    /// <value>true if <paramref name="_pieceType"/> is PieceType.(Queen/Bishop/Rook) else false.</value>
-    private bool _canMoveAcrossBoard = false;
-    
-    /// <value>Number of times the given instance has been moved. Incremented by 1 when moved.</value>
-    private int _timesMoved = 0;
-    
-    /// <value>Location assigned to all captured pieces.</value>
+    /// <summary>Enum to determine which team a given piece is on. Must be either Team.(White/Black)</summary>
+    public Team PieceTeam { get; init; }
+
+    /// <summary>Gets or sets a value representing whether or not the current <see cref="ChessPiece"/> instance is vulnerable to En Passant.</summary>
+    /// <value><see langword="true"/> if a pawn can be captured via En Passant; otherwise, <see langword="false"/>.</value>
+    private bool _enPassantCapturePossible { get; set; } = false;
+
+    /// <summary>true if <see cref="_pieceType"/> is PieceType.(Queen/Bishop/Rook) else false.</summary>
+    private bool _canMoveAcrossBoard { get; set; } = false;
+
+    /// <summary>Gets or sets the number of times the current <see cref="ChessPiece"/> instance has been moved.</summary>
+    /// <value>Integer reprensentation of how many a <see cref="ChessPiece"/> instance has been moved.</value>
+    /// <remarks>Incremented by 1 whenever moved.</remarks>
+    private int _timesMoved { get; set; } = 0;
+
+    /// <summary>Location assigned to all captured pieces.</summary>
     public static readonly Vector2 DefaultLocation = new Vector2(-1);
 
-    /// <value>true if <c>ChessPiece</c> instance has been captured, false otherwise.</value>
-    public bool Captured = false;
+    /// <summary>Gets or sets a value representing if the current <see cref="ChessPiece"/> instance has been captured.</summary>
+    /// <value><see langword="true"/> if <see cref="ChessPiece"/> instance has been captured; otherwise, <see langword="false"/>.</value>
+    public bool Captured { get; set; } = false;
 
     public ChessPiece(PieceType piece, Coords startingLocation, Team pieceTeam)
     {
@@ -192,11 +200,11 @@ public class ChessPiece
         return directions;
     }
     /// <summary>
-    /// Determines if the current instance of a <c>ChessPiece</c> object can attack another based on team allegiance.
+    /// Determines if the current instance of a <see cref="ChessPiece"/> object can attack another based on team allegiance.
     /// </summary>
-    /// <param name="enemyPiece">This parameter is assigned a value if the piece being compared is hostile to the current instance of the <c>ChessPiece</c> class.</param>
-    /// <param name="pieceToCompare"><c>ChessPiece</c> object that will have its allegiance tested.</param>
-    /// <returns>true if <paramref name="enemyPiece"/> and <paramref name="pieceToCompare"/> are both not null and are on different teams; otherwise false.</returns>
+    /// <param name="enemyPiece">This parameter is assigned a value if the piece being compared is hostile to the current instance of the <see cref="ChessPiece"/> class.</param>
+    /// <param name="pieceToCompare"><see cref="ChessPiece"/> object that will have its allegiance tested.</param>
+    /// <returns><see langword="true"/> if <paramref name="enemyPiece"/> and <paramref name="pieceToCompare"/> are both not null and are on different teams; otherwise <see langword="false"/>.</returns>
     bool DoesSquareContainEnemy(ChessPiece? pieceToCompare, out ChessPiece? enemyPiece)
     {
         enemyPiece = null;
@@ -217,12 +225,12 @@ public class ChessPiece
     }
 
     /// <summary>
-    /// Determine the available moves for a given chess piece. Moves that will place a friendly king in check will be filtered.
+    /// Determine the available moves for a given <see cref="ChessPiece"/> instance. Moves that will place a friendly king in check will be filtered.
     /// </summary>
-    /// <returns>A List(MovementInformation) object of available movements/attacks for a given chess piece.</returns>
+    /// <returns>A List(MovementInformation) object of available movements/attacks for the current <see cref="ChessPiece"/> instance.</returns>
     /// <param name="ignoreFriendlyInducedChecks">If true then checking to see if this piece's movements will unintenionally create a check on a friendly king are ignored.</param>
     /// <param name="disableCastling">If set to true then castling movements will be ignore.</param>
-    /// <param name="gameBoard">Array used to calculate moves available to the current <c>ChessPiece</c> instance.</param>
+    /// <param name="gameBoard">Array used to calculate moves available to the current <see cref="ChessPiece"/> instance.</param>
     public List<MovementInformation> AvailableMoves(ChessPiece?[,] gameBoard, bool ignoreFriendlyInducedChecks, bool disableCastling)
     {
         var viableMoves = new List<MovementInformation>();
@@ -374,7 +382,7 @@ public class ChessPiece
     /// <summary>
     /// Creates a copy of the current instance.
     /// </summary>
-    /// <returns>A new <c>ChessPiece</c> instance.</returns>
+    /// <returns>A a copy of the current <see cref="ChessPiece"/> instance.</returns>
     public ChessPiece Copy()
     {
         return new ChessPiece(_pieceType, new Coords(ReturnLocation(0), ReturnLocation(1)), PieceTeam)
@@ -384,9 +392,9 @@ public class ChessPiece
         };
     }
     /// <summary>
-    /// Determines if a given <c>ChessPiece</c> instance has a <paramref name="_pieceType"/> value of PieceType.King.
+    /// Determines if a given <see cref="ChessPiece"/> instance has a <see cref="_pieceType"/> value of <see cref="PieceType.King"/>.
     /// </summary>
-    /// <returns>true if <c>ChessPiece</c> instance has a <paramref name="_piecetype"/> property of PieceType.King; false otherwise.</returns>
+    /// <returns><see langword="true"/> if <see cref="ChessPiece"/> instance has a <see cref="_pieceType"/> property of <see cref="PieceType.King"/>; otherwise, <see langword="false"/>.</returns>
     public bool IsKing()
     {
         return _pieceType == PieceType.King;
@@ -398,7 +406,7 @@ public class ChessPiece
         // directionVectors = DetermineDirectionVectors();
     }
     /// <summary>
-    /// Increases the <paramref name="_timesMoved"/> property by one.
+    /// Increases the <see cref="_timesMoved"/> property by one.
     /// </summary>
     public void IncreaseMovementCount()
     {
@@ -413,7 +421,7 @@ public class ChessPiece
         _enPassantCapturePossible = false;
     }
     /// <summary>
-    /// Using the <paramref name="CurrentLocation"/> property return an X or Y coordinate cast to an integer.
+    /// Using the <see cref="CurrentLocation"/> property return an X or Y coordinate cast to an integer.
     /// </summary>
     /// <param name="dimension">Integer that is either 0 and 1</param>
     /// <exception cref="ArguemntOutOfRangeException">Exception is thrown if <paramref name="dimension"/> isn't 0 or 1.</exception>
@@ -434,23 +442,22 @@ public class ChessPiece
         }
     }
     /// <summary>
-    /// Returns the current value of the <paramref name="_pieceType"/> property.
+    /// Returns the current value of the <see cref="_pieceType"/> property.
     /// </summary>
-    /// <returns>A <c>PieceType</c> enum is returned.</returns>
+    /// <returns>A <see cref="PieceType"/> enum.</returns>
     public PieceType ReturnPieceType()
     {
         return _pieceType;
     }
 
     /// <summary>
-    /// Use the <paramref name="_pieceType"/> and <paramref name="PieceTeam"/> to return a descriptive name for a board square.
+    /// Use the <see cref="_pieceType"/> and <paramref name="PieceTeam"/> to return a descriptive name for a board square.
     /// For example: <example>White_Queen</example>
     /// </summary>
-    /// <exception cref="ArguemntOutOfRangeException">Exception is thrown if <paramref name="_pieceType"/> isn't a valid <c>PieceType</c> enum.</exception>
-    /// <returns>A string represntation of <paramref name="_pieceType"/> and <paramref name="PieceTeam"/>.</returns>
+    /// <exception cref="ArguemntOutOfRangeException">Exception is thrown if <see cref="_pieceType"/> isn't a valid <see cref="PieceType"/> enum.</exception>
+    /// <returns>A string represntation of <see cref="_pieceType"/> and <paramref name="PieceTeam"/>.</returns>
     public string ReturnPieceTypeName()
     {
-        string teamDesignation = PieceTeam == Team.White ? "White" : "Black";
         string methodValue = _pieceType switch
         {
             PieceType.King => "King",
@@ -461,7 +468,7 @@ public class ChessPiece
             PieceType.Queen => "Queen",
             _ => throw new ArgumentOutOfRangeException(nameof(_pieceType), _pieceType, "Unrecognized PieceType submitted."),
         };
-        return teamDesignation + "_" + methodValue;
+        return PieceTeam + "_" + methodValue;
     }
 }
 
