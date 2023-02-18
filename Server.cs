@@ -10,36 +10,39 @@ public class Server
 {
     /// <summary>Boolean representation of whether or not the <see cref="Server"/> instance is accepting new clients.</summary>
     private bool _acceptingNewClients { get; set; } = false;
-    /// <summary>List of connected <c>TcpClients</c> to the current <see cref="Server"/> instance. Limited to 2.</summary>
+    /// <summary>List of connected <c>TcpClients</c> to the current <see cref="Server"/> instance.</summary>
     private ConcurrentDictionary<int, Player> _connectedPlayers = new();
     /// <summary>Listens for user responses and connections.</summary>
     private TcpListener _gameServer { get; init; }
     /// <summary>Dictionary of <c>GameEnvironment</c> instances that have been started.</summary>
     private ConcurrentDictionary<int, GameEnvironment> _startedGames = new();
-    /// <summary>Data structure used to store players that are currently waiting for a game.</summary>
+    /// <summary>Stores players that are currently waiting for a game.</summary>
     private ConcurrentQueue<Player> _waitingForGameLobby = new();
     /// <summary>Stores Tasks that listen for <see cref="Player"/> responses.</summary>
     private ConcurrentDictionary<int, Task> _clientListeningTasks = new();
     /// <summary>Dictionary of Cancellation Tokens keyed to a given user</summary>
-    private ConcurrentDictionary<int, CancellationTokenSource> _clientListeningCancellationTokens = new();
+    private ConcurrentDictionary<int, CancellationTokenSource> _clientListeningCancelationTokens = new();
     public CancellationTokenSource ServerShutDownCancelSource { get; } = new();
-    /// <summary><see cref="ServerShutDownCancelSource"/>'s <c>CancellationToken</c>,</summary>
-    private CancellationToken _mainCancellationToken { get => ServerShutDownCancelSource.Token; }
+    /// <summary><see cref="ServerShutDownCancelSource"/>'s <see cref="CancellationToken"/>,</summary>
+    private CancellationToken _mainCancelationToken { get => ServerShutDownCancelSource.Token; }
 
     /// <summary>List that holds the asynchronous tasks started in <see cref="StartServer()"/>.</summary>
-    private readonly List<Task> _serverTasks = new();
+    private readonly List<Task> _serverTasks = new() { Capacity = 2 };
+    private static readonly CommandType[] _endGameCommands = new CommandType[3] { CommandType.DeclareLoss, CommandType.DeclareWin, CommandType.DeclareStaleMate };
     public enum CommandType
     {
-        ClientDisconnected,
+        ClientDisconnecting,
         NewMove,
         OpponentClientDisconnected,
         StartGameInstance,
-        Defeat,
-        Winner,
-        Draw,
-        Forefit,
+        DeclareForefit,
         LookingForGame,
         ServerIsShuttingDown,
+        DeclareWin,
+        DeclareLoss,
+        DeclareStaleMate
+
+
     }
     public class ServerCommand
     {
@@ -87,9 +90,20 @@ public class Server
     /// </summary>
     public async Task CloseServerAsync()
     {
-        ServerShutDownCancelSource.Cancel();
-        await Task.WhenAll(_serverTasks);
-        ServerShutDownCancelSource.Dispose();
+        try
+        {
+            ServerShutDownCancelSource.Cancel();
+            await Task.WhenAll(_serverTasks);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e.ToString());
+        }
+        finally
+        {
+            ServerShutDownCancelSource.Dispose();
+        }
+
         await BrodcastServerShutDown();
     }
     /// <summary>
@@ -99,7 +113,7 @@ public class Server
     {
         List<Player> matchedPlayers = new() { Capacity = 2 };
 
-        while (!_mainCancellationToken.IsCancellationRequested)
+        while (!_mainCancelationToken.IsCancellationRequested)
         {
             if (_waitingForGameLobby.TryDequeue(out Player? waitingPlayer))
             {
@@ -107,76 +121,101 @@ public class Server
 
                 if (matchedPlayers.Count == 2)
                 {
-                    bool bothPlayersAvailable = true;
+                    List<Task<bool>> clientPingingTasks = new();
+                    List<Task> clientRemovalTasks = new();
+                    foreach (Player user in matchedPlayers) { clientPingingTasks.Add(IsClientActiveAsync(user.Client)); }
 
-                    foreach (Player user in matchedPlayers)
+                    while (clientPingingTasks.Count > 0)
                     {
-                        if (!await IsClientActiveAsync(user.Client))
+                        Task<bool> completedTask = await Task.WhenAny(clientPingingTasks);
+                        if (!completedTask.Result)
                         {
-                            matchedPlayers.Remove(user);
-                            await ClientRemovalAsync(user);
-                            bothPlayersAvailable = false;
+                            int index = clientPingingTasks.IndexOf(completedTask);
+                            Player user = matchedPlayers[index];
+                            matchedPlayers.RemoveAt(index);
+                            clientRemovalTasks.Add(ClientRemovalAsync(user));
                         }
+                        clientPingingTasks.Remove(completedTask);
                     }
 
-                    if (bothPlayersAvailable)
+                    if (clientRemovalTasks.Count > 0) await Task.WhenAll(clientRemovalTasks);
+
+                    if (matchedPlayers.Count == 2)
                     {
                         var newGame = new GameEnvironment(matchedPlayers[0], matchedPlayers[1]);
-                        var notificationTasks = new List<Task>();
 
                         foreach (KeyValuePair<Team, Player> playerDetail in newGame.AssociatedPlayers)
                         {
                             var clientCommand = new ServerCommand(CommandType.StartGameInstance, newGame.GameID, assignedTeam: playerDetail.Key);
+                            bool cancelationTokenAvailable = _clientListeningCancelationTokens.TryGetValue(playerDetail.Value.ServerAssignedID, out CancellationTokenSource? cancelSource);
 
-                            bool cancellationTokenAvailable = _clientListeningCancellationTokens.TryGetValue(playerDetail.Value.ServerAssignedID, out CancellationTokenSource? cancelSource);
-
-                            if (cancellationTokenAvailable && cancelSource != null)
+                            if (cancelationTokenAvailable && cancelSource != null)
                             {
-                                notificationTasks.Add(SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), playerDetail.Value.Client!, cancelSource.Token));
+                                try
+                                {
+                                    await SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), playerDetail.Value.Client!, cancelSource.Token);
+                                }
+                                catch (Exception e) when (e is TaskCanceledException || e is IOException)
+                                {   // Failed to message client or client is leaving the server.
+                                    matchedPlayers.Remove(playerDetail.Value);
+                                }
                             }
                         }
-
-                        await Task.WhenAll(notificationTasks);
-
-                        _startedGames.TryAdd(newGame.GameID, newGame);
-
-                        matchedPlayers.Clear();
+                        // If they are no problems with notifying both players to start the game then track the game.
+                        if (matchedPlayers.Count == 2)
+                        {
+                            _startedGames.TryAdd(newGame.GameID, newGame);
+                            matchedPlayers.Clear();
+                        }
+                        else if (matchedPlayers.Count == 1)
+                        {
+                            var notifyOpponentDisconnectCommand = new ServerCommand(CommandType.OpponentClientDisconnected);
+                        }
                     }
-
                 }
             }
-            await Task.Delay(1000);
+            await Task.Delay(700, _mainCancelationToken);
         }
     }
     /// <summary>
-    /// Asynchronously waits for <c>TcpClient</c> connections to <see cref="_gameServer"/>.
+    /// Asynchronously waits for <see cref="TcpClient"/> connections to <see cref="_gameServer"/>.
     /// </summary>
     private async Task WaitForClientsAsync()
     {
         // Start listening for client requests.
         _gameServer.Start();
 
-        while (!_mainCancellationToken.IsCancellationRequested)
+        try
         {
-            TcpClient? newClient = await _gameServer.AcceptTcpClientAsync(_mainCancellationToken);
-
-            if (_mainCancellationToken.IsCancellationRequested == false && newClient != null)
+            while (true)
             {
-                Player newPlayer = new Player(newClient);
-                var cancellationSource = new CancellationTokenSource();
+                TcpClient? newClient = await _gameServer.AcceptTcpClientAsync(_mainCancelationToken);
 
-                _connectedPlayers.TryAdd(newPlayer.ServerAssignedID, newPlayer);
-                _clientListeningCancellationTokens.TryAdd(newPlayer.ServerAssignedID, cancellationSource);
-                _clientListeningTasks.TryAdd(newPlayer.ServerAssignedID, ProcessClientDataAsync(newPlayer, cancellationSource.Token));
+                if (newClient != null)
+                {
+                    Player newPlayer = new Player(newClient);
+                    var cancelationSource = new CancellationTokenSource();
+
+                    _connectedPlayers.TryAdd(newPlayer.ServerAssignedID, newPlayer);
+                    _clientListeningCancelationTokens.TryAdd(newPlayer.ServerAssignedID, cancelationSource);
+                    _clientListeningTasks.TryAdd(newPlayer.ServerAssignedID, ProcessClientDataAsync(newPlayer, cancelationSource.Token));
+                }
             }
         }
-
-        _gameServer.Stop();
+        catch (TaskCanceledException)
+        {   // Error raised if _mainCancelationToken.IsCancelRequested = true .
+            Console.WriteLine($"Locally hosted server:{nameof(_gameServer)}, is shutting down.");
+        }
+        finally
+        {   /// The above tasks will be dealt with when ClienTRemovalAsync is called when shutting down the server. 
+            _gameServer.Stop();
+        }
     }
     /// <summary>
-    /// Tests if a given <paramref name="client"/> is still responsive.
+    /// Asynchronously tests if a given <paramref name="client"/> is still responsive.
     /// </summary>
-    /// <returns><see langword="true"/> if socket is still connected; otherwise, <see langword="false"/>.</returns>
+    /// <returns><see cref="Task<bool>"/> <see langword="true"/> if socket is still connected; otherwise, <see langword="false"/>.</returns>
+    /// <param name="client"><see cref="TcpClient"/> that is tested.</param>
     private static async Task<bool> IsClientActiveAsync(TcpClient client)
     {
         byte[] data = new byte[1];
@@ -195,122 +234,144 @@ public class Server
     /// <summary>
     /// Sends a given <paramref name="client"/> a message.
     /// </summary>
-    /// <param name="client"><c>TcpClient</c> that is sent a message.</param>
+    /// <param name="client"><see cref="TcpClient"/> that is sent a message.</param>
     /// <param name="message">Message to be sent to <paramref name="client"/>.</param>
     /// <exception cref="IOException">Raised when an error occurs while attempting to use .WriteAsync.</exception>
-    private static async Task SendClientMessageAsync(string message, TcpClient client, CancellationToken token)
+    /// <exception cref="TaskCanceledException">Raised if <paramref name="token"/> is canceled.</exception>
+    private static async Task SendClientMessageAsync(string message, TcpClient client, CancellationToken? token)
     {
         byte[] msg = Encoding.ASCII.GetBytes(message);
         NetworkStream stream = client.GetStream();
-        await stream.WriteAsync(msg, 0, msg.Length, token);
+
+        if (token == null)
+        {
+            await stream.WriteAsync(msg, 0, msg.Length);
+        }
+        else
+        {
+            await stream.WriteAsync(msg, 0, msg.Length, (CancellationToken)token);
+        }
     }
 
     /// <summary>
     /// Handles responses from a <paramref name="user"/> client asynchronously.
     /// </summary>
+    /// <remarks>Upon exiting the main loop <paramref name="user"/> will have all of its references on the server dealt with.</remarks>
     /// <param name="user"><see cref="Player"/> instance that is monitored for its responses.</param>
-    /// <param name="token">A <c>CancellationToken</c> that is specificly for <paramref name ="user"/>.</param>
+    /// <param name="token">A <see cref="CancellationToken"/> that is specificly for <paramref name ="user"/>.</param>
     private async Task ProcessClientDataAsync(Player user, CancellationToken token)
     {
-        NetworkStream stream = user.Client.GetStream();
+        using NetworkStream stream = user.Client.GetStream();
         ServerCommand clientCommand;
 
         bool clientDisconnected = false;
 
-        while (!(token.IsCancellationRequested || clientDisconnected))
+        try
         {
-            var builder = new StringBuilder();
-            int responseByteCount;
-            byte[] bytes = new byte[256];
-
-            do
-            {   // Loop to receive all the data sent by the client.
-                responseByteCount = await stream.ReadAsync(bytes, token);
-                if (responseByteCount > 0) builder.Append(Encoding.ASCII.GetString(bytes, 0, responseByteCount));
-            } while (token.IsCancellationRequested == false && responseByteCount > 0);
-
-            if (token.IsCancellationRequested) break;
-            else if (builder.Length == 0) continue;
-
-            ServerCommand? deserializedData = JsonSerializer.Deserialize<ServerCommand>(builder.ToString());
-
-            if (deserializedData != null)
+            while (!clientDisconnected)
             {
-                if (deserializedData.CMD == CommandType.LookingForGame)
+                var builder = new StringBuilder();
+                int responseByteCount;
+                byte[] bytes = new byte[256];
+
+                do
+                {   // Loop to receive all the data sent by the client.
+                    responseByteCount = await stream.ReadAsync(bytes, token);
+                    if (responseByteCount > 0) builder.Append(Encoding.ASCII.GetString(bytes, 0, responseByteCount));
+                } while (responseByteCount > 0);
+
+                if (builder.Length == 0) continue;
+
+                string recievedText = builder.ToString();
+                ServerCommand? deserializedData = JsonSerializer.Deserialize<ServerCommand>(recievedText);
+
+                if (deserializedData != null)
                 {
-                    // Only add the user to the queue if they aren't already in it.
-                    if (!_waitingForGameLobby.Contains(user)) _waitingForGameLobby.Enqueue(user);
-                }
-                else if (deserializedData.CMD == CommandType.NewMove && deserializedData.MoveDetails != null)
-                {
-                    GameEnvironment currentGame = _startedGames[deserializedData.GameIdentifier];
-
-                    (Player opposingUser, Team opposingTeamColor) = (user == currentGame.AssociatedPlayers[Team.White]) ? (currentGame.AssociatedPlayers[Team.Black], Team.Black) : (currentGame.AssociatedPlayers[Team.White], Team.White);
-
-                    currentGame.SubmitFinalizedChange((MovementInformation)deserializedData.MoveDetails);
-                    // Send back a response to the opposing player.
-                    opposingUser.Client.GetStream().Write(bytes, 0, bytes.Length);
-
-                    if (currentGame.IsKingCheckMated(currentGame.ReturnKing(opposingTeamColor)))
+                    if (deserializedData.CMD == CommandType.LookingForGame)
+                    {   // Only add the user to the queue if they aren't already in it.
+                        if (!_waitingForGameLobby.Contains(user)) _waitingForGameLobby.Enqueue(user);
+                    }
+                    else if (deserializedData.CMD == CommandType.NewMove && deserializedData.MoveDetails != null)
                     {
-                        var clients = new[] { opposingUser.Client, user.Client };
-                        var linkedCommands = new[] { CommandType.Defeat, CommandType.Winner };
-                        var clientCommands = clients.Zip(linkedCommands, (c, lc) => new { Client = c, Command = lc });
-
-                        var winLoseTasks = new List<Task>();
-
-                        foreach (var msg in clientCommands)
+                        if (_startedGames.TryGetValue(deserializedData.GameIdentifier, out GameEnvironment? currentGame))
                         {
-                            clientCommand = new ServerCommand(msg.Command, currentGame.GameID);
-                            winLoseTasks.Add(SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), msg.Client, token));
+                            Player opposingUser = (user == currentGame.AssociatedPlayers[Team.White]) ? currentGame.AssociatedPlayers[Team.Black] : currentGame.AssociatedPlayers[Team.White];
+                            // Send back a response to the opposing player.
+                            int iterationCount = 0;
+                            while (true)
+                            {
+                                try
+                                {
+                                    await SendClientMessageAsync(recievedText, opposingUser.Client, null);
+                                    break;
+                                }
+                                catch (IOException)
+                                {
+                                    if (!await IsClientActiveAsync(opposingUser.Client) || ++iterationCount == 5)
+                                    {
+                                        await ClientRemovalAsync(opposingUser);
+                                        break;
+                                    }
+                                    else
+                                    {
+                                        continue;
+                                    }
+                                }
+                            }
                         }
-                        await Task.WhenAll(winLoseTasks);
-                        currentGame.GameEnded = true;
                     }
-                    else if (currentGame.IsStalemate())
+                    else if (_endGameCommands.Contains(deserializedData.CMD))
                     {
-                        // Send both connected clients a Draw command.
-                        clientCommand = new ServerCommand(CommandType.Draw, currentGame.GameID);
-
-                        foreach (var player in new Player[] { user, opposingUser })
+                        if (_startedGames.TryGetValue(deserializedData.GameIdentifier, out GameEnvironment? currentGame))
                         {
-                            await SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), player.Client, token);
+                            _startedGames.TryRemove(new KeyValuePair<int, GameEnvironment>(currentGame!.GameID, currentGame));
                         }
-
-                        currentGame.GameEnded = true;
                     }
-
-                    if (currentGame.GameEnded)
-                    {   // Stop tracking the game.
-                        _startedGames.TryRemove(new KeyValuePair<int, GameEnvironment>(currentGame.GameID, currentGame));
-                    }
-                }
-                else if (deserializedData.CMD == CommandType.ClientDisconnected)
-                {
-                    // Notify the opponent.
-                    List<GameEnvironment> gamesToDisconnect = (from gameKeyValue in _startedGames
-                                                               let game = gameKeyValue.Value
-                                                               where game.AssociatedPlayers[Team.White] == user || game.AssociatedPlayers[Team.Black] == user
-                                                               select game).ToList();
-
-                    var disconnectionTasks = new List<Task>();
-                    foreach (GameEnvironment game in gamesToDisconnect)
+                    else if (deserializedData.CMD == CommandType.ClientDisconnecting)
                     {
-                        clientCommand = new ServerCommand(CommandType.OpponentClientDisconnected, game.GameID);
-
-                        Player opposingUser = (user == game.AssociatedPlayers[Team.White]) ? game.AssociatedPlayers[Team.Black] : game.AssociatedPlayers[Team.White];
-
-                        disconnectionTasks.Add(SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), opposingUser.Client, token));
-
-                        _startedGames.TryRemove(new KeyValuePair<int, GameEnvironment>(game.GameID, game));
+                        clientDisconnected = true;
                     }
-
-                    await Task.WhenAll(disconnectionTasks);
-
-                    _connectedPlayers.TryRemove(new KeyValuePair<int, Player>(user.ServerAssignedID, user));
-                    clientDisconnected = true;
                 }
             }
+        }
+        catch (Exception e) when (e is IOException || e is TaskCanceledException)
+        { // Client has likely disconnected.
+            clientDisconnected = true;
+        }
+        finally
+        {
+            // Gather all the games that user is taking part in and notify the opponent os user's disconnect.
+            List<GameEnvironment> gamesToDisconnect = (from game in _startedGames.Values
+                                                       where game.AssociatedPlayers.ContainsValue(user)
+                                                       select game).ToList();
+            var disconnectionTasks = new List<Task>();
+
+            foreach (GameEnvironment game in gamesToDisconnect)
+            {
+                // If !_mainCancelationToken.IsCancellationRequested is true then the server is shutting down and there is no need to notify the opponent.
+                if (!_mainCancelationToken.IsCancellationRequested)
+                {
+                    clientCommand = new ServerCommand(CommandType.OpponentClientDisconnected, game.GameID);
+                    Player opposingUser = (user == game.AssociatedPlayers[Team.White]) ? game.AssociatedPlayers[Team.Black] : game.AssociatedPlayers[Team.White];
+                    disconnectionTasks.Add(SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), opposingUser.Client, token));
+                }
+                _startedGames.TryRemove(new KeyValuePair<int, GameEnvironment>(game.GameID, game));
+            }
+
+            _connectedPlayers.TryRemove(new KeyValuePair<int, Player>(user.ServerAssignedID, user));
+
+            CancellationTokenSource cancellationSource = _clientListeningCancelationTokens[user.ServerAssignedID];
+            // Dispose of the CancellationTokenSource.
+            cancellationSource.Dispose();
+            // Remove references to the Token.
+            _clientListeningCancelationTokens.TryRemove(new KeyValuePair<int, CancellationTokenSource>(user.ServerAssignedID, cancellationSource));
+
+            if (_waitingForGameLobby.Contains(user))
+            {   /// Remove user from the LFG queue.
+                _waitingForGameLobby = new ConcurrentQueue<Player>(_waitingForGameLobby.Where(x => !x.Equals(user)));
+            }
+
+            if (disconnectionTasks.Count > 0) await Task.WhenAll(disconnectionTasks);
         }
     }
     /// <summary>
@@ -319,27 +380,28 @@ public class Server
     /// <param name="user"><see cref="Player"/> instance that has its references removed.</param>
     private async Task ClientRemovalAsync(Player user)
     {
-        _clientListeningCancellationTokens[user.ServerAssignedID].Cancel();
-        await _clientListeningTasks[user.ServerAssignedID];
-        _clientListeningCancellationTokens[user.ServerAssignedID].Dispose();
-        user.Client.Dispose();
-        RemoveFromWaitingLobby(user);
-        _connectedPlayers.TryRemove(new KeyValuePair<int, Player>(user.ServerAssignedID, user));
-    }
-
-    /// <summary>
-    /// Removes <paramref name="user"/> instance from <see cref="_waitingForGameLobby"/> if it exists.
-    /// </summary>
-    private void RemoveFromWaitingLobby(Player user)
-    {
-        if (_waitingForGameLobby.Contains(user))
+        // Cancel the listening for response task and dispose of the token.
+        try
         {
-            _waitingForGameLobby = new ConcurrentQueue<Player>(_waitingForGameLobby.Where(x => !x.Equals(user)));
+            if (_clientListeningCancelationTokens.TryGetValue(user.ServerAssignedID, out CancellationTokenSource? cancelSource))
+            {
+                cancelSource.Cancel();
+                // Cancel Source is Disposed in the following Task.
+                await _clientListeningTasks[user.ServerAssignedID];
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+
+        }
+        finally
+        {
+            user.Client.Dispose();
         }
     }
 
     /// <summary>
-    /// Tells all connected TcpClients that the server is shutting down and removes relevant references.
+    /// Asynchronously tells all connected <see cref="TcpClients"/>  in <see cref="_connectedPlayers"/> that the server is shutting down and removes relevant references.
     /// </summary>
     private async Task BrodcastServerShutDown()
     {
@@ -347,11 +409,11 @@ public class Server
 
         var shutDownBroadcastTasks = new List<Task>();
 
-        var bb = new CancellationTokenSource();
-
+        // Tell clients that the server is shutting down and then dispose of their resources.
         foreach (var player in _connectedPlayers.Values)
         {
-            shutDownBroadcastTasks.Add(SendClientMessageAsync(shutdownCommand, player.Client, bb.Token).ContinueWith(x => ClientRemovalAsync(player)));
+            shutDownBroadcastTasks.Add(SendClientMessageAsync(shutdownCommand, player.Client, token: null)
+                                        .ContinueWith(x => ClientRemovalAsync(player)));
         }
 
         await Task.WhenAll(shutDownBroadcastTasks);

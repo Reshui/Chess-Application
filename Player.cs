@@ -19,19 +19,16 @@ public class Player
     }
     private TcpClient? _client;
 
-    public Socket UnderlyingSocket
-    {
-        get => Client.Client ?? throw new NullReferenceException(nameof(_client));
-    }
-
-    /// <summary>Server connected to the current instance of the <c>Player</c> class.</summary>
+    /// <summary>Server connected to the current instance of the <see cref="Player"/> class.</summary>
     private readonly TcpClient? _connectedServer;
     private Dictionary<int, GameEnvironment> _activeGames = new();
     private bool _serverIsConnected { get; set; } = false;
     public int ServerAssignedID { get; init; }
+
+    /// <summary>Static variable used by the <see cref="Server"/> class to generate a value for <see cref="ServerAssignedID"/> via a constructor.</summary>
     private static int _instanceCount = 0;
     /// <summary>
-    /// Constructor used by clients connected to a host server.
+    /// Client-side constructor.
     /// </summary>
     public Player()
     {
@@ -78,8 +75,7 @@ public class Player
                     if (bytesRead > 0) builder.Append(Encoding.ASCII.GetString(bytes, 0, bytesRead));
                 } while (!token.IsCancellationRequested && bytesRead > 0);
 
-                if (token.IsCancellationRequested) break;
-                else if (builder.Length == 0) continue;
+                if (builder.Length == 0) continue;
 
                 ServerCommand? response = JsonSerializer.Deserialize<ServerCommand>(builder.ToString());
 
@@ -96,33 +92,14 @@ public class Player
                     {
                         throw new NotImplementedException();
                     }
-                    else if (response.CMD == CommandType.OpponentClientDisconnected)
-                    {
-
-                    }
                     else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames[serverSideGameID] != null)
                     {
-                        throw new NotImplementedException("Opponent disconnection hasn't been implemented.");
-                        //_activeGames.Remove(serverSideGameID);
+                        _activeGames.Remove(serverSideGameID);
+                        throw new NotImplementedException("Opponent disconnection hasn't been fully implemented.");
                     }
                     else if (response.CMD == CommandType.NewMove)
                     {
-                        UpdateOpponentMove((MovementInformation)response.MoveDetails!, serverSideGameID);
-                    }
-                    else if (response.CMD == CommandType.Defeat && _activeGames[serverSideGameID] != null)
-                    {
-                        _activeGames[serverSideGameID].GameEnded = true;
-                        throw new NotImplementedException();
-                    }
-                    else if (response.CMD == CommandType.Winner && _activeGames[serverSideGameID] != null)
-                    {
-                        _activeGames[serverSideGameID].GameEnded = true;
-                        throw new NotImplementedException();
-                    }
-                    else if (response.CMD == CommandType.Draw && _activeGames[serverSideGameID] != null)
-                    {
-                        _activeGames[serverSideGameID].GameEnded = true;
-                        throw new NotImplementedException();
+                        _activeGames[serverSideGameID].ChangeGameBoardAndGUI((MovementInformation)response.MoveDetails!);
                     }
                 }
             }
@@ -145,76 +122,45 @@ public class Player
     {
         GameEnvironment targetedGameInstance = _activeGames[serverSideGameID];
 
-        targetedGameInstance.SubmitFinalizedChange(move);
-
-        if (targetedGameInstance.CanBeInteractedWith && _connectedServer != null && _serverIsConnected && !targetedGameInstance.GameEnded)
+        if (targetedGameInstance.ActiveTeam == move.SubmittingTeam)
         {
-            targetedGameInstance.CanBeInteractedWith = false;
+            targetedGameInstance.ChangeGameBoardAndGUI(move);
 
-            string submissionCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.NewMove, serverSideGameID, move));
-
-            await SendServerMessageAsync(submissionCommand, token);
-
-        }
-        else if (_connectedServer!.Connected == false || _serverIsConnected == false || targetedGameInstance.GameEnded)
-        {
-            throw new Exception("Server is no longer connected.");
-        }
-    }
-    /// <summary>
-    /// Updates a client-side <see cref="GameEnvironment"/> instance when a movement is recieved from <see cref="_connectedServer"/>.
-    /// </summary>
-    /// <param name="enemyMove">Board movement used to update a <see cref="GameEnvironment"/> instance.</param>
-    /// <param name="serverSideGameID">ID number used to target a specific <see cref="GameEnvironment"/> instance within <see cref="_activeGames"/>.</param>
-    public void UpdateOpponentMove(MovementInformation enemyMove, int serverSideGameID)
-    {
-        try
-        {
-            GameEnvironment targetedGameInstance = _activeGames[serverSideGameID];
-
-            if (targetedGameInstance != null && targetedGameInstance.Squares != null)
+            if (_connectedServer != null && _serverIsConnected)
             {
-                targetedGameInstance.SubmitFinalizedChange(enemyMove);
-
-                if (enemyMove.SecondaryPiece != null)
+                string submissionCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.NewMove, serverSideGameID, move));
+                try
                 {
-                    ChessPiece secPiece = enemyMove.SecondaryPiece;
-                    PictureBox? secBox = targetedGameInstance.Squares[secPiece.ReturnLocation(0), secPiece.ReturnLocation(1)];
-
-                    if (secBox != null)
-                    {
-                        if (enemyMove.CapturingSecondary)
-                        {
-                            secBox.Image = null;
-                        }
-                        else if (enemyMove.CastlingWithSecondary)
-                        {
-                            targetedGameInstance.Squares[(int)enemyMove.SecondaryNewLocation.X, (int)enemyMove.SecondaryNewLocation.Y]!.Image = secBox.Image;
-                            secBox.Image = null;
-                        }
-                    }
+                    await SendServerMessageAsync(submissionCommand, token);
                 }
-
-                ChessPiece enemyPiece = enemyMove.MainPiece;
-                PictureBox? mainBox = targetedGameInstance.Squares[enemyPiece.ReturnLocation(0), enemyPiece.ReturnLocation(1)];
-
-                if (mainBox != null)
+                catch (IOException)
                 {
-                    targetedGameInstance.Squares[(int)enemyMove.MainNewLocation.X, (int)enemyMove.MainNewLocation.Y]!.Image = mainBox.Image;
-                    mainBox.Image = null;
+                    _serverIsConnected = false;
+                    throw new NotImplementedException("Server not responding handling not implemented.");
+                }
+                catch (TaskCanceledException)
+                {
+                    throw new NotImplementedException("Task cancellation handling not implemented.");
                 }
             }
+            else if (_connectedServer!.Connected == false || _serverIsConnected == false)
+            {
+                _serverIsConnected = false;
+                throw new Exception("Server is no longer connected.");
+            }
         }
-        catch (KeyNotFoundException e)
+        else
         {
-            throw new NullReferenceException($"{nameof(serverSideGameID)} couldn't be found within {nameof(_activeGames)}.", e);
+            throw new Exception("Movement submitted on the wrong turn.");
         }
     }
 
     /// <summary>
     /// Sends <see cref="_connectedServer"/> a given <paramref name="message"/> asynchronously.
     /// </summary>
-    /// <param name="message">Serialized <c>ServerCommand</c> to send.</param>
+    /// <param name="message">Serialized <see cref="Server.ServerCommand"/> to send.</param>
+    /// <exception cref="IOException">Thrown if NetworkStream.WriteAsync generates an error.</exception>
+    /// <exception cref="TaskCanceledException">Thrown if <paramref name="token"/> source is canceled.</exception> 
     public async Task SendServerMessageAsync(string message, CancellationToken token)
     {
         if (_connectedServer != null)

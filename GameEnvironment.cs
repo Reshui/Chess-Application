@@ -2,46 +2,50 @@ namespace Pieces;
 
 using System.Numerics;
 using System.Linq;
-using System.Diagnostics.CodeAnalysis;
+//using System.Diagnostics.CodeAnalysis;
+
+public enum GameState
+{
+    LocalWin, LocalLoss, GameDraw, Playing
+}
 
 public class GameEnvironment
 {
-    /// <value>Array used to hold ChessPiece objects and their locations withn the current game.</value>
-    public ChessPiece?[,] GameBoard = new ChessPiece[8, 8];
-    /// <value>Array used to store visual information about <paramref name="GameBoard"/>.</value>
+    /// <summary>Array used to hold <see cref="Pieces.ChessPiece"/> instances and their locations withn the current game.</summary>
+    public readonly ChessPiece?[,] GameBoard = new ChessPiece[8, 8];
+    /// <summary>Array used to store visual information about <see cref="GameBoard"/>.</summary>
+    /// <remarks>Assigned a value when an instance of <see cref="Chess_GUi.BoardGUI"/> is generated.</remarks>
     public PictureBox[,]? Squares { get; set; }
     private ChessPiece _whiteKing { get; init; }
     private ChessPiece _blackKing { get; init; }
+    /// <summary>Player dictionary keyed to the <see cref="Pieces.Team"/> that they have been assigned to.</summary>
     public Dictionary<Team, Player> AssociatedPlayers = new();
-    /// <value>Dictionary of <c>ChessPiece</c> objects keyed to a team color.</value>
+    /// <summary>Dictionary of <see cref="Pieces.ChessPiece"/> objects keyed to a team color.</summary>
     private Dictionary<Team, List<ChessPiece>> _teamPieces;
-    ///<value>If over 50 then a Draw is determined.</value>
-    private int _movesSinceLastCapture { get; set; } = 0;
-    /// <value>List of submitted moves within the current <c>GameEnvironment</c> instance.</value>
+    /// <summary>Stores how many moves have been submitted since the last capture was made.</summary>
+    /// <remarks>If over 50 then a Draw is determined.</remarks>
+    private int _movesSinceLastCapture = 0;
+    /// <summary>List of submitted moves within the current <see cref="GameEnvironment"/> instance.</summary>
     private List<MovementInformation> _gameMoves = new();
+    /// <summary>Gets or sets a boolean that denotes whether or not a given instance has ended.</summary>
+    /// <value><see langword="true"/> if the <see cref="GameEnvironment"/> instance has ended; otherwise, <see langword="false"/>.</value>
     public bool GameEnded { get; set; } = false;
-    /// <value>Boolean represents whether or not the instance can be interacted with by a local <c>Player</c>.</value>
     public CancellationTokenSource? PlayerAffiliatedCancellationSource;
-    public bool CanBeInteractedWith
-    {
-        get
-        {
-            if (_initializedByClient) return _canBeInteractedWith;
-            else return false;
-        }
-        set
-        {
-            _canBeInteractedWith = value;
-        }
-    }
-    private bool _canBeInteractedWith = false;
-
-    /// <value>Server-Side integer used to identify the current <c>GameEnvironment</c> instance.</value>
-    private static int _instanceNumber;
+    /// <summary>Server-Side integer used to identify the current <see cref="GameEnvironment"/> instance.</summary>
+    /// <remarks>Value is auto-incremented in the relevant constructors.</remarks>
+    private static int _instanceNumber = 0;
+    /// <summary>Gets or initializes an ID number used to track the current instance on the server.</summary>
+    /// <value>The ID of the current <see cref="GameEnvironment"/> instance on the server.</value>
     public int GameID { get; init; }
-
-    /// <value>Variable used by the client-side <c>GameEnvironment</c> instance to Assign a team to the user.</value>
+    /// <summary>Gets or initializes a <see cref="Pieces.Team"/> enum that represents the assigned Team of the client.</summary>
+    /// <remarks>Variable used by the client-side <see cref="BoardGUI"/> instance to limit interaction with the board until it is that team's turn.</remarks>
+    /// <value><see cref="Pieces.Team"/> assigned to the local user.</value>
     public Team PlayerTeam { get; init; }
+    /// <summary>Gets or sets a value representing which <see cref="Pieces.Team"/> is currently allowed to submit MovementInformation.</summary>
+    /// <remarks>Alternated whenever <see cref="GameEnvironment.SubmitFinalizedChange(MovementInformation)"/> is called.</remarks>
+    ///<value>The <see cref="Pieces.Team"/> that is currently allowed to submit <see cref="Pieces.MovementInformation"/> to the instance.</value>
+    public Team ActiveTeam { get; set; } = Team.White;
+    public GameState MatchState { get; set; } = GameState.Playing;
     private bool _initializedByServer { get; init; } = false;
     private bool _initializedByClient { get; init; } = false;
     public ChessPiece this[int x, int y]
@@ -60,8 +64,6 @@ public class GameEnvironment
 
         PlayerAffiliatedCancellationSource = new();
 
-        CanBeInteractedWith = PlayerTeam == Team.White ? true : false;
-
         _teamPieces = GenerateBoard();
         _whiteKing = AssignKing(Team.White);
         _blackKing = AssignKing(Team.Black);
@@ -70,7 +72,7 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Constructor used for server - side code.
+    /// Constructor used by the server to track changes of active games and assign teams to Players.
     /// </summary>
     public GameEnvironment(Player playerOne, Player playerTwo)
     {
@@ -80,7 +82,7 @@ public class GameEnvironment
         var playerList = new List<Player> { playerOne, playerTwo };
 
         var rand = new Random();
-        int playerID = rand.Next(2);
+        int playerID = rand.Next(playerList.Count);
 
         AssociatedPlayers.Add(Team.White, playerList[playerID]);
         AssociatedPlayers.Add(Team.Black, playerList[playerID == 0 ? 1 : 0]);
@@ -92,10 +94,10 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Returns a <c>ChessPiece</c> object of type King. Call this during the initialization of the <c>GameEnvironment</c> class.
+    /// Returns a <see cref="ChessPiece"/> object of type King. Call this during the initialization of the <see cref="GameEnvironment"/> class.
     /// </summary>
-    /// <returns>A <c>ChessPiece</c> object of type king located on 1 of 2 starting lines.</returns>
-    /// <param name="kingTeam">Enum from the ChessPiece.cs file. Can either be Team.White/Black</param>
+    /// <returns>A <see cref="ChessPiece"/> object of type king located on 1 of 2 starting lines.</returns>
+    /// <param name="kingTeam">Variable used to find a given king.</param>
     private ChessPiece AssignKing(Team kingTeam)
     {
         int targetRow = kingTeam == Team.White ? 0 : this.GameBoard.GetUpperBound(0);
@@ -103,7 +105,7 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Creates chess pieces for both teams and places them within the GameBoard array.
+    /// Creates chess pieces for both teams and places them within the <see cref="GameBoard"/> array.
     /// </summary>
     /// <returns>A dictionary of pieces keyed to their respective teams.</returns>
     Dictionary<Team, List<ChessPiece>> GenerateBoard()
@@ -165,7 +167,7 @@ public class GameEnvironment
     /// Determines if a given king is checked based on king visibility.
     /// </summary>
     /// <param name="queriedKing">King that has its checked status tested.</param>
-    /// <param name="board">2D board of <c>ChessPiece</c> Objects.</param>
+    /// <param name="board">2D board of <see cref="ChessPiece"/> Objects.</param>
     /// <returns>true if <paramref name="queriedKing"/> is checked; else false.</returns>
     public static bool IsKingChecked(ChessPiece queriedKing, ChessPiece?[,] board)
     {
@@ -243,7 +245,7 @@ public class GameEnvironment
     /// Determines if movement details given by <paramref name="moveInfo"/> will expose a friendly king to check.
     /// </summary>
     /// <param name="moveInfo">Readonly struct with details on the movement to test.</param>
-    /// <param name="board">2D <c>ChessPiece</c> board.</param>
+    /// <param name="board">2D <see cref="ChessPiece"/> board.</param>
     /// <returns>true if a friendly king will be checked; false otherwise.</returns>
     public static bool WillChangeResultInFriendlyCheck(MovementInformation moveInfo, ChessPiece?[,] board)
     {
@@ -269,7 +271,7 @@ public class GameEnvironment
     /// A friendly King from the current board.
     /// </summary>
     /// <param name="teamColor">Enum to determine which team to return a king for.</param>
-    /// <returns>A friendly <c>ChessPiece</c> object with a <paramref name="_pieceType"/> property of type King.</returns>
+    /// <returns>A friendly <see cref="ChessPiece"/> object with a <see cref="ChessPiece._pieceType"/> property of <see cref="PieceType.King"/>.</returns>
     public ChessPiece ReturnKing(Team teamColor)
     {
         if (teamColor == Team.White) return _whiteKing;
@@ -278,8 +280,8 @@ public class GameEnvironment
     /// <summary>
     /// Determins if the king is checked and if so, determines if any move can undo the check.
     /// </summary>
-    /// <returns>A boolean represntation for if a given king is check-mated.</returns>
-    /// <param name ="kingToCheck"><c>ChessPiece</c> object of type King for which this function is executed against.</param>
+    /// <returns><see langword="true"/> if <paramref name="kingToCheck"/> is check-mated; otherwise, <see langword="false"/>.</returns>
+    /// <param name ="kingToCheck"><see cref="ChessPiece"/> object of type King for which this function is executed against.</param>
     public bool IsKingCheckMated(ChessPiece kingToCheck)
     {
         // It isn't possible to be checkmated without being in check first.
@@ -311,7 +313,7 @@ public class GameEnvironment
     /// <summary>
     /// Determines if a stalemate has been reached.
     /// </summary>
-    /// <returns>true if a stalemate has been reached and false otherwise.</returns>
+    /// <returns><see langword="true"/> if a stalemate has been reached; otherwise, <see langword="false"/>.</returns>
     public bool IsStalemate()
     {
         if (_movesSinceLastCapture >= 50) return true;
@@ -329,9 +331,9 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// When given a 2D <c>ChessPiece</c> array, copy any objects to a new array.
+    /// When given a 2D <see cref="ChessPiece"/> array, copy any objects to a new array.
     /// </summary>
-    /// <returns> A <c>ChessPiece</c>[,] array that contains a copy of every <c>ChessPiece</c>.</returns>
+    /// <returns> A <see cref="ChessPiece"/>[,] array that contains a copy of every <see cref="ChessPiece"/>.</returns>
     public static ChessPiece[,] CopyBoard(ChessPiece?[,] boardToCopy)
     {
         int arrayRowCount = boardToCopy.GetUpperBound(0) + 1;
@@ -353,13 +355,13 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Generates an array of Vectors represnting all moves for a given team.
+    /// Generates an array of Vectors represnting all moves for a given <paramref name ="queriedTeam"/>.
     /// </summary>
     /// <param name="ignoreChecks">If set to true then moves made by friendly pieces that would expose their king to check are ignored.</param>
-    /// <param name="disableCastling">true if you want to disable a king's ability to castle.</param>
+    /// <param name="disableCastling"><see langword="true"/> if you want to disable a king's ability to castle.</param>
     /// <param name="queriedTeam">Team for which available moves are calculated.</param>
     /// <param name="queriedBoard">Array representation of a chess board used to calculate available moves.</param>
-    /// <returns>A dictionary of possible moves keyed to a team.</returns>
+    /// <returns>A dictionary of possible moves for chess pieces that are on <paramref name="queriedTeam"/>.</returns>
     public static Dictionary<ChessPiece, List<MovementInformation>> AllPossibleMovesPerTeam(ChessPiece?[,] queriedBoard, Team queriedTeam, bool ignoreChecks, bool disableCastling)
     {
         var teamMoves = new Dictionary<ChessPiece, List<MovementInformation>>();
@@ -376,9 +378,9 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Replaces or moves <c>ChessPiece</c> object within a given chess board.
+    /// Replaces or moves <see cref="ChessPiece"/> object within <paramref name ="queriedBoard"/>.
     /// </summary>
-    /// <param name ="queriedBoard">2D nullable <c>ChessPiece</c> array.</param>
+    /// <param name ="queriedBoard">2D nullable <see cref="ChessPiece"/> array.</param>
     /// <param name ="movementDetails"> Struct that contains details for a given movement or capture.</param>
     /// <param name ="movementHasBeenFinalized">Boolean value that tells the code that this movemnet has been finalized and passes all checks.</param>
     public static void ChangePieceLocation(ChessPiece?[,] queriedBoard, MovementInformation movementDetails, bool movementHasBeenFinalized)
@@ -429,7 +431,7 @@ public class GameEnvironment
 
     }
     /// <summary>
-    /// Undoes a change to a <c>ChessPiece</c> Array
+    /// Undoes a change to a <see cref="ChessPiece"/> Array
     /// </summary>
     /// <param name="move">Struct that contains information on the change to undo.</param>
     /// <param name="board">Array that changes will be undone within.</param>
@@ -457,27 +459,31 @@ public class GameEnvironment
         }
     }
     /// <summary>
-    /// This method is used to submite finalized changes to the current game and return the next <c>Player</c> via <paramref name="currentlyActivePlayer"/>.
+    /// This method is used to submit finalized changes to <see cref="GameBoard"/> and exchanges <see cref="ActiveTeam"/> with the opposite <see cref="Team"/>.
     /// </summary>
-    /// <param name="newMove">Movement information to submit to the current instance of the <c>GameEnvironment</c> class.</param>
+    /// <param name="newMove"><see cref="MovementInformation"/> to submit to <see cref="GameBoard"/>.</param>
     public void SubmitFinalizedChange(MovementInformation newMove)
     {
-        ChangePieceLocation(this.GameBoard, newMove, true);
-        // Determine whose turn it is.
-        var currentlyActivePlayerTeam = newMove.MainPiece.PieceTeam == Team.Black ? Team.White : Team.Black;
+        if (newMove.SubmittingTeam == ActiveTeam)
+        {
+            ChangePieceLocation(this.GameBoard, newMove, true);
+            // Determine whose turn it is.
+            ActiveTeam = (ActiveTeam == Team.White ? Team.Black : Team.White);
 
-        if (newMove.CapturingSecondary) _movesSinceLastCapture = 0;
-        else _movesSinceLastCapture++;
+            if (newMove.CapturingSecondary) _movesSinceLastCapture = 0;
+            else _movesSinceLastCapture++;
 
-        DisablePlayerVulnerabilityToEnPassant(currentlyActivePlayerTeam);
+            DisablePlayerVulnerabilityToEnPassant(ActiveTeam);
 
-        _gameMoves.Add(newMove);
+            _gameMoves.Add(newMove);
+        }
+        else throw new Exception("The wrong team has submitted a move.");
     }
 
     /// <summary>
     /// Disables vulnerability to En Passant for the current <paramref name="activeTeam"/>.
     /// </summary>
-    /// <param name="activeTeam">The currently active <c>Player</c>.</param>
+    /// <param name="activeTeam">The currently active <see cref="Player"/>.</param>
     private void DisablePlayerVulnerabilityToEnPassant(Team activeTeam)
     {
         foreach (ChessPiece chessPiece in _teamPieces[activeTeam])
@@ -486,4 +492,59 @@ public class GameEnvironment
         }
     }
 
+    /// <summary>
+    /// Updates a client-side <see cref="GameEnvironment"/> instance and corresponding visuals using <paramref name="newMove"/>.
+    /// </summary>
+    /// <param name="newMove">Board movement used to update a <see cref="GameEnvironment"/> instance.</param>
+    public void ChangeGameBoardAndGUI(MovementInformation newMove)
+    {
+        if (GameBoard != null && Squares != null && ActiveTeam == newMove.SubmittingTeam)
+        {
+            SubmitFinalizedChange(newMove);
+
+            if (IsKingCheckMated(ReturnKing(PlayerTeam)))
+            {
+                MatchState = GameState.LocalLoss;
+            }
+            else if (IsKingCheckMated(ReturnKing(PlayerTeam == Team.White ? Team.Black : Team.White)))
+            {
+                MatchState = GameState.LocalWin;
+            }
+            else if (IsStalemate())
+            {
+                MatchState = GameState.GameDraw;
+            }
+
+            if (MatchState != GameState.Playing) GameEnded = true;
+
+            if (newMove.SecondaryPiece != null)
+            {
+                ChessPiece secPiece = newMove.SecondaryPiece;
+                PictureBox? secBox = Squares[secPiece.ReturnLocation(0), secPiece.ReturnLocation(1)];
+
+                if (secBox != null)
+                {
+                    if (newMove.CapturingSecondary)
+                    {
+                        secBox.Image = null;
+                    }
+                    else if (newMove.CastlingWithSecondary)
+                    {
+                        Squares[(int)newMove.SecondaryNewLocation.X, (int)newMove.SecondaryNewLocation.Y]!.Image = secBox.Image;
+                        secBox.Image = null;
+                    }
+                }
+            }
+
+            ChessPiece mainPiece = newMove.MainPiece;
+            PictureBox? mainBox = Squares[mainPiece.ReturnLocation(0), mainPiece.ReturnLocation(1)];
+
+            if (mainBox != null)
+            {
+                Squares[(int)newMove.MainNewLocation.X, (int)newMove.MainNewLocation.Y]!.Image = mainBox.Image;
+                mainBox.Image = null;
+            }
+        }
+
+    }
 }

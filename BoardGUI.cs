@@ -39,7 +39,7 @@ namespace Chess_GUi
         /// <summary>A <see cref="PictureBox"/> that represents a square containing a piece friendly to <see cref="User"/>.</summary>
         private PictureBox? _friendlySelectedSquare = null;
 
-        /// <summary>Player whose turn it currently is.</summary>
+        /// <summary><see cref="Playerr"/> instance used to communicate with the server.</summary>
         private readonly Player User;
 
         /// <summary>List of squares within <see cref="_pictureSquares"/> that have undergone a temporary visual change.</summary>
@@ -54,7 +54,7 @@ namespace Chess_GUi
         /// <summary>Stores a temporary reference to the friendly piece selected by <see cref="User"/></summary>
         private Image? _friendlyImage;
 
-        /// <summary>If set to true then references to temp images and previously selected squares will be set to null.</summary>
+        /// <summary>If <see langword="true"/> then <see cref="_friendlySelectedSquare"/> and <see cref="_targetSquare"/> will be set to <see langword="null"/> when <see cref="BoardGUI.SquareClickedEvent(object, EventArgs)"/> is called.</summary>
         private bool _resetSquareAssignments;
 
         public BoardGUI(Player user, GameEnvironment newGame)
@@ -113,11 +113,11 @@ namespace Chess_GUi
             if (_currentGame.PlayerTeam == Team.White)
             {   // Starts generating on the last row of the board.
                 top = MainBoard.Height - squareLength;
+                heightIncrementer *= -1;
             }
             else if (_currentGame.PlayerTeam == Team.Black)
             {   // Starts generating at the top of the board.
                 top = 0;
-                heightIncrementer *= -1;
             }
 
             int left = 0;
@@ -166,7 +166,7 @@ namespace Chess_GUi
                 _resetSquareAssignments = false;
             }
 
-            if (_currentGame.CanBeInteractedWith == false || _currentGame.GameEnded) return;
+            if (_currentGame.ActiveTeam != _currentGame.PlayerTeam || _currentGame.GameEnded) return;
 
             var selectedSquare = sender as PictureBox;
 
@@ -285,25 +285,6 @@ namespace Chess_GUi
                                                     let newSquareVector = new Vector2(coords[0], coords[1])
                                                     where Equals(cm.MainNewLocation, newSquareVector)
                                                     select cm).First();
-
-            if (submitedMovement.SecondaryPiece != null)
-            {
-                ChessPiece secondPiece = submitedMovement.SecondaryPiece;
-
-                int secondPieceRow = secondPiece.ReturnLocation(0);
-                int secondPieceColumn = secondPiece.ReturnLocation(1);
-
-                if (submitedMovement.CastlingWithSecondary)
-                {
-                    int newColumn = (int)submitedMovement.SecondaryNewLocation.Y;
-                    _pictureSquares[secondPieceRow, newColumn].Image = _pictureSquares[secondPieceRow, secondPieceColumn].Image;
-                    _pictureSquares[secondPieceRow, secondPieceColumn].Image = null;
-                }
-                else if (submitedMovement.CapturingSecondary && !Equals(submitedMovement.MainNewLocation, secondPiece.CurrentLocation))
-                {   // En Passant Capture conditions met.
-                    _pictureSquares[secondPieceRow, secondPieceColumn].Image = null;
-                }
-            }
 
             // Send change to the server and update on local client.
             await User.SubmitMoveToServerAsync(submitedMovement, _currentGame.GameID, _currentGame.PlayerAffiliatedCancellationSource!.Token);
