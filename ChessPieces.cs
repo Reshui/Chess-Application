@@ -58,6 +58,9 @@ public readonly struct MovementInformation
     /// <summary> Gets a value indicating if <see cref="MainPiece"/> is castling with <see cref="SecondaryPiece"/>.</summary>
     /// <value><see langword="true"/> if <see cref="MainPiece"/> is castling with <see cref="SecondaryPiece"/>; otherwise, <see langword="false"/></value>
     public bool CastlingWithSecondary { get; init; }
+    /// <summary>Gets a value indicating which <see cref="Team"/> is submitting the <see cref="MovementInformation"/> instance.</summary>
+    /// <value>The current value of <c>MainPiece.PieceTeam</c></value>
+    public Team SubmittingTeam { get => MainPiece.PieceTeam; }
 }
 
 public class ChessPiece
@@ -67,18 +70,30 @@ public class ChessPiece
 
     /// <summary>Current location of this <see cref="ChessPiece"/> instance within the current board.</summary>
     public Vector2 CurrentLocation { get; set; }
+    /// <summary>Gets the row that the <see cref="ChessPiece"/> instance is currently on.</summary>
+    /// <value>The <see cref="CurrentLocation"/>.<c>X</c> property cast to an int.</value>
+    public int CurrentRow { get => (int)CurrentLocation.X; }
+    /// <summary>Gets the column that the <see cref="ChessPiece"/> instance is currently in.</summary>
+    /// <value>The <see cref="CurrentLocation"/>.<c>Y</c> property cast to an int.</value>
+    public int CurrentColumn { get => (int)CurrentLocation.Y; }
 
-    /// <summary>Enum to determine piece type. One of (King,Pawn,Queen,Bishop,Rook,Knight)</summary>
-    private PieceType _pieceType { get; set; }
+    /// <summary>Gets the current value of <see cref="_pieceType"/>.</summary>
+    public PieceType AssignedType { get => _pieceType; }
+    /// <summary>Enum to describe what type of chess piece this instance will act as.</summary>
+    /// <remarks>One of (King,Pawn,Queen,Bishop,Rook,Knight)</remarks>
+    private PieceType _pieceType;
 
-    /// <summary>Enum to determine which team a given piece is on. Must be either Team.(White/Black)</summary>
+    /// <summary>Gets or initializes a Team enum to determine which team a <see cref="ChessPiece"/> is on.</summary>
+    /// <remarks>Must be either Team.(White/Black)</remarks>
+    /// <value>The current Team that this <see cref="ChessPiece"/> is on.</value>
     public Team PieceTeam { get; init; }
 
     /// <summary>Gets or sets a value representing whether or not the current <see cref="ChessPiece"/> instance is vulnerable to En Passant.</summary>
     /// <value><see langword="true"/> if a pawn can be captured via En Passant; otherwise, <see langword="false"/>.</value>
     private bool _enPassantCapturePossible { get; set; } = false;
 
-    /// <summary>true if <see cref="_pieceType"/> is PieceType.(Queen/Bishop/Rook) else false.</summary>
+    /// <summary>Gets or sets a value that describes if a <see cref="ChessPiece"/> instance can move across the board.</summary>
+    /// <value><see cref="true"/> if <see cref="_pieceType"/> is PieceType.(Queen/Bishop/Rook); otherwise, <see langword="false"/>.</value>
     private bool _canMoveAcrossBoard { get; set; } = false;
 
     /// <summary>Gets or sets the number of times the current <see cref="ChessPiece"/> instance has been moved.</summary>
@@ -113,14 +128,14 @@ public class ChessPiece
     private List<Vector2> DetermineDirectionVectors()
     {
 
-        if (_pieceType == PieceType.Knight) return KnightDirectionVectors();
+        if (AssignedType == PieceType.Knight) return KnightDirectionVectors();
         else return AllDirectionVectors();
 
     }
     /// <summary>
     /// Generates direction vectors for pieces that are capable of moving backwards,forwards,laterally and diagonally.
-    /// Used for Kings,Queens,Bishops,Pawns and Rooks.
     /// </summary>
+    /// <remarks>Used for Kings,Queens,Bishops,Pawns and Rooks.</remarks>
     /// <returns> A List{Vector2} is returned for a given piece.</returns>
     private List<Vector2> AllDirectionVectors()
     {
@@ -129,12 +144,12 @@ public class ChessPiece
 
         int possibleInitialJump = 0, forwardDirection = 0;
 
-        switch (_pieceType)
+        switch (AssignedType)
         {
             case PieceType.Pawn:
             case PieceType.Rook:
             case PieceType.Bishop:
-                if (_pieceType == PieceType.Pawn)
+                if (AssignedType == PieceType.Pawn)
                 {
                     forwardDirection = (PieceTeam == Team.White) ? 1 : -1;
                     possibleInitialJump = 2 * forwardDirection;
@@ -153,19 +168,19 @@ public class ChessPiece
                 // Being equal to 1 implies that one dimension has a value of 0 and is therefore a perpendicular vector.
                 bool perpendicularVector = Math.Abs(verticalScalar) + Math.Abs(horizontalScalar) == 1;
 
-                bool enterRook = (_pieceType == PieceType.Rook) && perpendicularVector;
-                bool enterBishop = (_pieceType == PieceType.Bishop) && !perpendicularVector;
-                bool enterPawn = (_pieceType == PieceType.Pawn) && verticalScalar == forwardDirection;
+                bool enterRook = (AssignedType == PieceType.Rook) && perpendicularVector;
+                bool enterBishop = (AssignedType == PieceType.Bishop) && !perpendicularVector;
+                bool enterPawn = (AssignedType == PieceType.Pawn) && verticalScalar == forwardDirection;
 
                 if (enterBishop || enterRook || enterPawn || defaultEntry)
                 {
                     directions.Add(new Vector2(verticalScalar, horizontalScalar));
 
-                    if (_pieceType == PieceType.King && verticalScalar == 0 && horizontalScalar != 0)
+                    if (AssignedType == PieceType.King && verticalScalar == 0 && horizontalScalar != 0)
                     {   // This vector will allow the king to castle in either direction.
                         directions.Add(new Vector2(verticalScalar, 2 * horizontalScalar));
                     }
-                    else if (_pieceType == PieceType.Pawn && horizontalScalar == 0)
+                    else if (AssignedType == PieceType.Pawn && horizontalScalar == 0)
                     {   // This vector will allow pawns to move forward 2 spaces if they haven't been moved.
                         directions.Add(new Vector2(possibleInitialJump, horizontalScalar));
                     }
@@ -204,7 +219,7 @@ public class ChessPiece
     /// </summary>
     /// <param name="enemyPiece">This parameter is assigned a value if the piece being compared is hostile to the current instance of the <see cref="ChessPiece"/> class.</param>
     /// <param name="pieceToCompare"><see cref="ChessPiece"/> object that will have its allegiance tested.</param>
-    /// <returns><see langword="true"/> if <paramref name="enemyPiece"/> and <paramref name="pieceToCompare"/> are both not null and are on different teams; otherwise <see langword="false"/>.</returns>
+    /// <returns><see langword="true"/> if <paramref name="enemyPiece"/> and <paramref name="pieceToCompare"/> are both not null and are on different teams; otherwise, <see langword="false"/>.</returns>
     bool DoesSquareContainEnemy(ChessPiece? pieceToCompare, out ChessPiece? enemyPiece)
     {
         enemyPiece = null;
@@ -228,7 +243,7 @@ public class ChessPiece
     /// Determine the available moves for a given <see cref="ChessPiece"/> instance. Moves that will place a friendly king in check will be filtered.
     /// </summary>
     /// <returns>A List(MovementInformation) object of available movements/attacks for the current <see cref="ChessPiece"/> instance.</returns>
-    /// <param name="ignoreFriendlyInducedChecks">If true then checking to see if this piece's movements will unintenionally create a check on a friendly king are ignored.</param>
+    /// <param name="ignoreFriendlyInducedChecks">If <see langword="true"/> then checking to see if this piece's movements will unintenionally create a check on a friendly king are ignored.</param>
     /// <param name="disableCastling">If set to true then castling movements will be ignore.</param>
     /// <param name="gameBoard">Array used to calculate moves available to the current <see cref="ChessPiece"/> instance.</param>
     public List<MovementInformation> AvailableMoves(ChessPiece?[,] gameBoard, bool ignoreFriendlyInducedChecks, bool disableCastling)
@@ -239,7 +254,7 @@ public class ChessPiece
         foreach (Vector2 movementVector in directionVectors)
         {
             // If this is a castling vector determine if castling is possible.
-            if (_pieceType == PieceType.King && Math.Abs(movementVector.Y) == 2)
+            if (AssignedType == PieceType.King && Math.Abs(movementVector.Y) == 2)
             {
                 if (disableCastling || _timesMoved != 0) continue;
                 // A castleDirection of -1 means it is towards the left.
@@ -252,10 +267,10 @@ public class ChessPiece
                 ChessPiece? pairedRook = gameBoard[friendlySpecialLine, rookColumn];
 
                 // Ensure that the king hasn't been moved and isn't already in check.
-                if (!kingIsChecked && pairedRook != null && pairedRook._pieceType == PieceType.Rook && pairedRook._timesMoved == 0)
+                if (!kingIsChecked && pairedRook != null && pairedRook.AssignedType == PieceType.Rook && pairedRook._timesMoved == 0)
                 {   // Now check to make sure that all spaces between the king and that rook are clear.
-                    int lesserColumnIndex = Math.Min(rookColumn, ReturnLocation(1));
-                    int greaterColumnIndex = Math.Max(rookColumn, ReturnLocation(1));
+                    int lesserColumnIndex = Math.Min(rookColumn, CurrentColumn);
+                    int greaterColumnIndex = Math.Max(rookColumn, CurrentColumn);
                     bool castlePathIsClear = true;
 
                     for (int columnIndex = lesserColumnIndex + 1; columnIndex < greaterColumnIndex; columnIndex++)
@@ -268,37 +283,39 @@ public class ChessPiece
                     }
 
                     if (!castlePathIsClear) continue;
-
-                    bool cannotCastleInThisDirection = false;
-
-                    if (!ignoreFriendlyInducedChecks)
+                    else
                     {
-                        Vector2 singleSquareMovement = new Vector2(0, castleDirection);
-                        // Initialize at the current location for addition purposes.
-                        Vector2 movement = CurrentLocation;
-                        // Ensure that the King will not be moving into or through check.
-                        for (int i = 0; i < 2; i++)
+                        bool cannotCastleInThisDirection = false;
+
+                        if (!ignoreFriendlyInducedChecks)
                         {
-                            movement = Vector2.Add(movement, singleSquareMovement);
-
-                            var singleSquareMovementInfo = new MovementInformation(this, null, movement, DefaultLocation, false, capturingSecondary: false, castlingWithSecondary: false);
-
-                            if (GameEnvironment.WillChangeResultInFriendlyCheck(singleSquareMovementInfo, gameBoard))
+                            Vector2 singleSquareMovement = new Vector2(0, castleDirection);
+                            // Initialize at the current location for addition purposes.
+                            Vector2 movement = CurrentLocation;
+                            // Ensure that the King will not be moving into or through check.
+                            for (int i = 0; i < 2; i++)
                             {
-                                cannotCastleInThisDirection = true;
-                                break;
+                                movement = Vector2.Add(movement, singleSquareMovement);
+
+                                var singleSquareMovementInfo = new MovementInformation(this, null, movement, DefaultLocation, false, capturingSecondary: false, castlingWithSecondary: false);
+
+                                if (GameEnvironment.WillChangeResultInFriendlyCheck(singleSquareMovementInfo, gameBoard))
+                                {
+                                    cannotCastleInThisDirection = true;
+                                    break;
+                                }
                             }
                         }
-                    }
 
-                    if (!cannotCastleInThisDirection)
-                    {
-                        var newKingLocation = Vector2.Add(CurrentLocation, movementVector);
-                        var newRookLocation = Vector2.Add(CurrentLocation, new Vector2(0, castleDirection));
+                        if (!cannotCastleInThisDirection)
+                        {
+                            var newKingLocation = Vector2.Add(CurrentLocation, movementVector);
+                            var newRookLocation = Vector2.Add(CurrentLocation, new Vector2(0, castleDirection));
 
-                        var moveInfo = new MovementInformation(this, pairedRook, newKingLocation, newRookLocation, enPassantCapturePossible: false, capturingSecondary: false, castlingWithSecondary: true);
+                            var moveInfo = new MovementInformation(this, pairedRook, newKingLocation, newRookLocation, enPassantCapturePossible: false, capturingSecondary: false, castlingWithSecondary: true);
 
-                        viableMoves.Add(moveInfo);
+                            viableMoves.Add(moveInfo);
+                        }
                     }
                 }
             }
@@ -322,14 +339,14 @@ public class ChessPiece
 
                         bool pawnAttackVector = false, movementWillExposeToEnPassant = false;
 
-                        if (_pieceType == PieceType.Pawn)
+                        if (AssignedType == PieceType.Pawn)
                         {
                             // Disable the starting move of moving 2 spaces forward if the pawn has already been moved.
                             if (Math.Abs(movementVector.X) == 2)
                             {
                                 int initialRowJumped = PieceTeam == Team.White ? 2 : 5;
 
-                                if (_timesMoved != 0 || gameBoard[initialRowJumped, ReturnLocation(1)] != null) break;
+                                if (_timesMoved != 0 || gameBoard[initialRowJumped, CurrentColumn] != null) break;
                                 movementWillExposeToEnPassant = true;
                             }
 
@@ -341,9 +358,9 @@ public class ChessPiece
                             {
                                 pawnAttackVector = true;
                                 // Now check for possible En Passant captures.
-                                if (DoesSquareContainEnemy(gameBoard[ReturnLocation(0), yCoord], out ChessPiece? captureablePawn))
+                                if (DoesSquareContainEnemy(gameBoard[CurrentRow, yCoord], out ChessPiece? captureablePawn))
                                 {
-                                    if (captureablePawn != null && captureablePawn._pieceType == PieceType.Pawn
+                                    if (captureablePawn != null && captureablePawn.AssignedType == PieceType.Pawn
                                     && captureablePawn._enPassantCapturePossible == true)
                                     {
                                         var enPassantCapture = new MovementInformation(this, captureablePawn, calculatedPosition, DefaultLocation, movementWillExposeToEnPassant, capturingSecondary: true, castlingWithSecondary: false);
@@ -385,7 +402,7 @@ public class ChessPiece
     /// <returns>A a copy of the current <see cref="ChessPiece"/> instance.</returns>
     public ChessPiece Copy()
     {
-        return new ChessPiece(_pieceType, new Coords(ReturnLocation(0), ReturnLocation(1)), PieceTeam)
+        return new ChessPiece(AssignedType, new Coords(CurrentRow, CurrentColumn), PieceTeam)
         {
             Captured = this.Captured,
             _enPassantCapturePossible = this._enPassantCapturePossible
@@ -397,7 +414,7 @@ public class ChessPiece
     /// <returns><see langword="true"/> if <see cref="ChessPiece"/> instance has a <see cref="_pieceType"/> property of <see cref="PieceType.King"/>; otherwise, <see langword="false"/>.</returns>
     public bool IsKing()
     {
-        return _pieceType == PieceType.King;
+        return AssignedType == PieceType.King;
     }
     public void PromotePawn()
     {
@@ -420,35 +437,6 @@ public class ChessPiece
     {
         _enPassantCapturePossible = false;
     }
-    /// <summary>
-    /// Using the <see cref="CurrentLocation"/> property return an X or Y coordinate cast to an integer.
-    /// </summary>
-    /// <param name="dimension">Integer that is either 0 and 1</param>
-    /// <exception cref="ArguemntOutOfRangeException">Exception is thrown if <paramref name="dimension"/> isn't 0 or 1.</exception>
-    /// <returns>An integer between 0 and 7.</returns>
-    public int ReturnLocation(int dimension)
-    {
-        if (dimension == 0)
-        {
-            return (int)CurrentLocation.X;
-        }
-        else if (dimension == 1)
-        {
-            return (int)CurrentLocation.Y;
-        }
-        else
-        {
-            throw new ArgumentOutOfRangeException(nameof(dimension), dimension, "Dimension parameter must be either 0 or 1.");
-        }
-    }
-    /// <summary>
-    /// Returns the current value of the <see cref="_pieceType"/> property.
-    /// </summary>
-    /// <returns>A <see cref="PieceType"/> enum.</returns>
-    public PieceType ReturnPieceType()
-    {
-        return _pieceType;
-    }
 
     /// <summary>
     /// Use the <see cref="_pieceType"/> and <paramref name="PieceTeam"/> to return a descriptive name for a board square.
@@ -458,7 +446,7 @@ public class ChessPiece
     /// <returns>A string represntation of <see cref="_pieceType"/> and <paramref name="PieceTeam"/>.</returns>
     public string ReturnPieceTypeName()
     {
-        string methodValue = _pieceType switch
+        string methodValue = AssignedType switch
         {
             PieceType.King => "King",
             PieceType.Pawn => "Pawn",
@@ -466,7 +454,7 @@ public class ChessPiece
             PieceType.Bishop => "Bishop",
             PieceType.Knight => "Knight",
             PieceType.Queen => "Queen",
-            _ => throw new ArgumentOutOfRangeException(nameof(_pieceType), _pieceType, "Unrecognized PieceType submitted."),
+            _ => throw new ArgumentOutOfRangeException(nameof(_pieceType), AssignedType, "Unrecognized PieceType submitted."),
         };
         return PieceTeam + "_" + methodValue;
     }

@@ -340,7 +340,7 @@ public class Server
         }
         finally
         {
-            // Gather all the games that user is taking part in and notify the opponent os user's disconnect.
+            // Gather all the games that user is taking part in and notify the opponent of the user's disconnect.
             List<GameEnvironment> gamesToDisconnect = (from game in _startedGames.Values
                                                        where game.AssociatedPlayers.ContainsValue(user)
                                                        select game).ToList();
@@ -360,11 +360,12 @@ public class Server
 
             _connectedPlayers.TryRemove(new KeyValuePair<int, Player>(user.ServerAssignedID, user));
 
-            CancellationTokenSource cancellationSource = _clientListeningCancelationTokens[user.ServerAssignedID];
-            // Dispose of the CancellationTokenSource.
-            cancellationSource.Dispose();
-            // Remove references to the Token.
-            _clientListeningCancelationTokens.TryRemove(new KeyValuePair<int, CancellationTokenSource>(user.ServerAssignedID, cancellationSource));
+            if (_clientListeningCancelationTokens.TryGetValue(user.ServerAssignedID, out CancellationTokenSource? cancelationSource))
+            {
+                cancelationSource.Dispose();
+                // Remove references to the Token.
+                _clientListeningCancelationTokens.TryRemove(new KeyValuePair<int, CancellationTokenSource>(user.ServerAssignedID, cancelationSource));
+            }
 
             if (_waitingForGameLobby.Contains(user))
             {   /// Remove user from the LFG queue.

@@ -168,11 +168,11 @@ public class GameEnvironment
     /// </summary>
     /// <param name="queriedKing">King that has its checked status tested.</param>
     /// <param name="board">2D board of <see cref="ChessPiece"/> Objects.</param>
-    /// <returns>true if <paramref name="queriedKing"/> is checked; else false.</returns>
+    /// <returns><see langword="true"/> if <paramref name="queriedKing"/> is checked; else <see langword="false"/>.</returns>
     public static bool IsKingChecked(ChessPiece queriedKing, ChessPiece?[,] board)
     {
         // This variable is needed to determine if a king can be attacked by an enemy pawn(pawns can only attack towards on side of the board.).
-        int kingRow = queriedKing.ReturnLocation(0);
+        int kingRow = queriedKing.CurrentRow;
 
         for (int verticalScalar = -1; verticalScalar < 2; verticalScalar++)
         {
@@ -198,7 +198,7 @@ public class GameEnvironment
                         {   // If a ChessPiece object is found determine its type and whether or not it is friendly.
                             if (piece.PieceTeam != queriedKing.PieceTeam)
                             {
-                                PieceType pieceType = piece.ReturnPieceType();
+                                PieceType pieceType = piece.AssignedType;
                                 // Certain captures are only available to specific combinations of vector scalars and piece types.
                                 bool enemyRookFound = pieceType == PieceType.Rook && perpendicularVector;
                                 bool enemyBishopFound = pieceType == PieceType.Bishop && !perpendicularVector;
@@ -233,7 +233,7 @@ public class GameEnvironment
             {
                 ChessPiece? piece = board[row, column];
 
-                if (piece != null && piece.PieceTeam != queriedKing.PieceTeam && piece.ReturnPieceType() == PieceType.Knight)
+                if (piece != null && piece.PieceTeam != queriedKing.PieceTeam && piece.AssignedType == PieceType.Knight)
                 {
                     return true;
                 }
@@ -385,8 +385,8 @@ public class GameEnvironment
     /// <param name ="movementHasBeenFinalized">Boolean value that tells the code that this movemnet has been finalized and passes all checks.</param>
     public static void ChangePieceLocation(ChessPiece?[,] queriedBoard, MovementInformation movementDetails, bool movementHasBeenFinalized)
     {
-        int oldRowCoord = movementDetails.MainPiece.ReturnLocation(0);
-        int oldColumnCoord = movementDetails.MainPiece.ReturnLocation(1);
+        int oldRowCoord = movementDetails.MainPiece.CurrentRow;
+        int oldColumnCoord = movementDetails.MainPiece.CurrentColumn;
 
         int newRowCoord = (int)movementDetails.MainNewLocation.X;
         int newColumnCoord = (int)movementDetails.MainNewLocation.Y;
@@ -395,9 +395,9 @@ public class GameEnvironment
         {
             ChessPiece secondaryInput = movementDetails.SecondaryPiece;
             // Since the board may be copy, deal with the object on the board rather than the input variables.
-            ChessPiece secondaryOnBoard = queriedBoard[secondaryInput.ReturnLocation(0), secondaryInput.ReturnLocation(1)]!;
+            ChessPiece secondaryOnBoard = queriedBoard[secondaryInput.CurrentRow, secondaryInput.CurrentColumn]!;
 
-            queriedBoard[secondaryOnBoard.ReturnLocation(0), secondaryOnBoard.ReturnLocation(1)] = null;
+            queriedBoard[secondaryOnBoard.CurrentRow, secondaryOnBoard.CurrentColumn] = null;
 
             secondaryOnBoard.CurrentLocation = movementDetails.SecondaryNewLocation;
 
@@ -439,18 +439,18 @@ public class GameEnvironment
     {
         ChessPiece? pieceOne = board[(int)move.MainNewLocation.X, (int)move.MainNewLocation.Y];
 
-        board[pieceOne!.ReturnLocation(0), pieceOne.ReturnLocation(1)] = null;
+        board[pieceOne!.CurrentRow, pieceOne.CurrentColumn] = null;
 
-        board[move.MainPiece.ReturnLocation(0), move.MainPiece.ReturnLocation(1)] = pieceOne;
+        board[move.MainPiece.CurrentRow, move.MainPiece.CurrentColumn] = pieceOne;
 
         pieceOne.CurrentLocation = move.MainPiece.CurrentLocation;
 
         if (move.CastlingWithSecondary)
         {
             ChessPiece? pieceTwo = board[(int)move.SecondaryNewLocation.X, (int)move.SecondaryNewLocation.Y];
-            board[pieceTwo!.ReturnLocation(0), pieceTwo.ReturnLocation(1)] = null;
+            board[pieceTwo!.CurrentRow, pieceTwo.CurrentColumn] = null;
 
-            board[move.SecondaryPiece!.ReturnLocation(0), move.SecondaryPiece.ReturnLocation(1)] = pieceTwo;
+            board[move.SecondaryPiece!.CurrentRow, move.SecondaryPiece.CurrentColumn] = pieceTwo;
             pieceTwo!.CurrentLocation = move.SecondaryPiece.CurrentLocation;
         }
         else if (move.CapturingSecondary)
@@ -488,7 +488,7 @@ public class GameEnvironment
     {
         foreach (ChessPiece chessPiece in _teamPieces[activeTeam])
         {
-            chessPiece.DisableEnPassantCaptures();
+            if (chessPiece.AssignedType == PieceType.Pawn) chessPiece.DisableEnPassantCaptures();
         }
     }
 
@@ -514,13 +514,13 @@ public class GameEnvironment
             {
                 MatchState = GameState.GameDraw;
             }
-
             if (MatchState != GameState.Playing) GameEnded = true;
 
+            #region Update Graphics
             if (newMove.SecondaryPiece != null)
             {
                 ChessPiece secPiece = newMove.SecondaryPiece;
-                PictureBox? secBox = Squares[secPiece.ReturnLocation(0), secPiece.ReturnLocation(1)];
+                PictureBox? secBox = Squares[secPiece.CurrentRow, secPiece.CurrentColumn];
 
                 if (secBox != null)
                 {
@@ -537,13 +537,14 @@ public class GameEnvironment
             }
 
             ChessPiece mainPiece = newMove.MainPiece;
-            PictureBox? mainBox = Squares[mainPiece.ReturnLocation(0), mainPiece.ReturnLocation(1)];
+            PictureBox? mainBox = Squares[mainPiece.CurrentRow, mainPiece.CurrentColumn];
 
             if (mainBox != null)
             {
                 Squares[(int)newMove.MainNewLocation.X, (int)newMove.MainNewLocation.Y]!.Image = mainBox.Image;
                 mainBox.Image = null;
             }
+            #endregion
         }
 
     }
