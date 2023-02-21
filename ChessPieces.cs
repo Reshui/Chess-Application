@@ -17,23 +17,30 @@ public struct Coords
         RowIndex = rowIndex;
         ColumnIndex = columnIndex;
     }
-
+    public Coords(Vector2 vector)
+    {
+        RowIndex = (int)vector.X;
+        ColumnIndex = (int)vector.Y;
+    }
     public int RowIndex { get; set; }
     public int ColumnIndex { get; set; }
 }
 
 public readonly struct MovementInformation
 {
-    public MovementInformation(ChessPiece mainPiece, ChessPiece? secondaryPiece, Vector2 mainNewLocation, Vector2 secondaryNewLocation, bool enPassantCapturePossible, bool capturingSecondary, bool castlingWithSecondary)
+    public MovementInformation(ChessPiece mainPiece, ChessPiece? secondaryPiece, Coords mainCoords, Coords secondaryCoords, bool enPassantCapturePossible, bool capturingSecondary, bool castlingWithSecondary)
     {
-        SecondaryPiece = secondaryPiece;
-        MainPiece = mainPiece;
-        MainNewLocation = mainNewLocation;
-        SecondaryNewLocation = secondaryNewLocation;
+        SecondaryPiece = secondaryPiece?.Copy();
+        MainPiece = mainPiece.Copy();
+        MainCoords = mainCoords;
+        SecondaryCoords = secondaryCoords;
         EnPassantCapturePossible = enPassantCapturePossible;
         CapturingSecondary = capturingSecondary;
         CastlingWithSecondary = castlingWithSecondary;
     }
+
+    public Coords MainCoords { get;init; }
+    public Coords SecondaryCoords { get; init; }
     /// <summary>Primary ChessPiece that is moved.</summary>
     public ChessPiece MainPiece { get; init; }
 
@@ -42,10 +49,10 @@ public readonly struct MovementInformation
     public ChessPiece? SecondaryPiece { get; init; }
 
     /// <summary>New location to place <see cref="MainPiece"/></summary>
-    public Vector2 MainNewLocation { get; init; }
+    public Vector2 MainNewLocation { get => new (MainCoords.RowIndex, MainCoords.ColumnIndex); }
 
     /// <summary>New location to place <see cref="SecondaryPiece"/>.</summary>
-    public Vector2 SecondaryNewLocation { get; init; }
+    public Vector2 SecondaryNewLocation { get => new(SecondaryCoords.RowIndex, SecondaryCoords.ColumnIndex); }
 
     /// <summary> Gets a value indicating if <see cref="MainPiece"/> is vulnerable to En Passant.</summary>
     /// <value><see langword="true"/> if <see cref="MainPiece"/> is vulnerable to En Passant; otherwise, <see langword="false"/></value>
@@ -66,19 +73,34 @@ public readonly struct MovementInformation
 public class ChessPiece
 {
     /// <summary>List of default movement vectors for a given <see cref="ChessPiece"/> instance.</summary>
-    private List<Vector2> directionVectors { get; set; }
+    private List<Vector2> _directionVectors = new();
+    public List<Vector2> DirectionVectors
+    {
+        get
+        {
+            if (_directionVectors.Count == 0)
+            {
+                _directionVectors = (AssignedType != PieceType.Knight) ? AllDirectionVectors() : KnightDirectionVectors();
+            }
 
+            return _directionVectors;
+        }
+        set => _directionVectors = value!;
+    }
     /// <summary>Current location of this <see cref="ChessPiece"/> instance within the current board.</summary>
-    public Vector2 CurrentLocation { get; set; }
+    public Vector2 CurrentLocation { get => new(CurrentRow, CurrentColumn); }
+
     /// <summary>Gets the row that the <see cref="ChessPiece"/> instance is currently on.</summary>
     /// <value>The <see cref="CurrentLocation"/>.<c>X</c> property cast to an int.</value>
-    public int CurrentRow { get => (int)CurrentLocation.X; }
+    public int CurrentRow { get; set; }
+
     /// <summary>Gets the column that the <see cref="ChessPiece"/> instance is currently in.</summary>
     /// <value>The <see cref="CurrentLocation"/>.<c>Y</c> property cast to an int.</value>
-    public int CurrentColumn { get => (int)CurrentLocation.Y; }
+    public int CurrentColumn { get; set; }
 
     /// <summary>Gets the current value of <see cref="_pieceType"/>.</summary>
     public PieceType AssignedType { get => _pieceType; }
+
     /// <summary>Enum to describe what type of chess piece this instance will act as.</summary>
     /// <remarks>One of (King,Pawn,Queen,Bishop,Rook,Knight)</remarks>
     private PieceType _pieceType;
@@ -86,32 +108,35 @@ public class ChessPiece
     /// <summary>Gets or initializes a Team enum to determine which team a <see cref="ChessPiece"/> is on.</summary>
     /// <remarks>Must be either Team.(White/Black)</remarks>
     /// <value>The current Team that this <see cref="ChessPiece"/> is on.</value>
-    public Team PieceTeam { get; init; }
+    public Team PieceTeam { get; set; }
 
     /// <summary>Gets or sets a value representing whether or not the current <see cref="ChessPiece"/> instance is vulnerable to En Passant.</summary>
     /// <value><see langword="true"/> if a pawn can be captured via En Passant; otherwise, <see langword="false"/>.</value>
-    private bool _enPassantCapturePossible { get; set; } = false;
+    private bool _enPassantCapturePossible = false;
 
     /// <summary>Gets or sets a value that describes if a <see cref="ChessPiece"/> instance can move across the board.</summary>
     /// <value><see cref="true"/> if <see cref="_pieceType"/> is PieceType.(Queen/Bishop/Rook); otherwise, <see langword="false"/>.</value>
-    private bool _canMoveAcrossBoard { get; set; } = false;
+    private bool _canMoveAcrossBoard = false;
 
     /// <summary>Gets or sets the number of times the current <see cref="ChessPiece"/> instance has been moved.</summary>
     /// <value>Integer reprensentation of how many a <see cref="ChessPiece"/> instance has been moved.</value>
     /// <remarks>Incremented by 1 whenever moved.</remarks>
-    private int _timesMoved { get; set; } = 0;
+    private int _timesMoved = 0;
+    //public int TimesMoved{get;set;}
 
     /// <summary>Location assigned to all captured pieces.</summary>
-    public static readonly Vector2 DefaultLocation = new Vector2(-1);
+    public static readonly Vector2 s_defaultLocation = new(-1);
 
     /// <summary>Gets or sets a value representing if the current <see cref="ChessPiece"/> instance has been captured.</summary>
     /// <value><see langword="true"/> if <see cref="ChessPiece"/> instance has been captured; otherwise, <see langword="false"/>.</value>
     public bool Captured { get; set; } = false;
 
-    public ChessPiece(PieceType piece, Coords startingLocation, Team pieceTeam)
+    public ChessPiece(PieceType assignedType, Coords currentLocation, Team pieceTeam)
     {
-        _pieceType = piece;
-        CurrentLocation = new Vector2(startingLocation.RowIndex, startingLocation.ColumnIndex);
+
+        AssignPieceType(assignedType);
+        AssignLocation(new Vector2(currentLocation.RowIndex, currentLocation.ColumnIndex));
+
         PieceTeam = pieceTeam;
 
         switch (_pieceType)
@@ -123,7 +148,11 @@ public class ChessPiece
                 break;
         }
 
-        directionVectors = DetermineDirectionVectors();
+        DirectionVectors = DetermineDirectionVectors();
+    }
+    public ChessPiece()
+    {
+
     }
     private List<Vector2> DetermineDirectionVectors()
     {
@@ -177,11 +206,11 @@ public class ChessPiece
                     directions.Add(new Vector2(verticalScalar, horizontalScalar));
 
                     if (AssignedType == PieceType.King && verticalScalar == 0 && horizontalScalar != 0)
-                    {   // This vector will allow the king to castle in either direction.
+                    {   // This will allow the king to castle in either direction horizontally for castling purposes.
                         directions.Add(new Vector2(verticalScalar, 2 * horizontalScalar));
                     }
                     else if (AssignedType == PieceType.Pawn && horizontalScalar == 0)
-                    {   // This vector will allow pawns to move forward 2 spaces if they haven't been moved.
+                    {   // This will allow pawns to move forward 2 spaces if they haven't been moved yet.
                         directions.Add(new Vector2(possibleInitialJump, horizontalScalar));
                     }
                 }
@@ -251,7 +280,7 @@ public class ChessPiece
         var viableMoves = new List<MovementInformation>();
         bool spaceIsEmpty;
 
-        foreach (Vector2 movementVector in directionVectors)
+        foreach (Vector2 movementVector in DirectionVectors)
         {
             // If this is a castling vector determine if castling is possible.
             if (AssignedType == PieceType.King && Math.Abs(movementVector.Y) == 2)
@@ -289,7 +318,7 @@ public class ChessPiece
 
                         if (!ignoreFriendlyInducedChecks)
                         {
-                            Vector2 singleSquareMovement = new Vector2(0, castleDirection);
+                            var singleSquareMovement = new Vector2(0, castleDirection);
                             // Initialize at the current location for addition purposes.
                             Vector2 movement = CurrentLocation;
                             // Ensure that the King will not be moving into or through check.
@@ -297,7 +326,7 @@ public class ChessPiece
                             {
                                 movement = Vector2.Add(movement, singleSquareMovement);
 
-                                var singleSquareMovementInfo = new MovementInformation(this, null, movement, DefaultLocation, false, capturingSecondary: false, castlingWithSecondary: false);
+                                var singleSquareMovementInfo = new MovementInformation(this, null, new Coords(movement), new Coords(s_defaultLocation), false, capturingSecondary: false, castlingWithSecondary: false);
 
                                 if (GameEnvironment.WillChangeResultInFriendlyCheck(singleSquareMovementInfo, gameBoard))
                                 {
@@ -312,7 +341,7 @@ public class ChessPiece
                             var newKingLocation = Vector2.Add(CurrentLocation, movementVector);
                             var newRookLocation = Vector2.Add(CurrentLocation, new Vector2(0, castleDirection));
 
-                            var moveInfo = new MovementInformation(this, pairedRook, newKingLocation, newRookLocation, enPassantCapturePossible: false, capturingSecondary: false, castlingWithSecondary: true);
+                            var moveInfo = new MovementInformation(this, pairedRook, new Coords(newKingLocation), new Coords(newRookLocation), enPassantCapturePossible: false, capturingSecondary: false, castlingWithSecondary: true);
 
                             viableMoves.Add(moveInfo);
                         }
@@ -363,7 +392,7 @@ public class ChessPiece
                                     if (captureablePawn != null && captureablePawn.AssignedType == PieceType.Pawn
                                     && captureablePawn._enPassantCapturePossible == true)
                                     {
-                                        var enPassantCapture = new MovementInformation(this, captureablePawn, calculatedPosition, DefaultLocation, movementWillExposeToEnPassant, capturingSecondary: true, castlingWithSecondary: false);
+                                        var enPassantCapture = new MovementInformation(this, captureablePawn, new Coords(calculatedPosition), new Coords(s_defaultLocation), movementWillExposeToEnPassant, capturingSecondary: true, castlingWithSecondary: false);
 
                                         if (ignoreFriendlyInducedChecks || !GameEnvironment.WillChangeResultInFriendlyCheck(enPassantCapture, gameBoard))
                                         {
@@ -377,7 +406,7 @@ public class ChessPiece
                         // Special notes for pawns: if pawnAttackVector = true, then the only way to move to that space is if enemyPieceAtQueriedLocation == true.
                         if ((spaceIsEmpty && !pawnAttackVector) || enemyPieceAtQueriedLocation)
                         {
-                            var moveInfo = new MovementInformation(this, captureablePiece, calculatedPosition, DefaultLocation, movementWillExposeToEnPassant, capturingSecondary: enemyPieceAtQueriedLocation, castlingWithSecondary: false);
+                            var moveInfo = new MovementInformation(this, captureablePiece, new Coords(calculatedPosition), new Coords(s_defaultLocation), movementWillExposeToEnPassant, capturingSecondary: enemyPieceAtQueriedLocation, castlingWithSecondary: false);
 
                             if (ignoreFriendlyInducedChecks || !GameEnvironment.WillChangeResultInFriendlyCheck(moveInfo, gameBoard))
                             {
@@ -385,7 +414,10 @@ public class ChessPiece
                             }
                         }
 
-                        if ((spaceIsEmpty || _canMoveAcrossBoard) == false) break;
+                        if (!spaceIsEmpty || !_canMoveAcrossBoard)
+                        {
+                            break;
+                        }
                     }
                     else
                     {   // Further multiplication of the vector will result in out of bounds values.
@@ -420,7 +452,7 @@ public class ChessPiece
     {
         throw new NotImplementedException("Pawn promotion hasn't been implemented.");
         // Get user to select what type of chess piece they want.
-        // directionVectors = DetermineDirectionVectors();
+        // _directionVectors = DetermineDirectionVectors();
     }
     /// <summary>
     /// Increases the <see cref="_timesMoved"/> property by one.
@@ -457,6 +489,15 @@ public class ChessPiece
             _ => throw new ArgumentOutOfRangeException(nameof(_pieceType), AssignedType, "Unrecognized PieceType submitted."),
         };
         return PieceTeam + "_" + methodValue;
+    }
+    public void AssignPieceType(PieceType newType)
+    {
+        _pieceType = newType;
+    }
+    public void AssignLocation(Vector2 newLocation)
+    {
+        CurrentRow = (int)newLocation.X;
+        CurrentColumn = (int)newLocation.Y;
     }
 }
 

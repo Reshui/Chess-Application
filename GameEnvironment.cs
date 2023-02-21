@@ -1,9 +1,6 @@
 namespace Pieces;
 
 using System.Numerics;
-using System.Linq;
-//using System.Diagnostics.CodeAnalysis;
-
 public enum GameState
 {
     LocalWin, LocalLoss, GameDraw, Playing
@@ -11,43 +8,58 @@ public enum GameState
 
 public class GameEnvironment
 {
+    private readonly ChessPiece _whiteKing;
+    private readonly ChessPiece _blackKing;
+    private bool _gameEnded = false;
+
     /// <summary>Array used to hold <see cref="Pieces.ChessPiece"/> instances and their locations withn the current game.</summary>
     public readonly ChessPiece?[,] GameBoard = new ChessPiece[8, 8];
+
     /// <summary>Array used to store visual information about <see cref="GameBoard"/>.</summary>
     /// <remarks>Assigned a value when an instance of <see cref="Chess_GUi.BoardGUI"/> is generated.</remarks>
     public PictureBox[,]? Squares { get; set; }
-    private ChessPiece _whiteKing { get; init; }
-    private ChessPiece _blackKing { get; init; }
+
     /// <summary>Player dictionary keyed to the <see cref="Pieces.Team"/> that they have been assigned to.</summary>
     public Dictionary<Team, Player> AssociatedPlayers = new();
-    /// <summary>Dictionary of <see cref="Pieces.ChessPiece"/> objects keyed to a team color.</summary>
-    private Dictionary<Team, List<ChessPiece>> _teamPieces;
+
+    /// <summary>Dictionary of <see cref="Pieces.ChessPiece"/> objects keyed to a <see cref="Team"/> enum.</summary>
+    private readonly Dictionary<Team, List<ChessPiece>> _teamPieces;
+
     /// <summary>Stores how many moves have been submitted since the last capture was made.</summary>
     /// <remarks>If over 50 then a Draw is determined.</remarks>
     private int _movesSinceLastCapture = 0;
+
     /// <summary>List of submitted moves within the current <see cref="GameEnvironment"/> instance.</summary>
-    private List<MovementInformation> _gameMoves = new();
-    /// <summary>Gets or sets a boolean that denotes whether or not a given instance has ended.</summary>
+    private readonly List<MovementInformation> _gameMoves = new();
+
+    /// <summary>Gets a boolean that denotes whether or not a given instance has ended.</summary>
     /// <value><see langword="true"/> if the <see cref="GameEnvironment"/> instance has ended; otherwise, <see langword="false"/>.</value>
-    public bool GameEnded { get; set; } = false;
-    public CancellationTokenSource? PlayerAffiliatedCancellationSource;
+    public bool GameEnded { get => _gameEnded; }
+
     /// <summary>Server-Side integer used to identify the current <see cref="GameEnvironment"/> instance.</summary>
     /// <remarks>Value is auto-incremented in the relevant constructors.</remarks>
-    private static int _instanceNumber = 0;
+    private static int s_instanceNumber = 0;
+
     /// <summary>Gets or initializes an ID number used to track the current instance on the server.</summary>
     /// <value>The ID of the current <see cref="GameEnvironment"/> instance on the server.</value>
     public int GameID { get; init; }
+
     /// <summary>Gets or initializes a <see cref="Pieces.Team"/> enum that represents the assigned Team of the client.</summary>
     /// <remarks>Variable used by the client-side <see cref="BoardGUI"/> instance to limit interaction with the board until it is that team's turn.</remarks>
     /// <value><see cref="Pieces.Team"/> assigned to the local user.</value>
     public Team PlayerTeam { get; init; }
+
     /// <summary>Gets or sets a value representing which <see cref="Pieces.Team"/> is currently allowed to submit MovementInformation.</summary>
     /// <remarks>Alternated whenever <see cref="GameEnvironment.SubmitFinalizedChange(MovementInformation)"/> is called.</remarks>
-    ///<value>The <see cref="Pieces.Team"/> that is currently allowed to submit <see cref="Pieces.MovementInformation"/> to the instance.</value>
+    ///<value>The <see cref="Pieces.Team"/> that is currently allowed to submit <see cref="Pieces.MovementInformation"/> to the <see cref="GameEnvironment"/> instance.</value>
     public Team ActiveTeam { get; set; } = Team.White;
+
+    /// <summary>Gets or sets the current game state.</summary>
+    /// <value>The current game state.</value>
     public GameState MatchState { get; set; } = GameState.Playing;
-    private bool _initializedByServer { get; init; } = false;
-    private bool _initializedByClient { get; init; } = false;
+
+    private readonly bool _initializedByServer = false;
+    private readonly bool _initializedByClient = false;
     public ChessPiece this[int x, int y]
     {
         get => GameBoard[x, y]!;
@@ -62,8 +74,6 @@ public class GameEnvironment
         GameID = serverSideID;
         PlayerTeam = playerTeam;
 
-        PlayerAffiliatedCancellationSource = new();
-
         _teamPieces = GenerateBoard();
         _whiteKing = AssignKing(Team.White);
         _blackKing = AssignKing(Team.Black);
@@ -74,10 +84,12 @@ public class GameEnvironment
     /// <summary>
     /// Constructor used by the server to track changes of active games and assign teams to Players.
     /// </summary>
+    /// <param name="playerOne">First player to be tracked.</param>
+    /// <param name="playerTwo">Second player to track.</param>
     public GameEnvironment(Player playerOne, Player playerTwo)
     {
         _teamPieces = GenerateBoard();
-        GameID = ++_instanceNumber;
+        GameID = ++s_instanceNumber;
 
         var playerList = new List<Player> { playerOne, playerTwo };
 
@@ -164,7 +176,7 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Determines if a given king is checked based on king visibility.
+    /// Determines if <paramref name="queriedKing"/> is checked on <paramref name="board"/>.
     /// </summary>
     /// <param name="queriedKing">King that has its checked status tested.</param>
     /// <param name="board">2D board of <see cref="ChessPiece"/> Objects.</param>
@@ -182,7 +194,7 @@ public class GameEnvironment
 
                 bool perpendicularVector = Math.Abs(verticalScalar) + Math.Abs(horizontalScalar) == 1;
 
-                Vector2 vectorDirection = new Vector2(verticalScalar, horizontalScalar);
+                var vectorDirection = new Vector2(verticalScalar, horizontalScalar);
                 // Propagate the vector at most 7 times to get from the current space to the opposite side of the board.
                 for (int propagationCount = 1; propagationCount < 8; propagationCount++)
                 {
@@ -215,8 +227,7 @@ public class GameEnvironment
                         }
                     }
                     else
-                    {
-                        // Out of bounds. Stop propagation of vector.
+                    {   // Out of bounds. Stop propagation of vector.
                         break;
                     }
                 }
@@ -245,11 +256,11 @@ public class GameEnvironment
     /// Determines if movement details given by <paramref name="moveInfo"/> will expose a friendly king to check.
     /// </summary>
     /// <param name="moveInfo">Readonly struct with details on the movement to test.</param>
-    /// <param name="board">2D <see cref="ChessPiece"/> board.</param>
-    /// <returns>true if a friendly king will be checked; false otherwise.</returns>
+    /// <param name="board">2D <see cref="ChessPiece[,]"/> board.</param>
+    /// <returns><see langword="true"/> if a friendly king will be checked; otherwise, <see langword="false"/>.</returns>
     public static bool WillChangeResultInFriendlyCheck(MovementInformation moveInfo, ChessPiece?[,] board)
     {
-        Team friendlyTeam = moveInfo.MainPiece.PieceTeam;
+        Team friendlyTeam = moveInfo.SubmittingTeam;
 
         var boardCopy = CopyBoard(board);
 
@@ -259,7 +270,7 @@ public class GameEnvironment
 
         foreach (ChessPiece piece in boardCopy)
         {
-            if (piece != null && piece.PieceTeam == friendlyTeam & piece.IsKing())
+            if (piece != null && piece.PieceTeam == friendlyTeam && piece.IsKing())
             {
                 friendlyKing = piece;
                 break;
@@ -381,7 +392,7 @@ public class GameEnvironment
     /// Replaces or moves <see cref="ChessPiece"/> object within <paramref name ="queriedBoard"/>.
     /// </summary>
     /// <param name ="queriedBoard">2D nullable <see cref="ChessPiece"/> array.</param>
-    /// <param name ="movementDetails"> Struct that contains details for a given movement or capture.</param>
+    /// <param name ="movementDetails">Struct that contains details for a given movement or capture.</param>
     /// <param name ="movementHasBeenFinalized">Boolean value that tells the code that this movemnet has been finalized and passes all checks.</param>
     public static void ChangePieceLocation(ChessPiece?[,] queriedBoard, MovementInformation movementDetails, bool movementHasBeenFinalized)
     {
@@ -391,7 +402,7 @@ public class GameEnvironment
         int newRowCoord = (int)movementDetails.MainNewLocation.X;
         int newColumnCoord = (int)movementDetails.MainNewLocation.Y;
 
-        if (movementDetails.SecondaryPiece != null)
+        if (movementDetails.SecondaryPiece is not null)
         {
             ChessPiece secondaryInput = movementDetails.SecondaryPiece;
             // Since the board may be copy, deal with the object on the board rather than the input variables.
@@ -399,7 +410,7 @@ public class GameEnvironment
 
             queriedBoard[secondaryOnBoard.CurrentRow, secondaryOnBoard.CurrentColumn] = null;
 
-            secondaryOnBoard.CurrentLocation = movementDetails.SecondaryNewLocation;
+            secondaryOnBoard.AssignLocation(movementDetails.SecondaryNewLocation);
 
             if (movementDetails.CastlingWithSecondary)
             {
@@ -419,7 +430,7 @@ public class GameEnvironment
         {
             queriedBoard[newRowCoord, newColumnCoord] = pieceToChange;
 
-            pieceToChange.CurrentLocation = movementDetails.MainNewLocation;
+            pieceToChange.AssignLocation(movementDetails.MainNewLocation);
 
             if (movementHasBeenFinalized)
             {
@@ -443,7 +454,7 @@ public class GameEnvironment
 
         board[move.MainPiece.CurrentRow, move.MainPiece.CurrentColumn] = pieceOne;
 
-        pieceOne.CurrentLocation = move.MainPiece.CurrentLocation;
+        pieceOne.AssignLocation(move.MainPiece.CurrentLocation);
 
         if (move.CastlingWithSecondary)
         {
@@ -451,7 +462,7 @@ public class GameEnvironment
             board[pieceTwo!.CurrentRow, pieceTwo.CurrentColumn] = null;
 
             board[move.SecondaryPiece!.CurrentRow, move.SecondaryPiece.CurrentColumn] = pieceTwo;
-            pieceTwo!.CurrentLocation = move.SecondaryPiece.CurrentLocation;
+            pieceTwo!.AssignLocation(move.SecondaryPiece.CurrentLocation);
         }
         else if (move.CapturingSecondary)
         {
@@ -496,7 +507,7 @@ public class GameEnvironment
     /// Updates a client-side <see cref="GameEnvironment"/> instance and corresponding visuals using <paramref name="newMove"/>.
     /// </summary>
     /// <param name="newMove">Board movement used to update a <see cref="GameEnvironment"/> instance.</param>
-    public void ChangeGameBoardAndGUI(MovementInformation newMove)
+    public void ChangeGameBoardAndGUI(MovementInformation newMove, bool piecesAlreadyMovedOnGUI)
     {
         if (GameBoard != null && Squares != null && ActiveTeam == newMove.SubmittingTeam)
         {
@@ -504,48 +515,61 @@ public class GameEnvironment
 
             if (IsKingCheckMated(ReturnKing(PlayerTeam)))
             {
-                MatchState = GameState.LocalLoss;
+                ChangeGameState(GameState.LocalLoss);
             }
             else if (IsKingCheckMated(ReturnKing(PlayerTeam == Team.White ? Team.Black : Team.White)))
             {
-                MatchState = GameState.LocalWin;
+                ChangeGameState(GameState.LocalWin);
             }
             else if (IsStalemate())
             {
-                MatchState = GameState.GameDraw;
+                ChangeGameState(GameState.GameDraw);
             }
-            if (MatchState != GameState.Playing) GameEnded = true;
 
             #region Update Graphics
-            if (newMove.SecondaryPiece != null)
-            {
-                ChessPiece secPiece = newMove.SecondaryPiece;
-                PictureBox? secBox = Squares[secPiece.CurrentRow, secPiece.CurrentColumn];
-
-                if (secBox != null)
+            if (!piecesAlreadyMovedOnGUI)
+            {                
+                if (newMove.SecondaryPiece is not null)
                 {
-                    if (newMove.CapturingSecondary)
+                    ChessPiece secPiece = newMove.SecondaryPiece;
+                    PictureBox? secBox = Squares[secPiece.CurrentRow, secPiece.CurrentColumn];
+
+                    if (secBox is not null)
                     {
-                        secBox.Image = null;
-                    }
-                    else if (newMove.CastlingWithSecondary)
-                    {
-                        Squares[(int)newMove.SecondaryNewLocation.X, (int)newMove.SecondaryNewLocation.Y]!.Image = secBox.Image;
-                        secBox.Image = null;
+                        if (newMove.CapturingSecondary)
+                        {
+                            secBox.Image = null;
+                        }
+                        else if (newMove.CastlingWithSecondary)
+                        {
+                            Squares[newMove.SecondaryCoords.RowIndex, newMove.SecondaryCoords.ColumnIndex]!.Image = secBox.Image;
+                            secBox.Image = null;
+                        }
                     }
                 }
-            }
 
-            ChessPiece mainPiece = newMove.MainPiece;
-            PictureBox? mainBox = Squares[mainPiece.CurrentRow, mainPiece.CurrentColumn];
+                ChessPiece mainPiece = newMove.MainPiece;
+                PictureBox? mainBox = Squares[mainPiece.CurrentRow, mainPiece.CurrentColumn];
 
-            if (mainBox != null)
-            {
-                Squares[(int)newMove.MainNewLocation.X, (int)newMove.MainNewLocation.Y]!.Image = mainBox.Image;
-                mainBox.Image = null;
+                if (mainBox is not null)
+                {
+                    Squares[newMove.MainCoords.RowIndex, newMove.MainCoords.ColumnIndex]!.Image = mainBox.Image;
+                    mainBox.Image = null;
+                }
             }
             #endregion
-        }
 
+            if (MatchState != GameState.Playing)
+            {
+                throw new NotImplementedException("Game ended UI changes/updates haven't been implemented.");
+            }
+        }
+    }
+    /// <summary>Changes the <see cref="MatchState"/> property to <paramref name="newState"/> and ends the game.</summary>
+    /// <param name="newState">New game state for the current instance.</param>
+    public void ChangeGameState(GameState newState)
+    {
+        MatchState = newState;
+        _gameEnded = newState != GameState.Playing;
     }
 }

@@ -8,8 +8,6 @@ using System;
 using System.Collections.Concurrent;
 public class Server
 {
-    public const string eosText = "End_Of_Stream";
-
     /// <summary>List of connected <see cref="TcpClient"/>s to the current <see cref="Server"/> instance.</summary>
     private readonly ConcurrentDictionary<int, Player> _connectedPlayers = new();
 
@@ -55,7 +53,8 @@ public class Server
         DeclareWin,
         DeclareLoss,
         DeclareStaleMate,
-        RegisterUser
+        RegisterUser,
+        SuccessfullyRegistered
     }
     [Serializable]
     public class ServerCommand
@@ -68,6 +67,7 @@ public class Server
         public Team? AssignedTeam { get; set; } = null;
         /// <summary>Specifies which instance of a <see cref="GameEnvironment"/> is being communicated with.</summary>
         public int GameIdentifier { get; set; } = 0;
+        /// <summary>Optional parameter used to assign a name to a <see cref="Player"/> instance.</summary>
         public string? Name { get; set; }
 
         public ServerCommand(CommandType cmd, int gameIdentifier = 0, MovementInformation? moveDetails = null, Team? assignedTeam = null, string? name = null)
@@ -75,12 +75,6 @@ public class Server
             CMD = cmd;
             GameIdentifier = gameIdentifier;
 
-            /*
-            MoveDetails = moveDetails;
-            AssignedTeam = assignedTeam;
-            Name = name;
-            */
-            
             if (cmd == CommandType.NewMove)
             {
                 MoveDetails = moveDetails ?? throw new ArgumentNullException(nameof(moveDetails), "A new move command has been submitted without a non-null MovementInformation struct.");
@@ -91,8 +85,8 @@ public class Server
             }
             else if (cmd == CommandType.RegisterUser)
             {
-                Name = name ?? throw new ArgumentNullException(nameof(name), "name value not provided.");
-            }            
+                Name = name ?? throw new ArgumentNullException(nameof(name), $"{nameof(name)} value not provided.");
+            }
         }
     }
     public Server()
@@ -175,14 +169,14 @@ public class Server
 
                         foreach (KeyValuePair<Team, Player> playerDetail in newGame.AssociatedPlayers)
                         {
-                            var clientCommand = new ServerCommand(CommandType.StartGameInstance, newGame.GameID, assignedTeam: playerDetail.Key);
+                            var startGameCommand = new ServerCommand(CommandType.StartGameInstance, newGame.GameID, assignedTeam: playerDetail.Key);
                             bool cancellationTokenAvailable = _clientListeningCancelationTokens.TryGetValue(playerDetail.Value.ServerAssignedID, out CancellationTokenSource? cancelSource);
 
                             if (cancellationTokenAvailable && cancelSource != null)
                             {
                                 try
                                 {
-                                    await SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), playerDetail.Value.Client!, cancelSource.Token);
+                                    await SendClientMessageAsync(JsonSerializer.Serialize(startGameCommand), playerDetail.Value.Client, cancelSource.Token);
                                 }
                                 catch (Exception e) when (e is TaskCanceledException || e is IOException)
                                 {   // Failed to message client or client is leaving the server.
@@ -283,16 +277,46 @@ public class Server
     public static async Task SendClientMessageAsync(string message, TcpClient client, CancellationToken? token)
     {
         byte[] msg = Encoding.ASCII.GetBytes(message);
-
         List<byte> constructedMessage = BitConverter.GetBytes(msg.Length).ToList();
-
         constructedMessage.AddRange(msg);
-
         byte[] msgConverted = constructedMessage.ToArray();
-        NetworkStream stream = client.GetStream();
 
-        await stream.WriteAsync(msgConverted);
+        await client.GetStream().WriteAsync(msgConverted);
 
+    }
+
+    /// <summary>
+    /// Asynchronously waits for messages from <paramref name="stream"/>.
+    /// </summary>
+    /// <exception cref="TaskCanceledException">Thrown if <paramref name="token"/> source is cancelled.</exception>
+    /// <exception cref="IOException">Thrown if something goes wrong with <paramref name="stream"/>.ReadAsync().</exception>
+    public static async Task<string> RecieveMessageFromStreamAsync(NetworkStream stream, CancellationToken token)
+    {
+        var builder = new StringBuilder();
+        // Incoming messages contain the length of the message in bytes within the first 4 bytes.
+        byte[] bytes = new byte[sizeof(int)];
+        int totalRecieved = -1 * bytes.Length, incomingMessageByteCount = 0, responseByteCount;
+        bool byteCountRecieved = false;
+
+        do
+        {   // Loop to receive all the data sent by the client.
+            responseByteCount = await stream.ReadAsync(bytes, token);
+
+            if (!byteCountRecieved)
+            {
+                byteCountRecieved = true;
+                incomingMessageByteCount = BitConverter.ToInt32(bytes, 0);
+                bytes = new byte[incomingMessageByteCount];
+            }
+            else
+            {
+                string textSection = Encoding.ASCII.GetString(bytes, 0, responseByteCount);
+                builder.Append(textSection);
+            }
+
+        } while (responseByteCount > 0 && (totalRecieved += responseByteCount) < incomingMessageByteCount);
+
+        return builder.ToString();
     }
 
     /// <summary>
@@ -306,41 +330,28 @@ public class Server
         using NetworkStream stream = user.Client.GetStream();
         ServerCommand clientCommand;
 
-        bool clientDisconnected = false;
-        bool userRegistered = false;
+        bool clientDisconnected = false, userRegistered = false;
+
         try
         {
             while (!clientDisconnected)
             {
-                var builder = new StringBuilder();
-                byte[] bytes = new byte[4];
-                int totalRecieved = 0, totalMessageByteCount = 0, responseByteCount = 0;
-                bool byteCountRecieved = false;
+                string recievedText = await RecieveMessageFromStreamAsync(stream, token);
 
-                do
-                {   // Loop to receive all the data sent by the client.
-                    responseByteCount = await stream.ReadAsync(bytes, token);
+                if (recievedText == string.Empty) continue;
 
-                    if (!byteCountRecieved)
-                    {
-                        byteCountRecieved = true;
-                        totalMessageByteCount = BitConverter.ToInt32(bytes, 0);
-                        bytes = new byte[totalMessageByteCount];
-                    }
-                    else
-                    {
-                        var textSection = Encoding.ASCII.GetString(bytes, 0, responseByteCount);
-                        builder.Append(textSection);
-                    }
+                ServerCommand? deserializedData=null;
 
-                } while ((totalRecieved += responseByteCount) < totalMessageByteCount);
-
-                if (builder.Length == 0) continue;
-
-                string recievedText = builder.ToString();
-
-                ServerCommand? deserializedData = JsonSerializer.Deserialize<ServerCommand>(recievedText);
-
+                try
+                {
+                    deserializedData = JsonSerializer.Deserialize<ServerCommand>(recievedText);
+                }
+                catch (InvalidOperationException e)
+                {
+                    Console.WriteLine(e.ToString());
+                    continue;
+                }
+                
                 if (deserializedData is not null)
                 {
                     if (deserializedData.CMD == CommandType.RegisterUser && !userRegistered)
@@ -349,6 +360,8 @@ public class Server
                         {
                             user.AssignName(deserializedData.Name!);
                             userRegistered = true;
+                            string succesfulRegister = JsonSerializer.Serialize(new ServerCommand(CommandType.SuccessfullyRegistered));
+                            await SendClientMessageAsync(succesfulRegister, user.Client, null);
                         }
                         catch (Exception)
                         { // Thrown if Name already has a value.
@@ -359,7 +372,7 @@ public class Server
                     {   // Only add the user to the queue if they aren't already in it.
                         if (!_waitingForGameLobby.Contains(user)) _waitingForGameLobby.Enqueue(user);
                     }
-                    else if (deserializedData.CMD == CommandType.NewMove && deserializedData.MoveDetails != null && userRegistered)
+                    else if (deserializedData.CMD == CommandType.NewMove && deserializedData.MoveDetails is not null && userRegistered)
                     {
                         if (_startedGames.TryGetValue(deserializedData.GameIdentifier, out GameEnvironment? currentGame))
                         {
@@ -456,7 +469,7 @@ public class Server
             }
 
             cancelSource.Dispose();
-            user.Client.Dispose();
+            user.Client.Close();
         }
     }
 

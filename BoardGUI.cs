@@ -57,19 +57,26 @@ namespace Chess_GUi
         /// <summary>If <see langword="true"/> then <see cref="_friendlySelectedSquare"/> and <see cref="_targetSquare"/> will be set to <see langword="null"/> when <see cref="BoardGUI.SquareClickedEvent(object, EventArgs)"/> is called.</summary>
         private bool _resetSquareAssignments;
 
+
+        private static int s_instanceCount = 0;
+        
+        public int CurrentInstanceCount { get; init; }
+
         public BoardGUI(Player user, GameEnvironment newGame)
         {
+            CurrentInstanceCount = ++s_instanceCount;
+            Name = CurrentInstanceCount.ToString();
             _currentGame = newGame;
             User = user;
-            InitializeComponent();
+            GenerateBoardElements();
         }
 
         [MemberNotNull(nameof(MainBoard), nameof(ConfirmMove), nameof(_pictureSquares))]
-        private void InitializeComponent()
+        private void GenerateBoardElements()
         {
             MainBoard = new Panel()
             {
-                Location = new Point(16, 15),
+                Location = new Point(0, 0),
                 Name = "MainBoard",
                 Size = new Size(640, 640),
                 TabIndex = 0
@@ -176,16 +183,16 @@ namespace Chess_GUi
             Color moveablePieceColor = ColorTranslator.FromHtml("#58871C");
             Color userSelectedMoveColor = ColorTranslator.FromHtml("#A1C17A");
 
-            // PictureBox.Name is a string containing the row and column coordinates: {row}{column}
+            // PictureBox.Name is a string containing the row and column coordinates: {row}{column}.
             int[] coords = (from cc in selectedSquare!.Name
                             select int.Parse(cc.ToString())).ToArray();
 
             ChessPiece? selectedPiece = _currentGame[coords[0], coords[1]];
 
-            if (selectedPiece != null && selectedPiece.PieceTeam == _currentGame.PlayerTeam && !selectedSquare.Equals(_friendlySelectedSquare))
+            if (selectedPiece?.PieceTeam == _currentGame.PlayerTeam && !selectedSquare.Equals(_friendlySelectedSquare))
             {   // Display available movements for the ChessPiece
 
-                if (_targetSquare != null)
+                if (_targetSquare is not null)
                 {
                     // _targetSquare not being null means that a different friendly piece has been selected
                     // and therefore the previously highlighted available movements need to have their respective colors reverted to normal.
@@ -287,7 +294,7 @@ namespace Chess_GUi
                                                     select cm).First();
 
             // Send change to the server and update on local client.
-            await User.SubmitMoveToServerAsync(submitedMovement, _currentGame.GameID, _currentGame.PlayerAffiliatedCancellationSource!.Token);
+            await User.SubmitMoveToServerAsync(submitedMovement, _currentGame.GameID);
         }
 
         /// <summary>
@@ -298,8 +305,7 @@ namespace Chess_GUi
             foreach (var squareInfo in _changedSquares)
             {
                 squareInfo.SquareChanged.BackColor = squareInfo.OriginalColor;
-                squareInfo.SquareChanged.BorderStyle = BorderStyle.None;
-                //squareInfo.SquareChanged.Image = 
+                squareInfo.SquareChanged.BorderStyle = BorderStyle.None; 
             }
         }
         /// <summary>
@@ -309,6 +315,19 @@ namespace Chess_GUi
         {
             if (_friendlySelectedSquare != null) _friendlySelectedSquare.Image = _friendlyImage;
             if (_targetSquare != null) _targetSquare.Image = _targetImage;
+        }
+
+        private void InitializeComponent()
+        {
+            this.SuspendLayout();
+            // 
+            // BoardGUI
+            // 
+            this.BackColor = System.Drawing.SystemColors.ActiveCaption;
+            this.Name = "BoardGUI";
+            this.Size = new System.Drawing.Size(1040, 685);
+            this.ResumeLayout(false);
+
         }
     }
 }

@@ -1,11 +1,12 @@
-using System;
 
 namespace Pieces;
 
+using Chess_GUi;
+using static Pieces.Server;
+
 using System.Net.Sockets;
 using System.Text.Json;
-using System.Text;
-using static Pieces.Server;
+
 public class Player
 {
     /// <summary>IP address of <see cref="_connectedServer"/>.</summary>
@@ -42,13 +43,16 @@ public class Player
 
     public readonly CancellationTokenSource MainTokenSource = new();
 
+    private readonly Form1? _gui;
+
     /// <summary>
     /// Client-side constructor.
     /// </summary>
-    public Player()
+    public Player(Form1 gui)
     {
         _hostPort = 13000;
         _hostAddress = "127.0.0.1";
+        _gui = gui;
     }
     /// <summary>
     /// Constructor used by the <see cref="Server"/> class to track clients.
@@ -88,32 +92,11 @@ public class Player
 
             while (!token.IsCancellationRequested)
             {
-                var builder = new StringBuilder();
-                byte[] bytes = new byte[4];
-                int totalRecieved = 0, totalMessageByteCount = 0, responseByteCount = 0;
-                bool byteCountRecieved = false;
+                string recievedText = await RecieveMessageFromStreamAsync(stream, token);
 
-                do
-                {   // Loop to receive all the data sent by the client.
-                    responseByteCount = await stream.ReadAsync(bytes, token);
+                if (recievedText == string.Empty) continue;
 
-                    if (!byteCountRecieved)
-                    {
-                        byteCountRecieved = true;
-                        totalMessageByteCount = BitConverter.ToInt32(bytes, 0);
-                        bytes = new byte[totalMessageByteCount];
-                    }
-                    else
-                    {
-                        var textSection = Encoding.ASCII.GetString(bytes, 0, responseByteCount);
-                        builder.Append(textSection);
-                    }
-
-                } while ((totalRecieved += responseByteCount) < totalMessageByteCount);
-
-                if (builder.Length == 0) continue;
-
-                ServerCommand? response = JsonSerializer.Deserialize<ServerCommand>(builder.ToString());
+                ServerCommand? response = JsonSerializer.Deserialize<ServerCommand>(recievedText);
 
                 if (response != null)
                 {
@@ -123,10 +106,10 @@ public class Player
                     {
                         var newGame = new GameEnvironment(serverSideGameID, (Team)response.AssignedTeam!);
                         _activeGames.Add(serverSideGameID, newGame);
+                        _gui?.AddGame(newGame);
                     }
                     else if (response.CMD == CommandType.ServerIsShuttingDown)
                     {
-                        stream.Dispose();
                         MainTokenSource.Cancel();
                     }
                     else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames.ContainsKey(serverSideGameID))
@@ -138,18 +121,18 @@ public class Player
                     }
                     else if (response.CMD == CommandType.NewMove && _activeGames.ContainsKey(serverSideGameID))
                     {
-                        _activeGames[serverSideGameID].ChangeGameBoardAndGUI(response.MoveDetails!.Value);
+                        _activeGames[serverSideGameID].ChangeGameBoardAndGUI(response.MoveDetails!.Value,false);
                     }
                 }
             }
         }
         catch (Exception e)
         {
-            Console.WriteLine("Host has disconnected. " + e);
-            stream.Dispose();
+            Console.WriteLine("Host has disconnected. " + e);        
         }
         finally
         {
+            stream.Dispose();
             _connectedServer.Close();
             ServerIsConnected = false;
         }
@@ -165,7 +148,7 @@ public class Player
 
         if (targetedGameInstance.ActiveTeam == move.SubmittingTeam)
         {
-            targetedGameInstance.ChangeGameBoardAndGUI(move);
+            targetedGameInstance.ChangeGameBoardAndGUI(move,true);
 
             if (_connectedServer != null && ServerIsConnected)
             {
