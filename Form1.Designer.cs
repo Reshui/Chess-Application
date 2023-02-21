@@ -30,19 +30,25 @@ namespace Chess_GUi
         /// </summary>
         private void InitializeComponent()
         {
-            this.flowLayoutPanel1 = new System.Windows.Forms.FlowLayoutPanel();
-            this.StartServer = new System.Windows.Forms.Button();
             this.JoinServer = new System.Windows.Forms.Button();
+            this.StartServer = new System.Windows.Forms.Button();
             this.MainView = new System.Windows.Forms.Panel();
+            this.panel1 = new System.Windows.Forms.Panel();
+            this.UserName = new System.Windows.Forms.TextBox();
+            this.panel1.SuspendLayout();
             this.SuspendLayout();
             // 
-            // flowLayoutPanel1
+            // JoinServer
             // 
-            this.flowLayoutPanel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.flowLayoutPanel1.Location = new System.Drawing.Point(0, 0);
-            this.flowLayoutPanel1.Name = "flowLayoutPanel1";
-            this.flowLayoutPanel1.Size = new System.Drawing.Size(187, 688);
-            this.flowLayoutPanel1.TabIndex = 0;
+            this.JoinServer.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(34)))), ((int)(((byte)(82)))), ((int)(((byte)(57)))));
+            this.JoinServer.ForeColor = System.Drawing.Color.White;
+            this.JoinServer.Location = new System.Drawing.Point(0, 55);
+            this.JoinServer.Name = "JoinServer";
+            this.JoinServer.Size = new System.Drawing.Size(187, 50);
+            this.JoinServer.TabIndex = 2;
+            this.JoinServer.Text = "Join Server";
+            this.JoinServer.UseVisualStyleBackColor = false;
+            this.JoinServer.Click += new System.EventHandler(this.JoinServer_Click);
             // 
             // StartServer
             // 
@@ -54,24 +60,33 @@ namespace Chess_GUi
             this.StartServer.TabIndex = 1;
             this.StartServer.Text = "Start Server";
             this.StartServer.UseVisualStyleBackColor = false;
-            // 
-            // JoinServer
-            // 
-            this.JoinServer.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(34)))), ((int)(((byte)(82)))), ((int)(((byte)(57)))));
-            this.JoinServer.ForeColor = System.Drawing.Color.White;
-            this.JoinServer.Location = new System.Drawing.Point(0, 50);
-            this.JoinServer.Name = "JoinServer";
-            this.JoinServer.Size = new System.Drawing.Size(187, 50);
-            this.JoinServer.TabIndex = 2;
-            this.JoinServer.Text = "Join Server";
-            this.JoinServer.UseVisualStyleBackColor = false;
+            this.StartServer.Click += new System.EventHandler(this.StartServer_Click);
             // 
             // MainView
             // 
-            this.MainView.Location = new System.Drawing.Point(187, 0);
+            this.MainView.BackColor = System.Drawing.Color.DarkGray;
+            this.MainView.Location = new System.Drawing.Point(191, 0);
             this.MainView.Name = "MainView";
-            this.MainView.Size = new System.Drawing.Size(1040, 688);
+            this.MainView.Size = new System.Drawing.Size(1040, 685);
             this.MainView.TabIndex = 3;
+            // 
+            // panel1
+            // 
+            this.panel1.Controls.Add(this.UserName);
+            this.panel1.Controls.Add(this.StartServer);
+            this.panel1.Controls.Add(this.JoinServer);
+            this.panel1.Location = new System.Drawing.Point(0, 0);
+            this.panel1.Name = "panel1";
+            this.panel1.Size = new System.Drawing.Size(190, 685);
+            this.panel1.TabIndex = 4;
+            // 
+            // UserName
+            // 
+            this.UserName.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(224)))), ((int)(((byte)(192)))));
+            this.UserName.Location = new System.Drawing.Point(0, 120);
+            this.UserName.Name = "UserName";
+            this.UserName.Size = new System.Drawing.Size(187, 27);
+            this.UserName.TabIndex = 3;
             // 
             // Form1
             // 
@@ -79,23 +94,20 @@ namespace Chess_GUi
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(39)))), ((int)(((byte)(46)))), ((int)(((byte)(68)))));
             this.ClientSize = new System.Drawing.Size(1432, 686);
+            this.Controls.Add(this.panel1);
             this.Controls.Add(this.MainView);
-            this.Controls.Add(this.JoinServer);
-            this.Controls.Add(this.StartServer);
-            this.Controls.Add(this.flowLayoutPanel1);
             this.Name = "Form1";
             this.Text = "Chess";
+            this.panel1.ResumeLayout(false);
+            this.panel1.PerformLayout();
             this.ResumeLayout(false);
 
         }
-
-
-
         #endregion
-
-        private FlowLayoutPanel flowLayoutPanel1;
         private Button StartServer;
         private Button JoinServer;
         private Panel MainView;
+        private Panel panel1;
+        private TextBox UserName;
     }
 }
