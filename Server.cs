@@ -258,7 +258,7 @@ public class Server
 
         try
         {
-            await client.GetStream().WriteAsync(data);
+            await client.GetStream().WriteAsync(data,0,0);
         }
         catch (IOException)
         {
@@ -290,33 +290,68 @@ public class Server
     /// </summary>
     /// <exception cref="TaskCanceledException">Thrown if <paramref name="token"/> source is cancelled.</exception>
     /// <exception cref="IOException">Thrown if something goes wrong with <paramref name="stream"/>.ReadAsync().</exception>
-    public static async Task<string> RecieveMessageFromStreamAsync(NetworkStream stream, CancellationToken token)
+    public static async Task<ServerCommand> RecieveCommandFromStreamAsync(NetworkStream stream, CancellationToken token)
     {
         var builder = new StringBuilder();
-        // Incoming messages contain the length of the message in bytes within the first 4 bytes.
-        byte[] bytes = new byte[sizeof(int)];
-        int totalRecieved = -1 * bytes.Length, incomingMessageByteCount = 0, responseByteCount;
-        bool byteCountRecieved = false;
+        int responseByteCount;
 
         do
-        {   // Loop to receive all the data sent by the client.
-            responseByteCount = await stream.ReadAsync(bytes, token);
+        {
+            // Incoming messages contain the length of the message in bytes within the first 4 bytes.
+            byte[] bytes = new byte[sizeof(int)];
+            int totalRecieved = -1 * bytes.Length, incomingMessageByteCount = 0;
+            bool byteCountRecieved = false;
 
-            if (!byteCountRecieved)
-            {
-                byteCountRecieved = true;
-                incomingMessageByteCount = BitConverter.ToInt32(bytes, 0);
-                bytes = new byte[incomingMessageByteCount];
-            }
-            else
-            {
-                string textSection = Encoding.ASCII.GetString(bytes, 0, responseByteCount);
-                builder.Append(textSection);
-            }
+            do
+            {   // Loop to receive all the data sent by the client.
+                responseByteCount = await stream.ReadAsync(bytes, token);
 
-        } while (responseByteCount > 0 && (totalRecieved += responseByteCount) < incomingMessageByteCount);
+                if (responseByteCount > 0)
+                {
+                    if (!byteCountRecieved)
+                    {                        
+                        try
+                        {   // Verify that the first 4 bytes are a number.
+                            incomingMessageByteCount = BitConverter.ToInt32(bytes, 0);
+                            totalRecieved += responseByteCount;
+                            byteCountRecieved = true;
+                        }
+                        catch (Exception)
+                        {
+                            break;
+                        }
+                        // Resize the array to fit incoming data.
+                        bytes = new byte[incomingMessageByteCount];                        
+                    }
+                    else
+                    {
+                        string textSection = Encoding.ASCII.GetString(bytes, 0, responseByteCount);
 
-        return builder.ToString();
+                        if ((totalRecieved += responseByteCount) == incomingMessageByteCount)
+                        {   // All message bytes have been recieved.
+                            if (builder.Length > 0) textSection = builder.Append(textSection).ToString();                            
+
+                            try
+                            {   // Making sure that the recieved text is a valid command.
+                                ServerCommand? newCommand = JsonSerializer.Deserialize<ServerCommand>(textSection)!;
+
+                                return newCommand;
+                            }
+                            catch (Exception)
+                            {
+                                if (builder.Length > 0) builder = new StringBuilder();
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            builder.Append(textSection);
+                        }
+                    }
+                }
+            } while (totalRecieved < incomingMessageByteCount);
+
+        } while (true);
     }
 
     /// <summary>
@@ -336,22 +371,8 @@ public class Server
         {
             while (!clientDisconnected)
             {
-                string recievedText = await RecieveMessageFromStreamAsync(stream, token);
+                ServerCommand deserializedData = await RecieveCommandFromStreamAsync(stream, token);
 
-                if (recievedText == string.Empty) continue;
-
-                ServerCommand? deserializedData=null;
-
-                try
-                {
-                    deserializedData = JsonSerializer.Deserialize<ServerCommand>(recievedText);
-                }
-                catch (InvalidOperationException e)
-                {
-                    Console.WriteLine(e.ToString());
-                    continue;
-                }
-                
                 if (deserializedData is not null)
                 {
                     if (deserializedData.CMD == CommandType.RegisterUser && !userRegistered)
@@ -385,7 +406,7 @@ public class Server
                             {
                                 try
                                 {
-                                    await SendClientMessageAsync(recievedText, opposingUser.Client, null);
+                                    await SendClientMessageAsync(JsonSerializer.Serialize(deserializedData), opposingUser.Client, null);
                                     break;
                                 }
                                 catch (IOException)
