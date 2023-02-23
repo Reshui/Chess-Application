@@ -41,9 +41,14 @@ public class Player
     /// <summary>Static variable used by the <see cref="Player.Player(TcpClient)"/> constructor to generate a value for <see cref="ServerAssignedID"/>.</summary>
     private static int s_instanceCount = 0;
 
+    /// <summary>TokenSource used to stop server listening tasks.</summary>
     public readonly CancellationTokenSource MainTokenSource = new();
 
+    /// <summary>Form object used to visually represent games.</summary>
     private readonly Form1? _gui;
+
+    /// <summary>List used to track long-running asynchronous tasks started by the Player instance.</summary>
+    private List<Task>? _asyncListeningTask;
 
     /// <summary>
     /// Client-side constructor.
@@ -52,6 +57,7 @@ public class Player
     {
         _hostPort = 13000;
         _hostAddress = "127.0.0.1";
+        _asyncListeningTask = new();
         _gui = gui;
     }
     /// <summary>
@@ -65,45 +71,51 @@ public class Player
         ServerAssignedID = ++s_instanceCount;
     }
 
+    public bool JoinServer()
+    {
+        try
+        {
+            _connectedServer = new TcpClient(_hostAddress, _hostPort);
+            _asyncListeningTask?.Add(StartListeningAsync());
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
+
+    }
+
     /// <summary>
     /// Asynchonously connects to a server and starts waiting for server responses.
     /// </summary>
-    public async Task StartListeningAsync()
+    private async Task StartListeningAsync()
     {
-
         var token = MainTokenSource.Token;
-
-        _connectedServer =  new TcpClient(_hostAddress, _hostPort);
-
         ServerIsConnected = true;
         // Get a client stream for reading and writing.
-        NetworkStream stream = _connectedServer.GetStream();
+        using NetworkStream stream = _connectedServer!.GetStream();
 
         try
         {
             var registerCommand = new ServerCommand(CommandType.RegisterUser, name: Name);
-
             var lfgCommand = new ServerCommand(CommandType.LookingForGame);
 
             foreach (ServerCommand commandToSend in new ServerCommand[2] { registerCommand, lfgCommand })
             {
-                await SendClientMessageAsync(JsonSerializer.Serialize(commandToSend), _connectedServer,MainTokenSource.Token);
+                await SendClientMessageAsync(JsonSerializer.Serialize(commandToSend), _connectedServer, MainTokenSource.Token);
             }
 
             while (!token.IsCancellationRequested)
             {
-                string recievedText = await RecieveMessageFromStreamAsync(stream, token);
+                ServerCommand response = await RecieveCommandFromStreamAsync(stream, token);
 
-                if (recievedText == string.Empty) continue;
-
-                ServerCommand? response = JsonSerializer.Deserialize<ServerCommand>(recievedText);
-
-                if (response != null)
+                if (response is not null)
                 {
                     int serverSideGameID = response.GameIdentifier;
 
                     if (response.CMD == CommandType.StartGameInstance)
-                    {
+                    {   // Create a GameEnvironmentInstance, track it and send to the main GUi as well.
                         var newGame = new GameEnvironment(serverSideGameID, (Team)response.AssignedTeam!);
                         _activeGames.Add(serverSideGameID, newGame);
                         _gui?.AddGame(newGame);
@@ -111,30 +123,34 @@ public class Player
                     else if (response.CMD == CommandType.ServerIsShuttingDown)
                     {
                         MainTokenSource.Cancel();
+                        throw new IOException();
                     }
                     else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames.ContainsKey(serverSideGameID))
                     {
                         _activeGames[serverSideGameID].ChangeGameState(GameState.GameDraw);
-
                         _activeGames.Remove(serverSideGameID);
-                        throw new NotImplementedException("Opponent disconnection hasn't been fully implemented.");
+                        //throw new NotImplementedException("Opponent disconnection hasn't been fully implemented.");
                     }
                     else if (response.CMD == CommandType.NewMove && _activeGames.ContainsKey(serverSideGameID))
                     {
-                        _activeGames[serverSideGameID].ChangeGameBoardAndGUI(response.MoveDetails!.Value,false);
+                        _activeGames[serverSideGameID].ChangeGameBoardAndGUI(response.MoveDetails!.Value, false);
                     }
                 }
             }
         }
-        catch (Exception e)
+        catch (IOException e)
+        { // Couldn't reach host.
+            Console.WriteLine("Host has disconnected. " + e);
+        }
+        catch (OperationCanceledException)
         {
-            Console.WriteLine("Host has disconnected. " + e);        
+            Console.WriteLine("Player class: ReadAsync cancelled.");
         }
         finally
         {
-            stream.Dispose();
-            _connectedServer.Close();
             ServerIsConnected = false;
+            _connectedServer.Close();
+            _connectedServer = null;
         }
     }
     /// <summary>
@@ -144,34 +160,35 @@ public class Player
     /// <param name="serverSideGameID">ID used to target a specific <see cref="GameEnvironment"/> instance.</param>
     public async Task SubmitMoveToServerAsync(MovementInformation move, int serverSideGameID, CancellationToken? token = null)
     {
-        GameEnvironment targetedGameInstance = _activeGames[serverSideGameID];
-
-        if (targetedGameInstance.ActiveTeam == move.SubmittingTeam)
+        if (_activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGameInstance))
         {
-            targetedGameInstance.ChangeGameBoardAndGUI(move,true);
-
-            if (_connectedServer != null && ServerIsConnected)
+            if (targetedGameInstance.ActiveTeam == move.SubmittingTeam)
             {
-                string submissionCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.NewMove, serverSideGameID, move));
-                try
+                targetedGameInstance.ChangeGameBoardAndGUI(move, piecesAlreadyMovedOnGUI: true);
+
+                if (_connectedServer is not null)
                 {
-                    await SendClientMessageAsync(submissionCommand, _connectedServer,token);
+                    string submissionCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.NewMove, serverSideGameID, move));
+                    try
+                    {
+                        await SendClientMessageAsync(submissionCommand, _connectedServer, token);
+                    }
+                    catch (IOException)
+                    {
+                        ServerIsConnected = false;
+                        throw new NotImplementedException("Server not responding handling not implemented.");
+                    }
                 }
-                catch (IOException)
+                else if (_connectedServer?.Connected == false || ServerIsConnected == false)
                 {
                     ServerIsConnected = false;
-                    throw new NotImplementedException("Server not responding handling not implemented.");
+                    throw new Exception("Server is no longer connected.");
                 }
             }
-            else if (_connectedServer?.Connected == false || ServerIsConnected == false)
+            else
             {
-                ServerIsConnected = false;
-                throw new Exception("Server is no longer connected.");
+                throw new Exception("Movement submitted on the wrong turn.");
             }
-        }
-        else
-        {
-            throw new Exception("Movement submitted on the wrong turn.");
         }
     }
 
@@ -183,5 +200,24 @@ public class Player
     {
         if (Name is null) _name = newName;
         else throw new Exception($"{nameof(_name)} has already been assigned a value.");
+    }
+    public async Task CloseConnectionToServerAsync()
+    {
+        if (_connectedServer is not null)
+        {
+            try
+            {
+                string notifyServerCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ClientDisconnecting));
+                await SendClientMessageAsync(notifyServerCommand, _connectedServer, null);
+            }
+            catch (IOException e)
+            {
+                Console.WriteLine("Exception generated when sending disconnect to server.  " + e.ToString());
+            }
+
+            MainTokenSource.Cancel();
+            if (_asyncListeningTask is not null && _asyncListeningTask.Count > 0) await Task.WhenAll(_asyncListeningTask);
+            MainTokenSource.Dispose();
+        }
     }
 }

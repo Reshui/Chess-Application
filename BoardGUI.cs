@@ -56,10 +56,9 @@ namespace Chess_GUi
 
         /// <summary>If <see langword="true"/> then <see cref="_friendlySelectedSquare"/> and <see cref="_targetSquare"/> will be set to <see langword="null"/> when <see cref="BoardGUI.SquareClickedEvent(object, EventArgs)"/> is called.</summary>
         private bool _resetSquareAssignments;
-
-
+        /// <summary>Static vaariablie used to track the <see cref="BoardGUI"/> instance count.</summary>
         private static int s_instanceCount = 0;
-        
+
         public int CurrentInstanceCount { get; init; }
 
         public BoardGUI(Player user, GameEnvironment newGame)
@@ -118,18 +117,25 @@ namespace Chess_GUi
             int top = 0, heightIncrementer = squareLength;
 
             if (_currentGame.PlayerTeam == Team.White)
-            {   // Starts generating on the last row of the board.
+            {   // Black will be palced at the top of the board.
                 top = MainBoard.Height - squareLength;
                 heightIncrementer *= -1;
             }
             else if (_currentGame.PlayerTeam == Team.Black)
-            {   // Starts generating at the top of the board.
+            {   // White will be placed at the top of the board.
                 top = 0;
             }
 
             int left = 0;
 
+
+            //C: \Users\Yliyah\Desktop\Resources\White_Rook.jpg
             string imageFolder = Path.GetFullPath(@"..\..\..\Resources\");
+            if (!Directory.Exists(imageFolder))
+            {
+                imageFolder = Path.GetFullPath(@"Resources\");
+            }
+
 
             for (int row = 0; row < squaresToCreate; row++)
             {
@@ -189,7 +195,7 @@ namespace Chess_GUi
 
             ChessPiece? selectedPiece = _currentGame[coords[0], coords[1]];
 
-            if (selectedPiece?.PieceTeam == _currentGame.PlayerTeam && !selectedSquare.Equals(_friendlySelectedSquare))
+            if (selectedPiece?.AssignedTeam == _currentGame.PlayerTeam && !selectedSquare.Equals(_friendlySelectedSquare))
             {   // Display available movements for the ChessPiece
 
                 if (_targetSquare is not null)
@@ -305,7 +311,7 @@ namespace Chess_GUi
             foreach (var squareInfo in _changedSquares)
             {
                 squareInfo.SquareChanged.BackColor = squareInfo.OriginalColor;
-                squareInfo.SquareChanged.BorderStyle = BorderStyle.None; 
+                squareInfo.SquareChanged.BorderStyle = BorderStyle.None;
             }
         }
         /// <summary>

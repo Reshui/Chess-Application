@@ -178,7 +178,7 @@ public class Server
                                 {
                                     await SendClientMessageAsync(JsonSerializer.Serialize(startGameCommand), playerDetail.Value.Client, cancelSource.Token);
                                 }
-                                catch (Exception e) when (e is TaskCanceledException || e is IOException)
+                                catch (Exception e) when (e is OperationCanceledException || e is IOException)
                                 {   // Failed to message client or client is leaving the server.
                                     matchedPlayers.Remove(playerDetail.Value);
                                     bothPlayersAvailable = false;
@@ -210,7 +210,15 @@ public class Server
                     }
                 }
             }
-            await Task.Delay(700, MainCancellationToken);
+
+            try
+            {
+                await Task.Delay(700, MainCancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+
+            }
         }
     }
     /// <summary>
@@ -238,7 +246,7 @@ public class Server
                 }
             }
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException)
         {   // Error raised if MainCancellationToken.IsCancelRequested = true .
             Console.WriteLine($"Locally hosted server:{nameof(_gameServer)}, is shutting down.");
         }
@@ -252,13 +260,13 @@ public class Server
     /// </summary>
     /// <returns><see cref="Task(bool)"/> <see langword="true"/> if socket is still connected; otherwise, <see langword="false"/>.</returns>
     /// <param name="client"><see cref="TcpClient"/> that is tested.</param>
-    private static async Task<bool> IsClientActiveAsync(TcpClient client)
+    public static async Task<bool> IsClientActiveAsync(TcpClient client)
     {
         byte[] data = new byte[1];
 
         try
         {
-            await client.GetStream().WriteAsync(data,0,0);
+            await client.GetStream().WriteAsync(data, 0, 0);
         }
         catch (IOException)
         {
@@ -281,7 +289,9 @@ public class Server
         constructedMessage.AddRange(msg);
         byte[] msgConverted = constructedMessage.ToArray();
 
-        await client.GetStream().WriteAsync(msgConverted);
+        NetworkStream stream = client.GetStream();
+
+        await stream.WriteAsync(msgConverted);
 
     }
 
@@ -290,6 +300,7 @@ public class Server
     /// </summary>
     /// <exception cref="TaskCanceledException">Thrown if <paramref name="token"/> source is cancelled.</exception>
     /// <exception cref="IOException">Thrown if something goes wrong with <paramref name="stream"/>.ReadAsync().</exception>
+    /// <exception cref="OperationCanceledException"> Thrown if <paramref name="token"/> is invoked while using .ReadAsync().</exception>
     public static async Task<ServerCommand> RecieveCommandFromStreamAsync(NetworkStream stream, CancellationToken token)
     {
         var builder = new StringBuilder();
@@ -309,19 +320,26 @@ public class Server
                 if (responseByteCount > 0)
                 {
                     if (!byteCountRecieved)
-                    {                        
-                        try
-                        {   // Verify that the first 4 bytes are a number.
-                            incomingMessageByteCount = BitConverter.ToInt32(bytes, 0);
+                    {
+                        if (responseByteCount != sizeof(int))
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            try
+                            {   // Verify that the first 4 bytes are a number.
+                                incomingMessageByteCount = BitConverter.ToInt32(bytes, 0);
+                            }
+                            catch (Exception)
+                            {
+                                continue;
+                            }
                             totalRecieved += responseByteCount;
                             byteCountRecieved = true;
+                            // Resize the array to fit incoming data.
+                            bytes = new byte[incomingMessageByteCount];
                         }
-                        catch (Exception)
-                        {
-                            break;
-                        }
-                        // Resize the array to fit incoming data.
-                        bytes = new byte[incomingMessageByteCount];                        
                     }
                     else
                     {
@@ -329,13 +347,12 @@ public class Server
 
                         if ((totalRecieved += responseByteCount) == incomingMessageByteCount)
                         {   // All message bytes have been recieved.
-                            if (builder.Length > 0) textSection = builder.Append(textSection).ToString();                            
+                            if (builder.Length > 0) textSection = builder.Append(textSection).ToString();
 
                             try
                             {   // Making sure that the recieved text is a valid command.
-                                ServerCommand? newCommand = JsonSerializer.Deserialize<ServerCommand>(textSection)!;
-
-                                return newCommand;
+                                ServerCommand? newCommand = JsonSerializer.Deserialize<ServerCommand>(textSection);
+                                return newCommand!;
                             }
                             catch (Exception)
                             {
@@ -435,7 +452,7 @@ public class Server
                 }
             }
         }
-        catch (Exception e) when (e is IOException || e is TaskCanceledException)
+        catch (Exception e) when (e is IOException || e is TaskCanceledException || e is OperationCanceledException)
         { // Client has likely disconnected.
             clientDisconnected = true;
         }
@@ -500,16 +517,21 @@ public class Server
     /// </summary>
     private async Task AnnounceServerShutDown()
     {
-        string shutdownCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ServerIsShuttingDown));
-
-        var shutDownBroadcastTasks = new List<Task>();
-        // Tell clients that the server is shutting down and then dispose of their resources.
-        foreach (var player in _connectedPlayers.Values)
+        // Note: Server should already be shut down.
+        if (_connectedPlayers.Count > 0)
         {
-            shutDownBroadcastTasks.Add(SendClientMessageAsync(shutdownCommand, player.Client, token: null)
-                                        .ContinueWith(x => ClientRemovalAsync(player)));
+            string shutdownCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ServerIsShuttingDown));
+
+            var shutDownBroadcastTasks = new List<Task>();
+            // Tell clients that the server is shutting down and then dispose of their resources.
+            foreach (Player player in _connectedPlayers.Values)
+            {
+                shutDownBroadcastTasks.Add(SendClientMessageAsync(shutdownCommand, player.Client, token: null)
+                                            .ContinueWith(x => ClientRemovalAsync(player)));
+            }
+
+            await Task.WhenAll(shutDownBroadcastTasks);
         }
 
-        await Task.WhenAll(shutDownBroadcastTasks);
     }
 }
