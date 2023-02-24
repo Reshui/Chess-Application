@@ -114,7 +114,7 @@ namespace Chess_GUi
             Color blackColor = ColorTranslator.FromHtml("#300d21");
             Color whiteColor = ColorTranslator.FromHtml("#C79F67");
 
-            int top = 0, heightIncrementer = squareLength;
+            int top = 0, heightIncrementer = squareLength, left = 0, rightMostSquareLeft = MainBoard.Width - squareLength, xIncrementer = squareLength;
 
             if (_currentGame.PlayerTeam == Team.White)
             {   // Black will be palced at the top of the board.
@@ -123,11 +123,9 @@ namespace Chess_GUi
             }
             else if (_currentGame.PlayerTeam == Team.Black)
             {   // White will be placed at the top of the board.
-                top = 0;
+                left = rightMostSquareLeft;
+                xIncrementer *= -1;
             }
-
-            int left = 0;
-
 
             //C: \Users\Yliyah\Desktop\Resources\White_Rook.jpg
             string imageFolder = Path.GetFullPath(@"..\..\..\Resources\");
@@ -157,9 +155,11 @@ namespace Chess_GUi
 
                     MainBoard.Controls.Add(_pictureSquares[row, column]);
 
-                    left += squareLength;
+                    left += xIncrementer;
                 }
-                left = 0;
+
+                left = _currentGame.PlayerTeam == Team.White ? 0 : rightMostSquareLeft;
+
                 top += heightIncrementer;
             }
             _currentGame.Squares = _pictureSquares;
