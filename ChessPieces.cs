@@ -225,7 +225,7 @@ public class ChessPiece
     /// <summary>
     /// Generates a list of direction vectors for the current <see cref="AssignedType"/>.
     /// </summary>
-    /// <returns> A <see cref="List{Vector2}"/> of available direction vectors for the current <see cref="AssignedType"/>.</returns>
+    /// <returns>A <see cref="List{Vector2}"/> of available direction vectors for the current <see cref="AssignedType"/>.</returns>
     private List<Vector2> AvailableDirectionVectors()
     {
         bool canMoveInAnyDirection = true;

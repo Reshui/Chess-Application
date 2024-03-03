@@ -12,6 +12,9 @@ public class GameEnvironment
     private readonly ChessPiece _whiteKing;
     private readonly ChessPiece _blackKing;
     private bool _gameEnded = false;
+    /// <summary>Stores how many moves have been submitted since the last capture was made.</summary>
+    /// <remarks>If over 50 then a Draw is determined.</remarks>
+    private int _movesSinceLastCapture = 0;
 
     /// <summary>Array used to hold <see cref="ChessPiece"/> instances and their locations withn the current game.</summary>
     public readonly ChessPiece?[,] GameBoard = new ChessPiece[8, 8];
@@ -25,10 +28,6 @@ public class GameEnvironment
 
     /// <summary>Dictionary of <see cref="ChessPiece"/> objects keyed to a <see cref="Team"/> enum.</summary>
     private readonly Dictionary<Team, Dictionary<string, ChessPiece>> _teamPieces;
-
-    /// <summary>Stores how many moves have been submitted since the last capture was made.</summary>
-    /// <remarks>If over 50 then a Draw is determined.</remarks>
-    private int _movesSinceLastCapture = 0;
 
     /// <summary>List of submitted moves within the current <see cref="GameEnvironment"/> instance.</summary>
     private readonly List<MovementInformation> _gameMoves = new();
@@ -111,11 +110,9 @@ public class GameEnvironment
     /// <summary>
     /// Creates chess pieces for both teams and places them within the <see cref="GameBoard"/> array.
     /// </summary>
-    /// <returns>A dictionary of pieces keyed to their respective teams.</returns>
+    /// <returns>A dictionary of pieces keyed to their Ids keyed to the team they are on.</returns>
     Dictionary<Team, Dictionary<string, ChessPiece>> GenerateBoard()
     {
-        PieceType specialPieceType = PieceType.Pawn;
-
         var piecesPerTeam = new Dictionary<Team, Dictionary<string, ChessPiece>>
         {
             { Team.White, new Dictionary<string, ChessPiece>() },
@@ -125,29 +122,16 @@ public class GameEnvironment
         // 2nd row from the top and bottom.
         int[] pawnRows = { 1, GameBoard.GetUpperBound(0) - 1 };
 
-        for (int columnIndex = 0; columnIndex <= GameBoard.GetUpperBound(1); columnIndex++)
+        for (int columnIndex = 0; columnIndex <= GameBoard.GetUpperBound(1); ++columnIndex)
         {
-            switch (columnIndex)
+            PieceType specialPieceType = columnIndex switch
             {
-                case 0:
-                case 7:
-                    specialPieceType = PieceType.Rook;
-                    break;
-                case 1:
-                case 6:
-                    specialPieceType = PieceType.Knight;
-                    break;
-                case 2:
-                case 5:
-                    specialPieceType = PieceType.Bishop;
-                    break;
-                case 3:
-                    specialPieceType = PieceType.Queen;
-                    break;
-                case 4:
-                    specialPieceType = PieceType.King;
-                    break;
-            }
+                0 or 7 => PieceType.Rook,
+                1 or 6 => PieceType.Knight,
+                2 or 5 => PieceType.Bishop,
+                3 => PieceType.Queen,
+                _ => PieceType.King
+            };
 
             foreach (int pawnRow in pawnRows)
             {
@@ -206,7 +190,7 @@ public class GameEnvironment
                                 bool enemyBishopFound = pieceType == PieceType.Bishop && !vectorIsPerpendicularOrParallel;
                                 bool enemyPawnFound = pieceType == PieceType.Pawn && propagationCount == 1 && !vectorIsPerpendicularOrParallel
                                     && ((kingRow > row && piece.AssignedTeam == Team.White) || (kingRow < row && piece.AssignedTeam == Team.Black));
-                                bool enemyQueenOrKingFound = pieceType == PieceType.Queen || (pieceType == PieceType.King && propagationCount == 1);
+                                bool enemyQueenOrKingFound = (pieceType == PieceType.Queen) || (pieceType == PieceType.King && propagationCount == 1);
 
                                 if (enemyBishopFound || enemyQueenOrKingFound || enemyPawnFound || enemyRookFound)
                                 {
@@ -247,7 +231,7 @@ public class GameEnvironment
     /// Determines if movement details provided by <paramref name="moveInfo"/> will expose the king associated with <paramref name ="teamToCheck"/> to check.
     /// </summary>
     /// <param name="moveInfo">Readonly struct with details on the movement to test.</param>
-    /// <param name="teamToCheck">Determines which Team to check for a checked state.</param>
+    /// <param name="teamToCheck">Used to determines which Team should be queried for a checked state.</param>
     /// <returns><see langword="true"/> if the king associated with <paramref name="teamToCheck"/> will be checked; otherwise, <see langword="false"/>.</returns>
     public bool WillChangeResultInCheck(MovementInformation moveInfo, Team teamToCheck)
     {
@@ -262,23 +246,18 @@ public class GameEnvironment
 
     /// <summary>Determins if the king is checked and if so, determines if any move can undo the check.</summary>
     /// <returns><see langword="true"/> if the team associated with <paramref name="teamToCheck"/> is check-mated; otherwise, <see langword="false"/>.</returns>
-    /// <param name ="teamToCheck">Team for which the function checks.</param>
+    /// <param name ="teamToCheck">Used to determine which king should be queried for a check-mate state.</param>
     public bool IsKingCheckMated(Team teamToCheck)
     {
         // It isn't possible to be checkmated without being in check first.
         if (!IsKingChecked(teamToCheck)) return false;
-        // Determine if there are any moves that can be done to prevent the current check.
 
-        foreach (ChessPiece friendlyChessPiece in _teamPieces[teamToCheck].Values)
+        // Determine if there are any moves that can be done to prevent the current check.
+        foreach (ChessPiece friendlyChessPiece in _teamPieces[teamToCheck].Values.Where(x => !x.Captured))
         {
-            if (!friendlyChessPiece.Captured)
+            foreach (var movement in AvailableMoves(friendlyChessPiece))
             {
-                List<MovementInformation> movesAvailableToQueriedPiece = AvailableMoves(friendlyChessPiece);
-                // Move the piece within the board and check if the king is still checked.
-                foreach (var movement in movesAvailableToQueriedPiece)
-                {
-                    if (WillChangeResultInCheck(movement, teamToCheck) == false) return false;
-                }
+                if (WillChangeResultInCheck(movement, teamToCheck) == false) return false;
             }
         }
         // Previous checks have failed. Return true.
@@ -396,12 +375,12 @@ public class GameEnvironment
         if (newMove.SubmittingTeam == ActiveTeam)
         {
             EditGameBoard(newMove, true);
-            ActiveTeam = ReturnOppositeTeam(ActiveTeam);
+            Team newActiveTeam = ActiveTeam = ReturnOppositeTeam(ActiveTeam);
 
             if (newMove.CapturingSecondary) _movesSinceLastCapture = 0;
             else _movesSinceLastCapture++;
 
-            DisablePlayerVulnerabilityToEnPassant(ActiveTeam);
+            DisableTeamVulnerabilityToEnPassant(newActiveTeam);
             _gameMoves.Add(newMove);
         }
         else
@@ -411,10 +390,10 @@ public class GameEnvironment
     }
 
     /// <summary>Disables vulnerability to En Passant for the current <paramref name="activeTeam"/>.</summary>
-    /// <param name="activeTeam">The currently active <see cref="Player"/>.</param>
-    private void DisablePlayerVulnerabilityToEnPassant(Team activeTeam)
+    /// <param name="activeTeam">The Team that will have its Pawns be no longer captureable via En Passant.</param>
+    private void DisableTeamVulnerabilityToEnPassant(Team activeTeam)
     {
-        foreach (ChessPiece chessPiece in _teamPieces[activeTeam].Values.Where(x => x.AssignedType == PieceType.Pawn))
+        foreach (ChessPiece chessPiece in _teamPieces[activeTeam].Values.Where(x => x.CanBeCapturedViaEnPassant))
         {
             chessPiece.DisableEnPassantCaptures();
         }
