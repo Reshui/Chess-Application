@@ -112,13 +112,10 @@ public class ChessPiece
     {
         get
         {
-            if (_directionVectors.Count == 0)
-            {
-                _directionVectors = (AssignedType != PieceType.Knight) ? AvailableDirectionVectors() : KnightDirectionVectors();
-            }
+            if (_directionVectors.Count == 0) { _directionVectors = AvailableDirectionVectors(); }
             return _directionVectors;
         }
-        set => _directionVectors = value!;
+        set => _directionVectors = value;
     }
     private List<Vector2> _directionVectors = new();
 
@@ -154,10 +151,7 @@ public class ChessPiece
     public Team AssignedTeam
     {
         get => _assignedTeam ?? throw new NullReferenceException($"Attempted to access {nameof(AssignedTeam)}. Backing field {nameof(_assignedTeam)} is null.");
-        set
-        {
-            _assignedTeam ??= value;
-        }
+        set { _assignedTeam ??= value; }
     }
     private Team? _assignedTeam = null;
 
@@ -229,11 +223,9 @@ public class ChessPiece
     }
 
     /// <summary>
-    /// Generates direction vectors for pieces that are capable of moving backwards,forwards,laterally and diagonally.
+    /// Generates a list of direction vectors for the current <see cref="AssignedType"/>.
     /// </summary>
-    /// <remarks>Used for Kings,Queens,Bishops,Pawns and Rooks.</remarks>
-    /// <returns> A List{Vector2} is returned for a given piece.</returns>
-    /// <exception cref="InvalidOperationException">Thrown if this method is called while AssignedType is PieceType.Knight.</exception>
+    /// <returns> A <see cref="List{Vector2}"/> of available direction vectors for the current <see cref="AssignedType"/>.</returns>
     private List<Vector2> AvailableDirectionVectors()
     {
         bool canMoveInAnyDirection = true;
@@ -289,7 +281,7 @@ public class ChessPiece
     }
 
     /// <summary>Generates general direction vectors for Knights.</summary>
-    /// <returns>A list of <see cref="Vector2"/> instances for which a Knight is allowed to move.</returns>
+    /// <returns>A <see cref="List{Vector2}"/> of direction vectors for Knights.</returns>
     public static List<Vector2> KnightDirectionVectors()
     {
         var directions = new List<Vector2>();
@@ -316,7 +308,7 @@ public class ChessPiece
     {
         return new ChessPiece(AssignedType, new Coords(CurrentRow, CurrentColumn), AssignedTeam)
         {
-            _enPassantCapturePossible = _enPassantCapturePossible,
+            CanBeCapturedViaEnPassant = _enPassantCapturePossible,
             ID = ID
         };
     }
@@ -339,7 +331,7 @@ public class ChessPiece
     }
 
     /// <summary>Promotes pawns to <paramref name="newType"/>.</summary>
-    /// <param name="newType">A PieceType Enum that is used to designate what this chess piece should be promoted to.</param>
+    /// <param name="newType">A <see cref="PieceType"/> Enum that is used to designate what this chess piece should be promoted to.</param>
     public void ChangePieceType(PieceType newType)
     {
         AssignedType = newType;
@@ -357,12 +349,12 @@ public class ChessPiece
     /// </summary> 
     public void EnableEnPassantCaptures()
     {
-        if (AssignedType.Equals(PieceType.Pawn)) _enPassantCapturePossible = true;
+        CanBeCapturedViaEnPassant = true;
     }
     /// <summary>
     /// Sets <see cref="_enPassantCapturePossible"/> to <see langword="false"/>.
     /// </summary>
-    public void DisableEnPassantCaptures() => _enPassantCapturePossible = false;
+    public void DisableEnPassantCaptures() => CanBeCapturedViaEnPassant = false;
 
     /// <summary>
     /// Use the <see cref="AssignedType"/> and <see cref="AssignedTeam"/> to return a descriptive name for a chess piece.

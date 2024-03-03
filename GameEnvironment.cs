@@ -168,11 +168,10 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Determines if <paramref name="queriedKing"/> is checked on <paramref name="board"/>.
+    /// Determines if king associated with <paramref name="teamToCheck"/> is checked on <paramref name="GameBoard"/>.
     /// </summary>
-    /// <param name="queriedKing">King that has its checked status tested.</param>
-    /// <param name="board">2D board of <see cref="ChessPiece"/> Objects.</param>
-    /// <returns><see langword="true"/> if <paramref name="queriedKing"/> is checked; else <see langword="false"/>.</returns>
+    /// <param name="teamToCheck">The team you want the checked status for.</param>
+    /// <returns><see langword="true"/> if the King associated with <paramref name="teamToCheck"/> is checked; else <see langword="false"/>.</returns>
     public bool IsKingChecked(Team teamToCheck)
     {
         // This variable is needed to determine if a king can be attacked by an enemy pawn(pawns can only attack towards on side of the board.).
@@ -310,12 +309,9 @@ public class GameEnvironment
     {
         var teamMoves = new Dictionary<string, List<MovementInformation>>();
 
-        foreach (ChessPiece chessPiece in _teamPieces[queriedTeam].Values)
+        foreach (ChessPiece chessPiece in _teamPieces[queriedTeam].Values.Where(x => !x.Captured))
         {
-            if (!chessPiece.Captured)
-            {
-                teamMoves.Add(chessPiece.ID, AvailableMoves(chessPiece));
-            }
+            teamMoves.Add(chessPiece.ID, AvailableMoves(chessPiece));
         }
         return teamMoves;
     }
@@ -490,12 +486,10 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Determine the available moves for a given <see cref="ChessPiece"/> instance. Moves that will place a friendly king in check will be filtered.
+    /// Determines the available moves for <paramref name="piece"/> and returns the result.
     /// </summary>
-    /// <returns>A List{MovementInformation} of available movements/attacks for the current <see cref="ChessPiece"/> instance.</returns>
-    /// <param name="ignoreFriendlyInducedChecks">If <see langword="true"/> then checking to see if this piece's movements will unintenionally create a check on a friendly king are ignored.</param>
-    /// <param name="disableCastling">If set to <see langword="true"/> then castling movements will be ignore.</param>
-    /// <param name="currentGame"><see cref="GameEnvironment"/> instance that the current <see cref="ChessPiece"/> instance is contained within.</param>
+    /// <returns>A <see cref="List{MovementInformation}"/> of available movements/attacks for <paramref name="piece"/>.</returns>
+    /// <param name="piece"><see cref="ChessPiece"/> instance to determine possible moves for.</param>
     public List<MovementInformation> AvailableMoves(ChessPiece piece)
     {
         var viableMoves = new List<MovementInformation>();
@@ -538,7 +532,6 @@ public class GameEnvironment
                         // Initialize movement at the current location for addition purposes in the following loop.
                         Vector2 movement = piece.CurrentLocation;
                         // Ensure that the King will not be moving into or through check.
-                        // A king will move at most 2 spaces when castling.
                         for (int i = 0; i < 2; ++i)
                         {
                             movement = Vector2.Add(movement, singleSquareMovement);
@@ -597,7 +590,7 @@ public class GameEnvironment
                             if (movementVector.X == 0)
                             {   // If there is no horizontal movement, disable attacking;
                                 canCaptureEnemy = false;
-                                // Add pawn promotion if conditions are met.
+                                #region  Adding pawn promotion moves if conditions are met.
                                 if (row == (piece.AssignedTeam.Equals(Team.White) ? 7 : 0) && targetSquareIsEmpty)
                                 {
                                     foreach (PieceType pieceType in Enum.GetValues(typeof(PieceType)))
@@ -612,11 +605,12 @@ public class GameEnvironment
                                     // Ignore just moving and remaining a pawn.
                                     continue;
                                 }
+                                #endregion
                             }
                             else
                             {
                                 pawnAttackVector = true;
-                                // Check for possible En Passant captures.
+                                # region Check for possible En Passant captures.
                                 if (piece.IsComparedPieceHostile(GameBoard[piece.CurrentRow, column], out ChessPiece? captureablePawn))
                                 {
                                     if (captureablePawn is not null && captureablePawn.AssignedType.Equals(PieceType.Pawn)
@@ -632,6 +626,7 @@ public class GameEnvironment
                                         }
                                     }
                                 }
+                                #endregion
                             }
                         }
                         // Special notes for pawns: if pawnAttackVector = true, then the only way to move to that space is if canCaptureEnemy == true.
@@ -672,11 +667,11 @@ public class GameEnvironment
     /// <exception cref="KeyNotFoundException"></exception>
     private ChessPiece GetPieceFromMovement(MovementInformation move, bool wantPrimary)
     {
-        Team wantedTeam = (wantPrimary || move.CastlingWithSecondary) ? move.SubmittingTeam : ReturnOppositeTeam(move.SubmittingTeam);
         ChessPiece pieceFromMove;
-        string pieceID = wantPrimary ? move.MainCopy.ID : move.SecondaryCopy!.ID;
         try
         {
+            Team wantedTeam = (wantPrimary || move.CastlingWithSecondary) ? move.SubmittingTeam : ReturnOppositeTeam(move.SubmittingTeam);
+            string pieceID = wantPrimary ? move.MainCopy.ID : move.SecondaryCopy!.ID;
             pieceFromMove = _teamPieces[wantedTeam][pieceID];
         }
         catch (KeyNotFoundException e)
