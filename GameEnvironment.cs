@@ -376,11 +376,11 @@ public class GameEnvironment
         {
             EditGameBoard(newMove, true);
             Team newActiveTeam = ActiveTeam = ReturnOppositeTeam(ActiveTeam);
+            DisableTeamVulnerabilityToEnPassant(newActiveTeam);
 
             if (newMove.CapturingSecondary) _movesSinceLastCapture = 0;
             else _movesSinceLastCapture++;
 
-            DisableTeamVulnerabilityToEnPassant(newActiveTeam);
             _gameMoves.Add(newMove);
         }
         else
@@ -473,6 +473,7 @@ public class GameEnvironment
     {
         var viableMoves = new List<MovementInformation>();
         bool targetSquareIsEmpty;
+        ChessPiece copyOfPiece = piece.Copy();
 
         foreach (Vector2 movementVector in piece.DirectionVectors)
         {
@@ -515,7 +516,7 @@ public class GameEnvironment
                         {
                             movement = Vector2.Add(movement, singleSquareMovement);
 
-                            var singleSquareMovementInfo = new MovementInformation(piece, null, new Coords(movement),
+                            var singleSquareMovementInfo = new MovementInformation(copyOfPiece, null, new Coords(movement),
                                                                 null, false,
                                                                 capturingSecondary: false, castlingWithSecondary: false, newType: null);
 
@@ -531,7 +532,7 @@ public class GameEnvironment
                             var newKingLocation = Vector2.Add(piece.CurrentLocation, movementVector);
                             var newRookLocation = Vector2.Add(piece.CurrentLocation, new Vector2(castleDirection, 0));
 
-                            var moveInfo = new MovementInformation(piece, pairedRook, new Coords(newKingLocation), new Coords(newRookLocation),
+                            var moveInfo = new MovementInformation(copyOfPiece, pairedRook.Copy(), new Coords(newKingLocation), new Coords(newRookLocation),
                                 enPassantCapturePossible: false, capturingSecondary: false,
                                 castlingWithSecondary: true, newType: null);
 
@@ -574,7 +575,7 @@ public class GameEnvironment
                                 {
                                     foreach (PieceType pieceType in Enum.GetValues(typeof(PieceType)))
                                     {
-                                        var pawnPromotionMove = new MovementInformation(piece, null, new Coords(calculatedPosition), null, false, false, false, pieceType);
+                                        var pawnPromotionMove = new MovementInformation(copyOfPiece, null, new Coords(calculatedPosition), null, false, false, false, pieceType);
 
                                         if (!pieceType.Equals(PieceType.King) && !pieceType.Equals(PieceType.Pawn) && !WillChangeResultInCheck(pawnPromotionMove, piece.AssignedTeam))
                                         {
@@ -595,7 +596,7 @@ public class GameEnvironment
                                     if (captureablePawn is not null && captureablePawn.AssignedType.Equals(PieceType.Pawn)
                                     && captureablePawn.CanBeCapturedViaEnPassant)
                                     {
-                                        var enPassantCapture = new MovementInformation(piece, captureablePawn, new Coords(calculatedPosition),
+                                        var enPassantCapture = new MovementInformation(copyOfPiece, captureablePawn?.Copy(), new Coords(calculatedPosition),
                                             new Coords(ChessPiece.s_capturedLocation), movementWillExposeToEnPassant, capturingSecondary: true,
                                             castlingWithSecondary: false, newType: null);
 
@@ -611,7 +612,7 @@ public class GameEnvironment
                         // Special notes for pawns: if pawnAttackVector = true, then the only way to move to that space is if canCaptureEnemy == true.
                         if ((targetSquareIsEmpty && !pawnAttackVector) || canCaptureEnemy)
                         {
-                            var moveInfo = new MovementInformation(piece, captureablePiece, new Coords(calculatedPosition),
+                            var moveInfo = new MovementInformation(copyOfPiece, captureablePiece?.Copy(), new Coords(calculatedPosition),
                                 canCaptureEnemy ? new Coords(ChessPiece.s_capturedLocation) : null, movementWillExposeToEnPassant,
                                 capturingSecondary: canCaptureEnemy, castlingWithSecondary: false, newType: null);
 

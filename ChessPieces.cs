@@ -21,7 +21,6 @@ public struct Coords
     ///<summary>Constructor used when initializing with a Vector2 struct.</summary>
     public Coords(Vector2 vector)
     {
-        //vector.
         RowIndex = (int)vector.Y;
         ColumnIndex = (int)vector.X;
     }
@@ -91,10 +90,29 @@ public struct MovementInformation
     /// </value>
     public PieceType? NewType { get; set; } = null;
 
-    public MovementInformation(ChessPiece mainPiece, ChessPiece? secondaryPiece, Coords newMainCoords, Coords? newSecondaryCoords, bool enPassantCapturePossible, bool capturingSecondary, bool castlingWithSecondary, PieceType? newType)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MovementInformation"/> class.
+    /// </summary>
+    /// <param name="mainPieceCopy">Copy of piece doing the move.</param>
+    /// <param name="secondaryPieceCopy">Copy or null of secondary piece being acted upon.</param>
+    /// <param name="newMainCoords">Coordinates to move <paramref name="mainPieceCopy"/> to.</param>
+    /// <param name="newSecondaryCoords">Coordinates to move <paramref name="secondaryPieceCopy"/> to.</param>
+    /// <param name="enPassantCapturePossible"><see langword="true"/> if <paramref name="mainPieceCopy"/> is captureable via En Passant; otherwise, ><see langword="false"/>.</param>
+    /// <param name="capturingSecondary"></param>
+    /// <param name="castlingWithSecondary"><see langword="true"/> if <paramref name="mainPieceCopy"/> should castle with <paramref name="secondaryPieceCopy"/>; otherwise, <see langword="false"/>   </param>
+    /// <param name="newType">PieceType to convert <paramref name="mainPieceCopy"/> to.</param>
+    /// <exception cref="ArgumentException"></exception>
+    public MovementInformation(ChessPiece mainPieceCopy, ChessPiece? secondaryPieceCopy, Coords newMainCoords, Coords? newSecondaryCoords, bool enPassantCapturePossible, bool capturingSecondary, bool castlingWithSecondary, PieceType? newType)
     {
-        SecondaryCopy = secondaryPiece?.Copy();
-        MainCopy = mainPiece.Copy();
+        if (mainPieceCopy.IsCopy && (secondaryPieceCopy?.IsCopy ?? true))
+        {
+            SecondaryCopy = secondaryPieceCopy;
+            MainCopy = mainPieceCopy;
+        }
+        else
+        {
+            throw new ArgumentException($"Both {nameof(mainPieceCopy)} and {nameof(secondaryPieceCopy)} must have a {nameof(ChessPiece.IsCopy)} property of true");
+        }
         NewMainCoords = newMainCoords;
         NewSecondaryCoords = newSecondaryCoords;
         EnPassantCapturePossible = enPassantCapturePossible;
@@ -206,6 +224,7 @@ public class ChessPiece
         set { _id ??= value; }
     }
     private string? _id = null;
+    public bool IsCopy { get; init; } = false;
     //[JsonConstructor]
     public ChessPiece(PieceType assignedType, Coords currentLocation, Team assignedTeam, int? initialColumnNumber = null)
     {
@@ -258,11 +277,11 @@ public class ChessPiece
                 // Being equal to 1 implies that one dimension has a value of 0 and is therefore a perpendicular or parallel vector.
                 bool vectorIsPerpendicularOrParallel = Math.Abs(verticalScalar) + Math.Abs(horizontalScalar) == 1;
 
-                bool enterRook = (AssignedType == PieceType.Rook) && vectorIsPerpendicularOrParallel;
-                bool enterBishop = (AssignedType == PieceType.Bishop) && vectorIsPerpendicularOrParallel == false;
-                bool enterPawn = (AssignedType == PieceType.Pawn) && verticalScalar == forwardDirection;
+                bool rookVector = (AssignedType == PieceType.Rook) && vectorIsPerpendicularOrParallel;
+                bool bishopVector = (AssignedType == PieceType.Bishop) && vectorIsPerpendicularOrParallel == false;
+                bool pawnVector = (AssignedType == PieceType.Pawn) && verticalScalar == forwardDirection;
 
-                if (enterBishop || enterRook || enterPawn || canMoveInAnyDirection)
+                if (bishopVector || rookVector || pawnVector || canMoveInAnyDirection)
                 {
                     directions.Add(new Vector2(horizontalScalar, verticalScalar));
 
@@ -309,7 +328,8 @@ public class ChessPiece
         return new ChessPiece(AssignedType, new Coords(CurrentRow, CurrentColumn), AssignedTeam)
         {
             CanBeCapturedViaEnPassant = _enPassantCapturePossible,
-            ID = ID
+            ID = ID,
+            IsCopy = true
         };
     }
 
