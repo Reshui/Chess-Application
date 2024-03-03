@@ -177,13 +177,15 @@ public class Server
                     else
                     {
                         var newGame = new GameEnvironment(matchedPlayers[0], matchedPlayers[1]);
-
+                        var playersThatHaveStartedGame = new List<Player>();
+                        // Inform player code that it should start a GameEnvironment instance.
                         foreach (KeyValuePair<Team, Player> playerDetail in newGame.AssociatedPlayers)
                         {
                             var startGameCommand = new ServerCommand(CommandType.StartGameInstance, newGame.GameID, assignedTeam: playerDetail.Key);
                             try
                             {
                                 await SendClientMessageAsync(JsonSerializer.Serialize(startGameCommand), playerDetail.Value.Client, playerDetail.Value.MainTokenSource.Token);
+                                playersThatHaveStartedGame.Add(playerDetail.Value);
                             }
                             catch (Exception e) when (e is OperationCanceledException || e is IOException)
                             {   // Failed to message client or client is leaving the server.
@@ -198,16 +200,19 @@ public class Server
                             _startedGames.TryAdd(newGame.GameID, newGame);
                             matchedPlayers.Clear();
                         }
-                        else if (matchedPlayers.Count == 1)
+                        else if (playersThatHaveStartedGame.Any())
                         {
-                            try
+                            var notifyOpponentDisconnectCommand = new ServerCommand(CommandType.OpponentClientDisconnected, newGame.GameID);
+                            foreach (Player playerWaitingForOpponent in playersThatHaveStartedGame)
                             {
-                                var notifyOpponentDisconnectCommand = new ServerCommand(CommandType.OpponentClientDisconnected, newGame.GameID);
-                                await SendClientMessageAsync(JsonSerializer.Serialize(notifyOpponentDisconnectCommand), matchedPlayers[0].Client!, matchedPlayers[0].MainTokenSource.Token);
-                            }
-                            catch (Exception)
-                            {   // Failed to message client or client is leaving the server.
-                                matchedPlayers.Clear();
+                                try
+                                {
+                                    await SendClientMessageAsync(JsonSerializer.Serialize(notifyOpponentDisconnectCommand), playerWaitingForOpponent.Client!, playerWaitingForOpponent.MainTokenSource.Token);
+                                }
+                                catch (Exception e) when (e is OperationCanceledException || e is IOException)
+                                {
+                                    matchedPlayers.Remove(playerWaitingForOpponent);
+                                }
                             }
                         }
                     }
@@ -405,11 +410,11 @@ public class Server
                         if (!_waitingForGameLobby.Contains(user)) _waitingForGameLobby.Enqueue(user);
                     }
                     else if (clientResponse.CMD == CommandType.NewMove && clientResponse.MoveDetails is not null && userRegistered)
-                    {
+                    {   // Send user response to the opposing player.
                         if (_startedGames.TryGetValue(clientResponse.GameIdentifier, out GameEnvironment? currentGame))
                         {
                             Player opposingUser = currentGame.AssociatedPlayers[GameEnvironment.ReturnOppositeTeam(clientResponse.MoveDetails.Value.SubmittingTeam)];
-                            try // Send user response to the opposing player.
+                            try
                             {
                                 await SendClientMessageAsync(JsonSerializer.Serialize(clientResponse), opposingUser.Client, user.MainTokenSource.Token);
                             }
