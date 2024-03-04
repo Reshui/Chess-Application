@@ -1,6 +1,5 @@
 namespace Pieces;
 
-using System.Diagnostics.Eventing.Reader;
 using System.Numerics;
 // using Microsoft.VisualBasic.Logging;
 
@@ -375,12 +374,14 @@ public class GameEnvironment
         if (newMove.SubmittingTeam == ActiveTeam)
         {
             EditGameBoard(newMove);
-            bool localPlayerIsSubmittingMove = ActiveTeam.Equals(PlayerTeam);
-            if (!localPlayerIsSubmittingMove && IsKingCheckMated(PlayerTeam))
+            bool localPlayerMove = ActiveTeam.Equals(PlayerTeam);
+            // The local player isn't allowed to submit a move that will place themselves in check, So just determine if the opponent
+            // has placed the local player in check.
+            if (!localPlayerMove && IsKingCheckMated(PlayerTeam))
             {
                 ChangeGameState(GameState.LocalLoss);
             }
-            else if (localPlayerIsSubmittingMove && IsKingCheckMated(ReturnOppositeTeam(PlayerTeam)))
+            else if (localPlayerMove && IsKingCheckMated(ReturnOppositeTeam(PlayerTeam)))
             {
                 ChangeGameState(GameState.LocalWin);
             }
