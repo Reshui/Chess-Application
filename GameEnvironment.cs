@@ -163,16 +163,16 @@ public class GameEnvironment
         ChessPiece queriedKing = ReturnKing(teamToCheck);
         int kingRow = queriedKing.CurrentRow;
 
-        for (int verticalScalar = -1; verticalScalar < 2; verticalScalar++)
+        for (int verticalScalar = -1; verticalScalar < 2; ++verticalScalar)
         {
-            for (int horizontalScalar = -1; horizontalScalar < 2; horizontalScalar++)
+            for (int horizontalScalar = -1; horizontalScalar < 2; ++horizontalScalar)
             {   // Exclude the current space.
                 if (verticalScalar == 0 && horizontalScalar == 0) continue;
 
                 bool vectorIsPerpendicularOrParallel = Math.Abs(verticalScalar) + Math.Abs(horizontalScalar) == 1;
                 var vectorDirection = new Vector2(horizontalScalar, verticalScalar);
                 // Propagate the vector at most 7 times to get from the current space to the opposite side of the board.
-                for (int propagationCount = 1; propagationCount < 8; propagationCount++)
+                for (int propagationCount = 1; propagationCount < 8; ++propagationCount)
                 {
                     var locationToCheck = Vector2.Add(queriedKing.CurrentLocation, Vector2.Multiply(vectorDirection, propagationCount));
                     (int row, int column) = ((int)locationToCheck.Y, (int)locationToCheck.X);
@@ -298,7 +298,6 @@ public class GameEnvironment
     /// Replaces or moves a <see cref="ChessPiece"/> object within the <paramref name ="GameBoard"/> array.
     /// </summary>
     /// <param name ="move">Struct that contains details for a given movement or capture.</param>
-    /// <param name ="increaseMovementCounts"><see langword="true"/> if you want to increase the movementcount property of the primary chess piece in <paramref name="move"/>.</param>
     private void EditGameBoard(MovementInformation move)
     {
         // For simplicity the second piece is moved first.
@@ -371,10 +370,17 @@ public class GameEnvironment
     /// <param name="newMove"><see cref="MovementInformation"/> to submit to <see cref="GameBoard"/>.</param>
     public void SubmitFinalizedChange(MovementInformation newMove)
     {
-        if (newMove.SubmittingTeam == ActiveTeam)
+        if (newMove.SubmittingTeam == ActiveTeam && !GameEnded)
         {
-            EditGameBoard(newMove);
             bool localPlayerMove = ActiveTeam.Equals(PlayerTeam);
+            EditGameBoard(newMove);
+
+            if (newMove.CapturingSecondary) _movesSinceLastCapture = 0;
+            else ++_movesSinceLastCapture;
+            Team newActiveTeam = ActiveTeam = ReturnOppositeTeam(ActiveTeam);
+            DisableTeamVulnerabilityToEnPassant(newActiveTeam);
+            _gameMoves.Add(newMove);
+
             // The local player isn't allowed to submit a move that will place themselves in check, So just determine if the opponent
             // has placed the local player in check.
             if (!localPlayerMove && IsKingCheckMated(PlayerTeam))
@@ -389,14 +395,6 @@ public class GameEnvironment
             {
                 ChangeGameState(GameState.GameDraw);
             }
-
-            if (newMove.CapturingSecondary) _movesSinceLastCapture = 0;
-            else ++_movesSinceLastCapture;
-
-            Team newActiveTeam = ActiveTeam = ReturnOppositeTeam(ActiveTeam);
-            DisableTeamVulnerabilityToEnPassant(newActiveTeam);
-
-            _gameMoves.Add(newMove);
         }
         else
         {
