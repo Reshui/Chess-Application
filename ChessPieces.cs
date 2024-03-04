@@ -310,7 +310,7 @@ public class ChessPiece
         {
             int verticalScalar = (Math.Abs(horizontalScalar) == 2) ? 1 : 2;
 
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < 2; ++i)
             {
                 directions.Add(new Vector2(horizontalScalar, verticalScalar));
                 verticalScalar *= -1;
