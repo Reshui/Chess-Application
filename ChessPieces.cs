@@ -183,6 +183,7 @@ public class ChessPiece
         private set
         {
             if (AssignedType == PieceType.Pawn) _enPassantCapturePossible = value;
+            else if (value == true) throw new InvalidOperationException("Attempting to make a non Pawn vulnerable to En Passant.");
         }
     }
     private bool _enPassantCapturePossible = false;
