@@ -187,7 +187,7 @@ public class Server
                                 await SendClientMessageAsync(JsonSerializer.Serialize(startGameCommand), playerDetail.Value.Client, playerDetail.Value.MainTokenSource.Token);
                                 playersThatHaveStartedGame.Add(playerDetail.Value);
                             }
-                            catch (Exception e) when (e is OperationCanceledException || e is IOException)
+                            catch (Exception e) when (e is TaskCanceledException || e is IOException)
                             {   // Failed to message client or client is leaving the server.
                                 matchedPlayers.Remove(playerDetail.Value);
                                 bothPlayersAvailable = false;
@@ -203,13 +203,14 @@ public class Server
                         else if (playersThatHaveStartedGame.Any())
                         {
                             var notifyOpponentDisconnectCommand = new ServerCommand(CommandType.OpponentClientDisconnected, newGame.GameID);
+                            // Inform players that are waiting for their opponent that they have disconnected.
                             foreach (Player playerWaitingForOpponent in playersThatHaveStartedGame)
                             {
                                 try
                                 {
                                     await SendClientMessageAsync(JsonSerializer.Serialize(notifyOpponentDisconnectCommand), playerWaitingForOpponent.Client!, playerWaitingForOpponent.MainTokenSource.Token);
                                 }
-                                catch (Exception e) when (e is OperationCanceledException || e is IOException)
+                                catch (Exception e) when (e is TaskCanceledException || e is IOException)
                                 {
                                     matchedPlayers.Remove(playerWaitingForOpponent);
                                 }
@@ -455,7 +456,7 @@ public class Server
                 if (gameFound && !ServerTasksCancellationToken.IsCancellationRequested)
                 {
                     clientCommand = new ServerCommand(CommandType.OpponentClientDisconnected, game.GameID);
-                    Player opposingUser = (user == game.AssociatedPlayers[Team.White]) ? game.AssociatedPlayers[Team.Black] : game.AssociatedPlayers[Team.White];
+                    Player opposingUser = user.Equals(game.AssociatedPlayers[Team.White]) ? game.AssociatedPlayers[Team.Black] : game.AssociatedPlayers[Team.White];
                     gameEndingNotificationTasks.Add(SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), opposingUser.Client, ServerTasksCancellationToken));
                 }
             }

@@ -1,4 +1,6 @@
 namespace Pieces;
+
+using System.Diagnostics.Eventing.Reader;
 using System.Numerics;
 // using Microsoft.VisualBasic.Logging;
 
@@ -235,11 +237,9 @@ public class GameEnvironment
     /// <returns><see langword="true"/> if the king associated with <paramref name="teamToCheck"/> will be checked; otherwise, <see langword="false"/>.</returns>
     public bool WillChangeResultInCheck(MovementInformation moveInfo, Team teamToCheck)
     {
-        bool updateMovementCount = true;
-
-        EditGameBoard(moveInfo, increaseMovementCounts: updateMovementCount);
+        EditGameBoard(moveInfo);
         bool returnValue = IsKingChecked(teamToCheck);
-        UndoGameBoardEdit(moveInfo, decreaseMovementCounts: updateMovementCount);
+        UndoGameBoardEdit(moveInfo);
 
         return returnValue;
     }
@@ -300,42 +300,42 @@ public class GameEnvironment
     /// </summary>
     /// <param name ="move">Struct that contains details for a given movement or capture.</param>
     /// <param name ="increaseMovementCounts"><see langword="true"/> if you want to increase the movementcount property of the primary chess piece in <paramref name="move"/>.</param>
-    public void EditGameBoard(MovementInformation move, bool increaseMovementCounts)
+    private void EditGameBoard(MovementInformation move)
     {
         // For simplicity the second piece is moved first.
         if (move.SecondaryCopy is not null && move.SecondaryNewLocation is not null)
         {
             ChessPiece secondaryOnBoard = GetPieceFromMovement(move, false);
             AdjustChessPieceLocationProperty(secondaryOnBoard, (Vector2)move.SecondaryNewLocation);
-            if (move.CastlingWithSecondary && increaseMovementCounts) secondaryOnBoard.IncreaseMovementCount();
+            if (move.CastlingWithSecondary) secondaryOnBoard.IncreaseMovementCount();
         }
 
         ChessPiece pieceToChange = GetPieceFromMovement(move, true);
         AdjustChessPieceLocationProperty(pieceToChange, move.MainNewLocation);
 
         if (move.EnPassantCapturePossible) pieceToChange.EnableEnPassantCaptures();
-        if (increaseMovementCounts) pieceToChange.IncreaseMovementCount();
-        if (move.NewType is not null) pieceToChange.ChangePieceType((PieceType)move.NewType);
+        else if (move.NewType is not null) pieceToChange.ChangePieceType((PieceType)move.NewType);
+        pieceToChange.IncreaseMovementCount();
     }
 
     /// <summary>
     /// Undoes a change to a <see cref="ChessPiece"/> array using information from <paramref name="movementToUndo"/>.
     /// </summary>
     /// <param name="movementToUndo">Struct that contains information on the change to undo.</param>
-    private void UndoGameBoardEdit(MovementInformation movementToUndo, bool decreaseMovementCounts)
+    private void UndoGameBoardEdit(MovementInformation movementToUndo)
     {
         ChessPiece mainChessPiece = GetPieceFromMovement(movementToUndo, true);
         AdjustChessPieceLocationProperty(mainChessPiece, movementToUndo.MainCopy.CurrentLocation);
 
         if (movementToUndo.EnPassantCapturePossible) mainChessPiece.DisableEnPassantCaptures();
         if (movementToUndo.NewType is not null) mainChessPiece.ChangePieceType(movementToUndo.MainCopy.AssignedType);
-        if (decreaseMovementCounts) mainChessPiece.DecreaseMovementCount();
+        mainChessPiece.DecreaseMovementCount();
 
         if (movementToUndo.SecondaryCopy is not null)
         {
             ChessPiece pieceTwo = GetPieceFromMovement(movementToUndo, false);
             AdjustChessPieceLocationProperty(pieceTwo, movementToUndo.SecondaryCopy.CurrentLocation);
-            if (decreaseMovementCounts && movementToUndo.CastlingWithSecondary) pieceTwo.DecreaseMovementCount();
+            if (movementToUndo.CastlingWithSecondary) pieceTwo.DecreaseMovementCount();
         }
     }
 
@@ -374,12 +374,26 @@ public class GameEnvironment
     {
         if (newMove.SubmittingTeam == ActiveTeam)
         {
-            EditGameBoard(newMove, true);
-            Team newActiveTeam = ActiveTeam = ReturnOppositeTeam(ActiveTeam);
-            DisableTeamVulnerabilityToEnPassant(newActiveTeam);
+            EditGameBoard(newMove);
+            bool localPlayerIsSubmittingMove = ActiveTeam.Equals(PlayerTeam);
+            if (!localPlayerIsSubmittingMove && IsKingCheckMated(PlayerTeam))
+            {
+                ChangeGameState(GameState.LocalLoss);
+            }
+            else if (localPlayerIsSubmittingMove && IsKingCheckMated(ReturnOppositeTeam(PlayerTeam)))
+            {
+                ChangeGameState(GameState.LocalWin);
+            }
+            else if (IsStalemate())
+            {
+                ChangeGameState(GameState.GameDraw);
+            }
 
             if (newMove.CapturingSecondary) _movesSinceLastCapture = 0;
-            else _movesSinceLastCapture++;
+            else ++_movesSinceLastCapture;
+
+            Team newActiveTeam = ActiveTeam = ReturnOppositeTeam(ActiveTeam);
+            DisableTeamVulnerabilityToEnPassant(newActiveTeam);
 
             _gameMoves.Add(newMove);
         }
@@ -409,19 +423,6 @@ public class GameEnvironment
         if (GameBoard is not null && Squares is not null && ActiveTeam == newMove.SubmittingTeam)
         {
             SubmitFinalizedChange(newMove);
-
-            if (IsKingCheckMated(PlayerTeam))
-            {
-                ChangeGameState(GameState.LocalLoss);
-            }
-            else if (IsKingCheckMated(ReturnOppositeTeam(PlayerTeam)))
-            {
-                ChangeGameState(GameState.LocalWin);
-            }
-            else if (IsStalemate())
-            {
-                ChangeGameState(GameState.GameDraw);
-            }
 
             // Updates Graphics
             if (!piecesAlreadyMovedOnGUI)
@@ -596,7 +597,7 @@ public class GameEnvironment
                                     if (captureablePawn is not null && captureablePawn.AssignedType.Equals(PieceType.Pawn)
                                     && captureablePawn.CanBeCapturedViaEnPassant)
                                     {
-                                        var enPassantCapture = new MovementInformation(copyOfPiece, captureablePawn?.Copy(), new Coords(calculatedPosition),
+                                        var enPassantCapture = new MovementInformation(copyOfPiece, captureablePawn.Copy(), new Coords(calculatedPosition),
                                             new Coords(ChessPiece.s_capturedLocation), movementWillExposeToEnPassant, capturingSecondary: true,
                                             castlingWithSecondary: false, newType: null);
 

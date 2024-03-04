@@ -350,7 +350,7 @@ public class ChessPiece
         return false;
     }
 
-    /// <summary>Promotes pawns to <paramref name="newType"/>.</summary>
+    /// <summary>Changes the <see cref="AssignedType"/> property to <paramref name="newType"/> and assigns new direction vectors.</summary>
     /// <param name="newType">A <see cref="PieceType"/> Enum that is used to designate what this chess piece should be promoted to.</param>
     public void ChangePieceType(PieceType newType)
     {
@@ -367,10 +367,8 @@ public class ChessPiece
     /// <summary>
     /// Toggles <see cref="_enPassantCapturePossible"/> to <see langword="true"/>.
     /// </summary> 
-    public void EnableEnPassantCaptures()
-    {
-        CanBeCapturedViaEnPassant = true;
-    }
+    public void EnableEnPassantCaptures() => CanBeCapturedViaEnPassant = true;
+
     /// <summary>
     /// Sets <see cref="_enPassantCapturePossible"/> to <see langword="false"/>.
     /// </summary>
