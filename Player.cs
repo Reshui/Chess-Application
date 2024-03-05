@@ -43,7 +43,7 @@ public class Player
     private static int s_instanceCount = 0;
 
     /// <summary>TokenSource used to stop server listening tasks.</summary>
-    public readonly CancellationTokenSource MainTokenSource = new();
+    public readonly CancellationTokenSource MainTokenSource;
 
     /// <summary>Form object used to visually represent games.</summary>
     private readonly Form1? _gui;
@@ -54,22 +54,24 @@ public class Player
     /// <summary>
     /// Client-side constructor.
     /// </summary>
-    public Player(Form1 gui)
+    public Player(Form1 gui, CancellationTokenSource cancelSource)
     {
         _hostPort = 13000;
         _hostAddress = "127.0.0.1";
         _asyncListeningTask = new();
         _gui = gui;
+        MainTokenSource = cancelSource;
     }
     /// <summary>
     /// Constructor used by the <see cref="Server"/> class to track clients.
     /// </summary>
-    public Player(TcpClient client)
+    public Player(TcpClient client, CancellationTokenSource cancelSource)
     {
         _hostPort = 13000;
         _hostAddress = "127.0.0.1";
         Client = client;
         ServerAssignedID = ++s_instanceCount;
+        MainTokenSource = cancelSource;
     }
     /// <summary>Joins a server and starts asynchronous tasks.</summary>
     /// <returns><see langword="true"/> if server was joined successfully; otherwise, <see langword="false"/>.</returns>
