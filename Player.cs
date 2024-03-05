@@ -28,7 +28,7 @@ public class Player
 
     /// <summary>Stores a list of games that the user is involved in.</summary>
     private readonly Dictionary<int, GameEnvironment> _activeGames = new();
-    private bool ServerIsConnected { get; set; } = false;
+    private bool PermitAccessToServer { get; set; } = false;
     /// <summary>ID used by server to track players.</summary>
     public int ServerAssignedID { get; init; }
 
@@ -51,7 +51,11 @@ public class Player
     /// <summary>List used to track long-running asynchronous tasks started by the Player instance.</summary>
     private readonly List<Task>? _asyncListeningTask;
 
-    private bool _userWantsToQuit = false;
+    /// <summary>
+    /// Gets or sets a boolean that describes if the user wants to quit playing.
+    /// </summary>
+    /// <value><see langword="true"/> if <see cref="CloseConnectionToServerAsync()"/> has been called; otherwise, <see langword="false"/>.</value>
+    public bool UserWantsToQuit { get; private set; } = false;
     /// <summary>
     /// Client-side constructor.
     /// </summary>
@@ -96,7 +100,7 @@ public class Player
     private async Task StartListeningAsync()
     {
         var token = MainTokenSource.Token;
-        ServerIsConnected = true;
+        PermitAccessToServer = true;
         // Get a client stream for reading and writing.
         using NetworkStream stream = _connectedServer!.GetStream();
 
@@ -126,14 +130,16 @@ public class Player
                     }
                     else if (response.CMD == CommandType.ServerIsShuttingDown)
                     {
+                        PermitAccessToServer = false;
                         MainTokenSource.Cancel();
+                        _gui?.ServerIsUnreachable();
                         throw new IOException("Shutdwon command recieved.");
                     }
                     else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames.ContainsKey(serverSideGameID))
                     {
-                        _activeGames[serverSideGameID].ChangeGameState(GameState.GameDraw);
+                        _activeGames[serverSideGameID].ChangeGameState(GameState.OpponentDisconnected);
+                        _gui?.DisableGame(serverSideGameID);
                         _activeGames.Remove(serverSideGameID);
-                        //throw new NotImplementedException("Opponent disconnection hasn't been fully implemented.");
                     }
                     else if (response.CMD == CommandType.NewMove && _activeGames.ContainsKey(serverSideGameID))
                     {
@@ -153,7 +159,7 @@ public class Player
         }
         finally
         {
-            ServerIsConnected = false;
+            PermitAccessToServer = false;
             _connectedServer.Close();
             _connectedServer = null;
         }
@@ -165,7 +171,7 @@ public class Player
     /// <param name="move">Chess movement to submit to the server.</param>
     /// <param name="serverSideGameID">ID used to target a specific <see cref="GameEnvironment"/> instance.</param>
     /// <exception cref="IOException">The server can no longer be reached.</exception>
-    /// <exception cref="InvalidOperationException">Attempt to submit move when it isn't this player's turn.</exception> 
+    /// <exception cref="InvalidOperationException">Attempted to submit move when it isn't this player's turn.</exception> 
     public async Task SubmitMoveToServerAsync(MovementInformation move, int serverSideGameID)
     {
         if (_activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGameInstance))
@@ -174,34 +180,48 @@ public class Player
             {
                 targetedGameInstance.ChangeGameBoardAndGUI(move, piecesAlreadyMovedOnGUI: true);
 
-                if (_connectedServer is not null)
+                if (_connectedServer is not null && PermitAccessToServer)
                 {
                     string submissionCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.NewMove, serverSideGameID, move));
                     try
                     {
                         await SendClientMessageAsync(submissionCommand, _connectedServer, MainTokenSource.Token);
+                        if (targetedGameInstance.GameEnded) _gui?.DisableGame(targetedGameInstance.GameID);
                     }
-                    catch (IOException e)
+                    catch (Exception e) when (e is IOException || e is TaskCanceledException)
                     {
-                        ServerIsConnected = false;
-                        await CloseConnectionToServerAsync();
-                        throw new IOException("Unable to contact server.", e);
+                        targetedGameInstance.ChangeGameState(GameState.ServerUnavailable);
+
+                        if (e is IOException)
+                        {
+                            // Server can't be reached.
+                            PermitAccessToServer = false;
+                            _gui?.ServerIsUnreachable();
+                            await CloseConnectionToServerAsync();
+                            throw new IOException("Unable to contact server.", e);
+                        }
+                        else if (!UserWantsToQuit && e is TaskCanceledException)
+                        {
+                            // Token was cancelled in either CloseConnectionToServerAsync() or a server shut down command was recieved.
+                            _gui?.ServerIsUnreachable();
+                            throw new IOException("The server is shutting down.", e);
+                        }
                     }
-                    catch (TaskCanceledException e)
+                    catch (ObjectDisposedException)
                     {
-                        if (!_userWantsToQuit) throw new IOException("The server is shutting down.", e);
+                        _gui?.ServerIsUnreachable();
                     }
-                }
-                else if (_connectedServer?.Connected == false || ServerIsConnected == false)
-                {
-                    ServerIsConnected = false;
-                    throw new IOException("Server is no longer connected.");
                 }
             }
-            else
+            else if (_connectedServer?.Connected == false || PermitAccessToServer == false)
             {
-                throw new InvalidOperationException("Movement submitted on the wrong turn.");
+                PermitAccessToServer = false;
+                throw new IOException("Server is no longer connected.");
             }
+        }
+        else
+        {
+            throw new InvalidOperationException("Movement submitted on the wrong turn.");
         }
     }
 
@@ -221,13 +241,13 @@ public class Player
     /// </summary>
     public async Task CloseConnectionToServerAsync()
     {
-        _userWantsToQuit = true;
+        UserWantsToQuit = true;
         if (_connectedServer is not null)
         {
             try
             {   // Command is sent first rather than at the end of client listening because, 
                 // when the token is invoked the stream cannot be sent any more messages.
-                if (ServerIsConnected)
+                if (PermitAccessToServer && _connectedServer.Connected)
                 {
                     string notifyServerCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ClientDisconnecting));
                     await SendClientMessageAsync(notifyServerCommand, _connectedServer, null);

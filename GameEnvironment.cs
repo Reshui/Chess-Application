@@ -5,14 +5,14 @@ using System.Numerics;
 
 public enum GameState
 {
-    LocalWin, LocalLoss, GameDraw, Playing
+    LocalWin, LocalLoss, GameDraw, Playing, OpponentDisconnected, ServerUnavailable
 }
 
 public class GameEnvironment
 {
     private readonly ChessPiece _whiteKing;
     private readonly ChessPiece _blackKing;
-    private bool _gameEnded = false;
+
     /// <summary>Stores how many moves have been submitted since the last capture was made.</summary>
     /// <remarks>If over 50 then a Draw is determined.</remarks>
     private int _movesSinceLastCapture = 0;
@@ -32,10 +32,6 @@ public class GameEnvironment
 
     /// <summary>List of submitted moves within the current <see cref="GameEnvironment"/> instance.</summary>
     private readonly List<MovementInformation> _gameMoves = new();
-
-    /// <summary>Gets a boolean that denotes whether or not a given instance has ended.</summary>
-    /// <value><see langword="true"/> if the <see cref="GameEnvironment"/> instance has ended; otherwise, <see langword="false"/>.</value>
-    public bool GameEnded { get => _gameEnded; }
 
     /// <summary>Server-Side integer used to identify the current <see cref="GameEnvironment"/> instance.</summary>
     /// <remarks>Value is auto-incremented in the relevant constructors.</remarks>
@@ -62,6 +58,10 @@ public class GameEnvironment
     /// <summary>Returns a boolean that represents if the instance is active and available for playing.</summary>
     /// <returns><see langword="true"/> if <see cref="MatchState"/> equals <see cref="GameState.Playing"/>; otherwsise, <see langword="false"/>.</returns>
     private bool IsGameActive { get => MatchState == GameState.Playing; }
+
+    /// <summary>Gets a boolean that denotes whether or not a given instance has ended.</summary>
+    /// <value><see langword="true"/> if the <see cref="GameEnvironment"/> instance has ended; otherwise, <see langword="false"/>.</value>
+    public bool GameEnded { get => MatchState != GameState.Playing; }
 
     public ChessPiece this[int x, int y]
     {
@@ -639,7 +639,6 @@ public class GameEnvironment
     public void ChangeGameState(GameState newState)
     {
         MatchState = newState;
-        _gameEnded = newState != GameState.Playing;
     }
     /// <summary>Returns a chess piece within the current instance based on the ID property of a ChessPiece found in <paramref name="move"/> parameter.</summary>
     /// <param name="move">Data used to help retrieve a chess piece.</param>

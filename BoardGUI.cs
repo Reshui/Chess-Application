@@ -56,14 +56,10 @@ namespace Chess_GUi
 
         /// <summary>If <see langword="true"/> then <see cref="_friendlySelectedSquare"/> and <see cref="_chessPieceDestinationSquare"/> will be set to <see langword="null"/> when <see cref="BoardGUI.SquareClickedEvent(object, EventArgs)"/> is called.</summary>
         private bool _resetSquareAssignments;
-        /// <summary>Static vaariablie used to track the <see cref="BoardGUI"/> instance count.</summary>
-        private static int s_instanceCount = 0;
-        public int CurrentInstanceCount { get; init; }
         public bool InteractionsDisabled { get; set; } = false;
-        public BoardGUI(Player user, GameEnvironment newGame)
+        public BoardGUI(Player user, GameEnvironment newGame, string nameOfGui)
         {
-            CurrentInstanceCount = ++s_instanceCount;
-            Name = CurrentInstanceCount.ToString();
+            Name = nameOfGui;
             _currentGame = newGame;
             _player = user;
             GenerateBoardElements();
@@ -315,11 +311,8 @@ namespace Chess_GUi
                 catch (IOException)
                 {
                     InteractionsDisabled = true;
-                    _currentGame.ChangeGameState(GameState.GameDraw);
-                    throw new NotImplementedException("Use GUI to notify user of server not being available.");
                 }
             }
-
         }
 
         /// <summary>

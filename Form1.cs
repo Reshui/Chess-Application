@@ -14,7 +14,7 @@ namespace Chess_GUi
     {
         private Server? _hostedServer;
         private Player? _localPlayer;
-        private readonly List<BoardGUI> _boards = new();
+        private readonly Dictionary<string, BoardGUI> _boards = new();
         // public event StartServerHandlerAsync ServerStart;
         public Form1()
         {
@@ -43,7 +43,7 @@ namespace Chess_GUi
 
         private void JoinServer_Click(object sender, EventArgs e)
         {
-            string userName = "Miller";// UserName.Text;
+            string userName = "Default name";// UserName.Text;
 
             if (userName != string.Empty && _localPlayer is null)
             {
@@ -69,9 +69,10 @@ namespace Chess_GUi
         {
             if (_localPlayer is not null)
             {
-                var trackedElements = new BoardGUI(_localPlayer, newGame);
+                var trackedElements = new BoardGUI(_localPlayer, newGame, newGame.GameID.ToString());
 
-                _boards.Add(trackedElements);
+                _boards.Add(trackedElements.Name, trackedElements);
+                // Added the created GUI to the control.
                 MainView.Controls.Add(trackedElements);
                 trackedElements.Size = MainView.Size;
                 MainView.Controls[trackedElements.Name].BringToFront();
@@ -79,6 +80,29 @@ namespace Chess_GUi
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="gameID"></param>
+        /// <exception cref="NotImplementedException"></exception>
+        public void DisableGame(int gameID)
+        {
+            if (_localPlayer is not null && false == _localPlayer.UserWantsToQuit)
+            {
+                BoardGUI wantedDisplay = _boards[gameID.ToString()];
+                wantedDisplay.Enabled = false;
+                wantedDisplay.InteractionsDisabled = true;
+                throw new NotImplementedException("Need to create display based on game status.");
+            }
+        }
+        /// <summary>
+        /// Makes changes to the GUI to reflect that the server that <see cref="_localPlayer"/> is connected too has disconnected.
+        /// </summary>
+        /// <exception cref="NotImplementedException"></exception>
+        public void ServerIsUnreachable()
+        {
+            throw new NotImplementedException("");
+        }
         private void GameTracker_SelectedIndexChanged(object sender, EventArgs e)
         {
             MainView.Controls[GameTracker.SelectedItem as string].BringToFront();
