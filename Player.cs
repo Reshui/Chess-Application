@@ -259,8 +259,11 @@ public class Player
             }
             finally
             {
-                MainTokenSource.Cancel();
-                if (_asyncListeningTask is not null && _asyncListeningTask.Count > 0) await Task.WhenAll(_asyncListeningTask);
+                if (!MainTokenSource.IsCancellationRequested)
+                {
+                    MainTokenSource.Cancel();
+                    if (_asyncListeningTask is not null && _asyncListeningTask.Count > 0) await Task.WhenAll(_asyncListeningTask);
+                }
                 MainTokenSource.Dispose();
             }
         }
