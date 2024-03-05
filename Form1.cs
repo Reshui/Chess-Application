@@ -47,7 +47,7 @@ namespace Chess_GUi
 
             if (userName != string.Empty && _localPlayer is null)
             {
-                _localPlayer = new Player(this);
+                _localPlayer = new Player(this, new CancellationTokenSource());
                 _localPlayer.AssignName(userName);
 
                 if (_localPlayer.JoinServer())
