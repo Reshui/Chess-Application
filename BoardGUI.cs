@@ -19,10 +19,10 @@ namespace Chess_GUi
     public class BoardGUI : UserControl
     {
         /// <summary>Button that appears when a valid move has been selected.</summary>
-        private Button ConfirmMove;
+        public Button ConfirmMoveBTN { get; private set; }
 
         /// <summary>Container for all <see cref="PictureBox"/> objects contained within <see cref="_pictureSquares"/>.</summary>
-        private Panel MainBoard;
+        private Panel _mainBoard;
 
         /// <summary>2D array of <see cref="PictureBox"/> objects that represent the visible board.</summary>
         private PictureBox[,] _pictureSquares;
@@ -57,6 +57,7 @@ namespace Chess_GUi
         /// <summary>If <see langword="true"/> then <see cref="_friendlySelectedSquare"/> and <see cref="_chessPieceDestinationSquare"/> will be set to <see langword="null"/> when <see cref="BoardGUI.SquareClickedEvent(object, EventArgs)"/> is called.</summary>
         private bool _resetSquareAssignments;
         public bool InteractionsDisabled { get; set; } = false;
+        public GameState StateOfGame { get => _currentGame.MatchState; }
         public BoardGUI(Player user, GameEnvironment newGame, string nameOfGui)
         {
             Name = nameOfGui;
@@ -65,22 +66,22 @@ namespace Chess_GUi
             GenerateBoardElements();
         }
 
-        [MemberNotNull(nameof(MainBoard), nameof(ConfirmMove), nameof(_pictureSquares))]
+        [MemberNotNull(nameof(_mainBoard), nameof(ConfirmMoveBTN), nameof(_pictureSquares))]
         private void GenerateBoardElements()
         {
-            MainBoard = new Panel()
+            _mainBoard = new Panel()
             {
                 Location = new Point(0, 0),
-                Name = "MainBoard",
+                Name = "_mainBoard",
                 Size = new Size(640, 640),
                 TabIndex = 0
             };
 
-            ConfirmMove = new Button()
+            ConfirmMoveBTN = new Button()
             {
                 BackColor = Color.FromArgb(153, 218, 56),
                 Location = new Point(710, 126),
-                Name = "ConfirmMove",
+                Name = "ConfirmMoveBTN",
                 Size = new Size(322, 75),
                 TabIndex = 1,
                 Text = "Confirm Selection",
@@ -90,8 +91,8 @@ namespace Chess_GUi
 
             CreateBoard();
 
-            ConfirmMove.Click += new EventHandler(this.ConfirmMoveClickedEvent!);
-            Controls.AddRange(new Control[] { MainBoard, ConfirmMove });
+            ConfirmMoveBTN.Click += new EventHandler(this.ConfirmMoveClickedEvent!);
+            Controls.AddRange(new Control[] { _mainBoard, ConfirmMoveBTN });
         }
 
         /// <summary>
@@ -104,16 +105,16 @@ namespace Chess_GUi
 
             _pictureSquares = new PictureBox[squaresToCreate, squaresToCreate];
 
-            int squareLength = MainBoard.Width / squaresToCreate;
+            int squareLength = _mainBoard.Width / squaresToCreate;
 
             Color blackColor = ColorTranslator.FromHtml("#300d21");
             Color whiteColor = ColorTranslator.FromHtml("#C79F67");
 
-            int top = 0, heightIncrementer = squareLength, left = 0, rightMostSquareLeftValue = MainBoard.Width - squareLength, xIncrementer = squareLength;
+            int top = 0, heightIncrementer = squareLength, left = 0, rightMostSquareLeftValue = _mainBoard.Width - squareLength, xIncrementer = squareLength;
 
             if (_currentGame.PlayerTeam == Team.White)
             {   // Black will be palced at the top of the board.
-                top = MainBoard.Height - squareLength;
+                top = _mainBoard.Height - squareLength;
                 heightIncrementer *= -1;
             }
             else if (_currentGame.PlayerTeam == Team.Black)
@@ -145,7 +146,7 @@ namespace Chess_GUi
                     };
 
                     _pictureSquares[row, column].Click += new EventHandler(this.SquareClickedEvent!);
-                    MainBoard.Controls.Add(_pictureSquares[row, column]);
+                    _mainBoard.Controls.Add(_pictureSquares[row, column]);
                     left += xIncrementer;
                 }
                 left = _currentGame.PlayerTeam == Team.White ? 0 : rightMostSquareLeftValue;
@@ -201,7 +202,7 @@ namespace Chess_GUi
                 // List of squares that can be moved to. 
                 _validMovementSquares = (from move in _movesAvailableToPiece
                                          let labelName = $"{move.NewMainCoords.RowIndex}{move.NewMainCoords.ColumnIndex}"
-                                         select MainBoard.Controls[labelName] as PictureBox).ToList();
+                                         select _mainBoard.Controls[labelName] as PictureBox).ToList();
 
                 // Create a list of structs that will be used to revert any changes in borderstyle or backColor.
                 _changedSquares = (from square in _validMovementSquares
@@ -220,7 +221,7 @@ namespace Chess_GUi
                     square.BackColor = availableMovesColor;
                 }
 
-                ConfirmMove.Visible = false;
+                ConfirmMoveBTN.Visible = false;
                 // Store a reference to the current image so that it can be placed
                 // onto other squares or have any changes to _friendlySelectedSquare reversed.
                 _friendlyImage = _friendlySelectedSquare.Image;
@@ -245,7 +246,7 @@ namespace Chess_GUi
                 _chessPieceDestinationSquare.Image = _friendlyImage;
 
                 _friendlySelectedSquare!.Image = null;
-                ConfirmMove.Visible = true;
+                ConfirmMoveBTN.Visible = true;
             }
             else if (!selectedSquare.Equals(_friendlySelectedSquare))
             {
@@ -254,7 +255,7 @@ namespace Chess_GUi
                 ResetSquareColors();
                 _resetSquareAssignments = true;
                 _validMovementSquares.Clear();
-                ConfirmMove.Visible = false;
+                ConfirmMoveBTN.Visible = false;
             }
         }
 
@@ -265,7 +266,7 @@ namespace Chess_GUi
         public async void ConfirmMoveClickedEvent(object sender, EventArgs e)
         {
             // Ensure the user can no longer submit a move.
-            ConfirmMove.Visible = false;
+            ConfirmMoveBTN.Visible = false;
 
             _resetSquareAssignments = true;
             _validMovementSquares.Clear();
