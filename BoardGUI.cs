@@ -1,6 +1,7 @@
 ﻿
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
+using System.Reflection.Metadata.Ecma335;
 using Pieces;
 
 namespace Chess_GUi
@@ -30,43 +31,42 @@ namespace Chess_GUi
         /// <summary>A <see cref="GameEnvironment"/> instance that is mapped to the GUI.</summary>
         private readonly GameEnvironment _currentGame;
 
-        /// <summary>List of squares that a piece friendly to <see cref="User"/> can move to.</summary>
+        /// <summary>List of squares that a piece friendly to <see cref="_player"/> can move to.</summary>
         private List<PictureBox> _validMovementSquares = new();
 
         /// <summary>Valid square that a chess piece can move to.</summary>
         private PictureBox? _chessPieceDestinationSquare = null;
 
-        /// <summary>A <see cref="PictureBox"/> that represents a square containing a piece friendly to <see cref="User"/>.</summary>
+        /// <summary>A <see cref="PictureBox"/> that represents a square containing a piece friendly to <see cref="_player"/>.</summary>
         private PictureBox? _friendlySelectedSquare = null;
 
         /// <summary><see cref="Playerr"/> instance used to communicate with the server.</summary>
-        private readonly Player User;
+        private readonly Player _player;
 
         /// <summary>List of squares within <see cref="_pictureSquares"/> that have undergone a temporary visual change.</summary>
         private List<OriginalBackColor> _changedSquares = new();
 
-        /// <summary>List of available moves to the currently selected piece friendly to the <see cref="User"/>.</summary>
+        /// <summary>List of available moves to the currently selected piece friendly to the <see cref="_player"/>.</summary>
         private List<MovementInformation>? _movesAvailableToPiece;
 
         /// <summary>Stores a temporary reference to an image when selecting an available movement.</summary>
         private Image? _targetImage;
 
-        /// <summary>Stores a temporary reference to the friendly piece selected by <see cref="User"/></summary>
+        /// <summary>Stores a temporary reference to the friendly piece selected by <see cref="_player"/></summary>
         private Image? _friendlyImage;
 
         /// <summary>If <see langword="true"/> then <see cref="_friendlySelectedSquare"/> and <see cref="_chessPieceDestinationSquare"/> will be set to <see langword="null"/> when <see cref="BoardGUI.SquareClickedEvent(object, EventArgs)"/> is called.</summary>
         private bool _resetSquareAssignments;
         /// <summary>Static vaariablie used to track the <see cref="BoardGUI"/> instance count.</summary>
         private static int s_instanceCount = 0;
-
         public int CurrentInstanceCount { get; init; }
-
+        public bool InteractionsDisabled { get; set; } = false;
         public BoardGUI(Player user, GameEnvironment newGame)
         {
             CurrentInstanceCount = ++s_instanceCount;
             Name = CurrentInstanceCount.ToString();
             _currentGame = newGame;
-            User = user;
+            _player = user;
             GenerateBoardElements();
         }
 
@@ -127,7 +127,6 @@ namespace Chess_GUi
                 xIncrementer *= -1;
             }
 
-            //C: \Users\Yliyah\Desktop\Resources\White_Rook.jpg
             string imageFolder = Path.GetFullPath(@"..\..\..\Resources\");
             if (!Directory.Exists(imageFolder))
             {
@@ -164,6 +163,7 @@ namespace Chess_GUi
         /// </summary>
         private void SquareClickedEvent(object sender, EventArgs e)
         {
+            if (InteractionsDisabled) return;
             // First determine if a piece friendly to the player has been selected.
             // If not do nothing, Else display available moves.
             if (_resetSquareAssignments)
@@ -299,13 +299,28 @@ namespace Chess_GUi
                     _pictureSquares[piece.CurrentRow, piece.CurrentColumn].Image = null;
                 }
             }
-            // If a pawn reaches the opposite side of the board, prompt the user to select a different piece type.
-            if (submittedMovement.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(submittedMovement.NewMainCoords.RowIndex))
+
+            if (!InteractionsDisabled)
             {
-                throw new NotImplementedException("Exchanging a pawn for a special piece hasn't been implemented.");
+                // If a pawn reaches the opposite side of the board, prompt the user to select a different piece type.
+                if (submittedMovement.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(submittedMovement.NewMainCoords.RowIndex))
+                {
+                    throw new NotImplementedException("Exchanging a pawn for a special piece hasn't been implemented visually.");
+                }
+                // Send change to the server and update on local client.
+
+                try
+                {
+                    await _player.SubmitMoveToServerAsync(submittedMovement, _currentGame.GameID);
+                }
+                catch (IOException)
+                {
+                    InteractionsDisabled = true;
+                    _currentGame.ChangeGameState(GameState.GameDraw);
+                    throw new NotImplementedException("Use GUI to notify user of server not being available.");
+                }
             }
-            // Send change to the server and update on local client.
-            await User.SubmitMoveToServerAsync(submittedMovement, _currentGame.GameID);
+
         }
 
         /// <summary>

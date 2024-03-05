@@ -49,8 +49,9 @@ public class Player
     private readonly Form1? _gui;
 
     /// <summary>List used to track long-running asynchronous tasks started by the Player instance.</summary>
-    private List<Task>? _asyncListeningTask;
+    private readonly List<Task>? _asyncListeningTask;
 
+    private bool _userWantsToQuit = false;
     /// <summary>
     /// Client-side constructor.
     /// </summary>
@@ -80,13 +81,13 @@ public class Player
         try
         {
             _connectedServer = new TcpClient(_hostAddress, _hostPort);
-            _asyncListeningTask?.Add(StartListeningAsync());
-            return true;
         }
         catch (SocketException)
         {
             return false;
         }
+        _asyncListeningTask?.Add(StartListeningAsync());
+        return true;
     }
 
     /// <summary>
@@ -141,13 +142,14 @@ public class Player
                 }
             }
         }
-        catch (IOException e)
+        catch (IOException)
         {   // Couldn't reach host.
-            Console.WriteLine("Host has disconnected. " + e);
+            Console.WriteLine("Host has disconnected.");
         }
-        catch (OperationCanceledException)
+        catch (TaskCanceledException)
         {
-
+            // User has decided to disconnect using CloseConnectionToServerAsync().
+            // Server has already been notified or will be.
         }
         finally
         {
@@ -162,7 +164,9 @@ public class Player
     /// </summary>
     /// <param name="move">Chess movement to submit to the server.</param>
     /// <param name="serverSideGameID">ID used to target a specific <see cref="GameEnvironment"/> instance.</param>
-    public async Task SubmitMoveToServerAsync(MovementInformation move, int serverSideGameID, CancellationToken? token = null)
+    /// <exception cref="IOException">The server can no longer be reached.</exception>
+    /// <exception cref="InvalidOperationException">Attempt to submit move when it isn't this player's turn.</exception> 
+    public async Task SubmitMoveToServerAsync(MovementInformation move, int serverSideGameID)
     {
         if (_activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGameInstance))
         {
@@ -175,23 +179,28 @@ public class Player
                     string submissionCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.NewMove, serverSideGameID, move));
                     try
                     {
-                        await SendClientMessageAsync(submissionCommand, _connectedServer, token);
+                        await SendClientMessageAsync(submissionCommand, _connectedServer, MainTokenSource.Token);
                     }
-                    catch (IOException)
+                    catch (IOException e)
                     {
                         ServerIsConnected = false;
-                        throw new NotImplementedException("Server not responding handling not implemented.");
+                        await CloseConnectionToServerAsync();
+                        throw new IOException("Unable to contact server.", e);
+                    }
+                    catch (TaskCanceledException e)
+                    {
+                        if (!_userWantsToQuit) throw new IOException("The server is shutting down.", e);
                     }
                 }
                 else if (_connectedServer?.Connected == false || ServerIsConnected == false)
                 {
                     ServerIsConnected = false;
-                    throw new Exception("Server is no longer connected.");
+                    throw new IOException("Server is no longer connected.");
                 }
             }
             else
             {
-                throw new Exception("Movement submitted on the wrong turn.");
+                throw new InvalidOperationException("Movement submitted on the wrong turn.");
             }
         }
     }
@@ -212,13 +221,17 @@ public class Player
     /// </summary>
     public async Task CloseConnectionToServerAsync()
     {
+        _userWantsToQuit = true;
         if (_connectedServer is not null)
         {
             try
             {   // Command is sent first rather than at the end of client listening because, 
                 // when the token is invoked the stream cannot be sent any more messages.
-                string notifyServerCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ClientDisconnecting));
-                await SendClientMessageAsync(notifyServerCommand, _connectedServer, null);
+                if (ServerIsConnected)
+                {
+                    string notifyServerCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ClientDisconnecting));
+                    await SendClientMessageAsync(notifyServerCommand, _connectedServer, null);
+                }
             }
             catch (IOException e)
             {
