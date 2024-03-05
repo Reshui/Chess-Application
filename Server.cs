@@ -27,6 +27,7 @@ public class Server
     public readonly CancellationTokenSource ServerShutDownCancelSource = new();
 
     /// <summary>Gets <see cref="ServerShutDownCancelSource"/>'s <see cref="CancellationToken"/>.</summary>
+    /// <exception cref="ObjectDisposedException"></exception>
     private CancellationToken ServerTasksCancellationToken => ServerShutDownCancelSource.Token;
 
     /// <summary>List that holds the asynchronous tasks started in <see cref="StartServer()"/>.</summary>
@@ -173,7 +174,7 @@ public class Server
                 _waitingForGameLobby = new ConcurrentQueue<Player>(_waitingForGameLobby.Where(x => !x.Equals(user)));
             }
 
-            user.MainTokenSource.Dispose();
+            try { user.MainTokenSource.Dispose(); } catch (ObjectDisposedException) { }
             user.Client.Close();
             Console.WriteLine($"{user.Name} has disconnected from the server.");
         }
@@ -201,25 +202,27 @@ public class Server
                     List<Task<bool>> clientPingingTasks = new();
                     foreach (Player user in matchedPlayers)
                     {
-                        clientPingingTasks.Add(IsClientActiveAsync(user.Client, user.MainTokenSource.Token));
+                        try
+                        {
+                            clientPingingTasks.Add(IsClientActiveAsync(user.Client, user.MainTokenSource.Token));
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            matchedPlayers.Remove(user);
+                            bothPlayersAvailable = false;
+                            break;
+                        }
                     }
 
-                    while (clientPingingTasks.Count > 0)
+                    while (bothPlayersAvailable && clientPingingTasks.Count > 0)
                     {
                         Task<bool> completedTask = await Task.WhenAny(clientPingingTasks);
-                        if (!completedTask.Result)
+                        if (completedTask.IsFaulted || !completedTask.Result)
                         {
-                            int index = clientPingingTasks.IndexOf(completedTask);
-                            Player user = matchedPlayers[index];
-                            matchedPlayers.RemoveAt(index);
-                            try
-                            {
-                                user.MainTokenSource.Cancel();
-                            }
-                            catch (ObjectDisposedException)
-                            {
-                                // Client is being actively removed.
-                            }
+                            Player user = matchedPlayers[clientPingingTasks.IndexOf(completedTask)];
+                            matchedPlayers.Remove(user);
+                            // If error then Client is being actively removed.
+                            try { user.MainTokenSource.Cancel(); } catch (ObjectDisposedException) { }
                             bothPlayersAvailable = false;
                         }
                         clientPingingTasks.Remove(completedTask);
@@ -275,7 +278,7 @@ public class Server
             {
                 await Task.Delay(700, ServerTasksCancellationToken);
             }
-            catch (OperationCanceledException)
+            catch (TaskCanceledException)
             {
                 break;
             }
@@ -308,6 +311,7 @@ public class Server
     /// <param name="client"><see cref="TcpClient"/> that is sent a message.</param>
     /// <param name="message">Message to be sent to <paramref name="client"/>.</param>
     /// <exception cref="IOException">Raised when an error occurs while attempting to use .WriteAsync.</exception>
+    /// <exception cref="ObjectDisposedException"></exception>
     public static async Task SendClientMessageAsync(string message, TcpClient client, CancellationToken? token)
     {
         byte[] msg = Encoding.ASCII.GetBytes(message);
@@ -428,9 +432,9 @@ public class Server
 
                         }
                     }
-                    else if (clientResponse.CMD == CommandType.LookingForGame && userRegistered)
+                    else if (clientResponse.CMD == CommandType.LookingForGame && userRegistered && !_waitingForGameLobby.Contains(user))
                     {   // Only add the user to the queue if they aren't already in it.
-                        if (!_waitingForGameLobby.Contains(user)) _waitingForGameLobby.Enqueue(user);
+                        _waitingForGameLobby.Enqueue(user);
                     }
                     else if (clientResponse.CMD == CommandType.NewMove && clientResponse.MoveDetails is not null && userRegistered)
                     {   // Send user response to the opposing player.
@@ -445,14 +449,11 @@ public class Server
                             {
                                 if (!ServerTasksCancellationToken.IsCancellationRequested)
                                 {
-                                    // If the opposingUser isn't reachable send player notification that the opponent couldn't be reached.
-                                    if (e is IOException)
-                                    {
-                                        // Errors thrown here will be caught in outermost catch statement.
-                                        var opponentDisconnectedCommand = new ServerCommand(CommandType.OpponentClientDisconnected, currentGame.GameID);
-                                        await SendClientMessageAsync(JsonSerializer.Serialize(opponentDisconnectedCommand), user.Client, user.MainTokenSource.Token);
-                                    }
                                     try { opposingUser.MainTokenSource.Cancel(); } catch (ObjectDisposedException) { }
+                                    // If the opposingUser isn't reachable send player notification that the opponent couldn't be reached.
+                                    // Errors thrown here will be caught in outermost catch statement.
+                                    var opponentDisconnectedCommand = new ServerCommand(CommandType.OpponentClientDisconnected, currentGame.GameID);
+                                    await SendClientMessageAsync(JsonSerializer.Serialize(opponentDisconnectedCommand), user.Client, user.MainTokenSource.Token);
                                 }
                             }
                         }
@@ -463,31 +464,24 @@ public class Server
                     }
                     else if (clientResponse.CMD == CommandType.ClientDisconnecting)
                     {
-                        try
-                        {
-                            user.MainTokenSource.Cancel();
-                        }
-                        catch (ObjectDisposedException)
-                        {
-
-                        }
+                        user.MainTokenSource.Cancel();
                         clientDisconnected = true;
                     }
                 }
             }
         }
-        catch (Exception e) when (e is IOException || e is TaskCanceledException || e is OperationCanceledException || e is ObjectDisposedException)
+        catch (Exception e) when (e is IOException || e is TaskCanceledException || e is ObjectDisposedException)
         {   // Client has likely disconnected.
             clientDisconnected = true;
         }
         finally
         {
+            // Gather all the games that user is taking part in and notify the opponent of the user's disconnect.
             if (!ServerTasksCancellationToken.IsCancellationRequested)
             {
-                // Gather all the games that user is taking part in and notify the opponent of the user's disconnect.
-                List<GameEnvironment> gamesToDisconnect = (from game in _startedGames.Values
-                                                           where game.AssociatedPlayers.ContainsValue(user)
-                                                           select game).ToList();
+                var gamesToDisconnect = from game in _startedGames.Values
+                                        where game.AssociatedPlayers.ContainsValue(user)
+                                        select game;
 
                 var gameEndingNotificationTasks = new List<Task>();
                 // Send the opposing player a notification about their opponent disconnecting
