@@ -83,16 +83,36 @@ namespace Chess_GUi
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="gameID"></param>
+        /// <param name="gameID"><see cref="GameEnvironment.GameID"/> of game to target.</param>
         /// <exception cref="NotImplementedException"></exception>
         public void DisableGame(int gameID)
         {
-            if (_localPlayer is not null && false == _localPlayer.UserWantsToQuit)
+            if (_localPlayer is not null && !_localPlayer.UserWantsToQuit)
             {
                 BoardGUI wantedDisplay = _boards[gameID.ToString()];
                 wantedDisplay.Enabled = false;
                 wantedDisplay.InteractionsDisabled = true;
-                throw new NotImplementedException("Need to create display based on game status.");
+
+                string messageToDisplay = wantedDisplay.StateOfGame switch
+                {
+                    GameState.LocalWin => "You Win",
+                    GameState.LocalLoss => "You have lost.",
+                    GameState.GameDraw => "Game Draw",
+                    GameState.OpponentDisconnected => "Opponent Disconnected",
+                    GameState.ServerUnavailable => "Server is unavailable",
+                    _ => throw new ArgumentException("Unaccounted for GameState.")
+                };
+
+                var labelToShowUser = new Label()
+                {
+                    Location = wantedDisplay.ConfirmMoveBTN.Location,
+                    Name = "Disclaimer",
+                    Size = wantedDisplay.ConfirmMoveBTN.Size,
+                    TabIndex = 0,
+                    Text = messageToDisplay
+                };
+
+                wantedDisplay.Controls.Add(labelToShowUser);
             }
         }
         /// <summary>
