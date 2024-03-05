@@ -131,7 +131,8 @@ public class GameEnvironment
                 1 or 6 => PieceType.Knight,
                 2 or 5 => PieceType.Bishop,
                 3 => PieceType.Queen,
-                _ => PieceType.King
+                4 => PieceType.King,
+                _ => throw new ArgumentOutOfRangeException($"{nameof(columnIndex)} is greater than 7 or less than 0.")
             };
 
             foreach (int pawnRow in pawnRows)
