@@ -53,7 +53,7 @@ public class GameEnvironment
 
     /// <summary>Gets or sets the current game state.</summary>
     /// <value>The current game state.</value>
-    public GameState MatchState { get; set; } = GameState.Playing;
+    public GameState MatchState { get; private set; } = GameState.Playing;
 
     /// <summary>Returns a boolean that represents if the instance is active and available for playing.</summary>
     /// <returns><see langword="true"/> if <see cref="MatchState"/> equals <see cref="GameState.Playing"/>; otherwsise, <see langword="false"/>.</returns>
