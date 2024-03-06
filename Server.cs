@@ -501,7 +501,7 @@ public class Server
                     {
                         clientCommand = new ServerCommand(CommandType.OpponentClientDisconnected, game.GameID);
                         Player opposingUser = user.Equals(game.AssociatedPlayers[Team.White]) ? game.AssociatedPlayers[Team.Black] : game.AssociatedPlayers[Team.White];
-                        gameEndingNotificationTasks.Add(SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), opposingUser.Client, ServerTasksCancellationToken));
+                        gameEndingNotificationTasks.Add(SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), opposingUser.Client, CancellationToken.None));
                     }
                 }
 
