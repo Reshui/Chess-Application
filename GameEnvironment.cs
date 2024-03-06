@@ -378,7 +378,6 @@ public class GameEnvironment
             {
                 UpdateSquaresOnGUI(newMove, piecesAlreadyMovedOnGUI);
             }
-
             EditGameBoard(newMove);
             if (newMove.CapturingSecondary)
             {
@@ -389,8 +388,6 @@ public class GameEnvironment
                 ++_movesSinceLastCapture;
             }
 
-            Team newActiveTeam = ActiveTeam = ReturnOppositeTeam(ActiveTeam);
-            DisableTeamVulnerabilityToEnPassant(newActiveTeam);
             bool localPlayerMove = ActiveTeam.Equals(PlayerTeam);
             // The local player isn't allowed to submit a move that will place themselves in check, So just determine if the opponent
             // has placed the local player in check.
@@ -405,6 +402,11 @@ public class GameEnvironment
             else if (IsStalemate())
             {
                 ChangeGameState(GameState.GameDraw);
+            }
+            else
+            {
+                Team newActiveTeam = ActiveTeam = ReturnOppositeTeam(ActiveTeam);
+                DisableTeamVulnerabilityToEnPassant(newActiveTeam);
             }
         }
         else
