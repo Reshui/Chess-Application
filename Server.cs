@@ -501,6 +501,8 @@ public class Server
                     {
                         clientCommand = new ServerCommand(CommandType.OpponentClientDisconnected, game.GameID);
                         Player opposingUser = user.Equals(game.AssociatedPlayers[Team.White]) ? game.AssociatedPlayers[Team.Black] : game.AssociatedPlayers[Team.White];
+                        // CancellationToken.None will be used instead of ServerCancellationToken so that the stream isn't closed in case the client is about to be informed of
+                        // Server shutdown.
                         gameEndingNotificationTasks.Add(SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), opposingUser.Client, CancellationToken.None));
                     }
                 }
