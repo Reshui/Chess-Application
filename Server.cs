@@ -6,8 +6,6 @@ using System.Text;
 using System.Text.Json;
 using System;
 using System.Collections.Concurrent;
-using System.Diagnostics.Eventing.Reader;
-
 public class Server
 {
     /// <summary>List of connected <see cref="TcpClient"/> instances to the current <see cref="Server"/> instance.</summary>
