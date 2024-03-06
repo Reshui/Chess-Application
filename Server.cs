@@ -310,15 +310,14 @@ public class Server
     /// <param name="message">Message to be sent to <paramref name="client"/>.</param>
     /// <exception cref="IOException">Raised when an error occurs while attempting to use .WriteAsync.</exception>
     /// <exception cref="ObjectDisposedException"></exception>
-    public static async Task SendClientMessageAsync(string message, TcpClient client, CancellationToken? token)
+    public static async Task SendClientMessageAsync(string message, TcpClient client, CancellationToken token)
     {
         byte[] msg = Encoding.ASCII.GetBytes(message);
         List<byte> constructedMessage = BitConverter.GetBytes(msg.Length).ToList();
         constructedMessage.AddRange(msg);
         byte[] msgConverted = constructedMessage.ToArray();
 
-        if (token is not null) await client.GetStream().WriteAsync(msgConverted, (CancellationToken)token);
-        else await client.GetStream().WriteAsync(msgConverted);
+        await client.GetStream().WriteAsync(msgConverted, token);
     }
 
     /// <summary>
