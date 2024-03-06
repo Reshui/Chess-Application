@@ -356,9 +356,8 @@ public class Server
             {
                 do
                 {
-                    if (stream.DataAvailable)
+                    if (stream.DataAvailable && !token.IsCancellationRequested)
                     {
-                        token.ThrowIfCancellationRequested();
                         responseByteCount = await stream.ReadAsync(bytes, CancellationToken.None);
                         break;
                     }
