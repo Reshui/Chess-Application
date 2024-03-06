@@ -269,7 +269,7 @@ public class Player
                 _connectedServer.Close();
                 _connectedServer = null;
             }
-            _gui?.ServerIsUnreachable();
+            if (!UserWantsToQuit) _gui?.ServerIsUnreachable();
         }
     }
 }
