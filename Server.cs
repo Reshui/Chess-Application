@@ -353,8 +353,20 @@ public class Server
             bool byteCountRecieved = false;
 
             do
-            {   // Loop to receive all the data sent by the client.
-                responseByteCount = await stream.ReadAsync(bytes, token);
+            {
+                do
+                {
+                    if (stream.DataAvailable)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        responseByteCount = await stream.ReadAsync(bytes, CancellationToken.None);
+                        break;
+                    }
+                    else
+                    {
+                        await Task.Delay(400, token);
+                    }
+                } while (true);
 
                 if (responseByteCount > 0)
                 {
