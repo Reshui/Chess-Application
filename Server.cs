@@ -308,6 +308,7 @@ public class Server
     /// <param name="message">Message to be sent to <paramref name="client"/>.</param>
     /// <exception cref="IOException">Raised when an error occurs while attempting to use .WriteAsync.</exception>
     /// <exception cref="ObjectDisposedException"></exception>
+    /// <exception cref="InvalidOperationException"></exception>
     public static async Task SendClientMessageAsync(string message, TcpClient client, CancellationToken token)
     {
         byte[] msg = Encoding.ASCII.GetBytes(message);
