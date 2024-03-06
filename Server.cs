@@ -148,7 +148,7 @@ public class Server
             }
             catch (Exception)
             { }
-            // Cancel all listeng and waiting tasks.
+            // Cancel all listening and waiting tasks.
             ServerShutDownCancelSource.Cancel();
             _waitingForGameLobby.Clear();
             await Task.WhenAll(_serverTasks);
@@ -166,7 +166,6 @@ public class Server
     /// <summary>
     /// Removes <paramref name="user"/> from <see cref="_clientListeningTasks"/> and <see cref="_connectedPlayers"/>.
     /// </summary>
-    /// <remarks>If <see cref="ServerTasksCancellationToken.IsCancellationRequested"/> then <paramref name="user"/> will be sent a server shutdown message</remarks>
     /// <param name="user"><see cref="Player"/> instance that has its references removed.</param>
     private void ClientRemovalAsync(Player user, CancellationTokenSource userPersonalSource)
     {
