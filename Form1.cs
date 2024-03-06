@@ -1,3 +1,4 @@
+using Microsoft.VisualBasic.Logging;
 using Pieces;
 
 namespace Chess_GUi
@@ -14,7 +15,12 @@ namespace Chess_GUi
     {
         private Server? _hostedServer;
         private Player? _localPlayer;
-        private readonly Dictionary<string, BoardGUI> _boards = new();
+
+        /// <summary>
+        /// Dictionary used to keep track of started games.
+        /// </summary>
+        private readonly Dictionary<string, BoardGUI> _boardGuiByName = new();
+        private Task<bool>? _joinServerTask;
         // public event StartServerHandlerAsync ServerStart;
         public Form1()
         {
@@ -25,7 +31,7 @@ namespace Chess_GUi
 
         private async void Form1_FormClosing(object sender, EventArgs evnt)
         {
-            if (_localPlayer is not null) { await _localPlayer.CloseConnectionToServerAsync(); _localPlayer = null; }
+            if (_localPlayer is not null) { await _localPlayer.CloseConnectionToServerAsync(true, false); _localPlayer = null; }
 
             if (_hostedServer is not null) { await _hostedServer.CloseServerAsync(); _hostedServer = null; }
         }
@@ -69,14 +75,14 @@ namespace Chess_GUi
         {
             if (_localPlayer is not null)
             {
-                var trackedElements = new BoardGUI(_localPlayer, newGame, newGame.GameID.ToString());
+                var trackedChessBoardGUI = new BoardGUI(_localPlayer, newGame, newGame.GameID.ToString());
 
-                _boards.Add(trackedElements.Name, trackedElements);
+                _boardGuiByName.Add(trackedChessBoardGUI.Name, trackedChessBoardGUI);
                 // Added the created GUI to the control.
-                MainView.Controls.Add(trackedElements);
-                trackedElements.Size = MainView.Size;
-                MainView.Controls[trackedElements.Name].BringToFront();
-                GameTracker.Items.Add(trackedElements.Name);
+                MainView.Controls.Add(trackedChessBoardGUI);
+                trackedChessBoardGUI.Size = MainView.Size;
+                MainView.Controls[trackedChessBoardGUI.Name].BringToFront();
+                GameTracker.Items.Add(trackedChessBoardGUI.Name);
             }
         }
 
@@ -89,7 +95,7 @@ namespace Chess_GUi
         {
             if (_localPlayer is not null && !_localPlayer.UserWantsToQuit)
             {
-                BoardGUI wantedDisplay = _boards[gameID.ToString()];
+                BoardGUI wantedDisplay = _boardGuiByName[gameID.ToString()];
                 wantedDisplay.Enabled = false;
                 wantedDisplay.InteractionsDisabled = true;
 
@@ -121,7 +127,42 @@ namespace Chess_GUi
         /// <exception cref="NotImplementedException"></exception>
         public void ServerIsUnreachable()
         {
-            throw new NotImplementedException("");
+            foreach (var gameGUI in _boardGuiByName)
+            {
+                gameGUI.Value.Enabled = false;
+            }
+            var length = 100;
+            var height = 50;
+            var serverCloseLabel = new Label()
+            {
+                Size = new Size(length, height),
+                Location = new Point(MainView.Left + MainView.Width / 2 - length / 2, MainView.Top + MainView.Height / 2 - height / 2),
+                Text = "Server is unavailable",
+                Name = "Server NA",
+                BackColor = Color.Crimson
+            };
+
+            MainView.Controls.Add(serverCloseLabel);
+            serverCloseLabel.BringToFront();
+
+            try
+            {
+                _localPlayer = null;
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            finally
+            {
+                JoinServer.BackColor = Color.FromArgb(34, 82, 57);
+                JoinServer.ForeColor = Color.White;
+
+                StartServer.BackColor = Color.FromArgb(34, 82, 57);
+                StartServer.ForeColor = Color.White;
+
+                JoinServer.Enabled = true;
+                StartServer.Enabled = true;
+            }
         }
         private void GameTracker_SelectedIndexChanged(object sender, EventArgs e)
         {
