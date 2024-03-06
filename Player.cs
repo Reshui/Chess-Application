@@ -131,8 +131,6 @@ public class Player
                     else if (response.CMD == CommandType.ServerIsShuttingDown)
                     {
                         PermitAccessToServer = false;
-                        MainTokenSource.Cancel();
-                        _gui?.ServerIsUnreachable();
                         throw new IOException("Shutdwon command recieved.");
                     }
                     else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames.ContainsKey(serverSideGameID))
@@ -160,8 +158,8 @@ public class Player
         finally
         {
             PermitAccessToServer = false;
-            _connectedServer.Close();
-            _connectedServer = null;
+            // Function has already been called if true.
+            if (!UserWantsToQuit) await CloseConnectionToServerAsync(false, true);
         }
     }
 
@@ -188,40 +186,42 @@ public class Player
                         await SendClientMessageAsync(submissionCommand, _connectedServer, MainTokenSource.Token);
                         if (targetedGameInstance.GameEnded) _gui?.DisableGame(targetedGameInstance.GameID);
                     }
-                    catch (Exception e) when (e is IOException || e is TaskCanceledException)
+                    catch (Exception e) when (e is IOException || e is TaskCanceledException || e is NullReferenceException)
                     {
                         targetedGameInstance.ChangeGameState(GameState.ServerUnavailable);
-
+                        IOException? newIOException = default;
                         if (e is IOException)
                         {
                             // Server can't be reached.
                             PermitAccessToServer = false;
-                            _gui?.ServerIsUnreachable();
-                            await CloseConnectionToServerAsync();
-                            throw new IOException("Unable to contact server.", e);
+                            newIOException = new IOException("Unable to contact server.", e);
                         }
                         else if (!UserWantsToQuit && e is TaskCanceledException)
                         {
                             // Token was cancelled in either CloseConnectionToServerAsync() or a server shut down command was recieved.
-                            _gui?.ServerIsUnreachable();
-                            throw new IOException("The server is shutting down.", e);
+                            newIOException = new IOException("The server is shutting down.", e);
+                        }
+
+                        if (newIOException is not null)
+                        {
+                            await CloseConnectionToServerAsync(false, false);
+                            throw newIOException;
                         }
                     }
                     catch (ObjectDisposedException)
-                    {
-                        _gui?.ServerIsUnreachable();
+                    {   // Token was disposed of in CloseConnectionToServerAsync()
                     }
                 }
+                else if (_connectedServer?.Connected ?? false == false || PermitAccessToServer == false)
+                {
+                    PermitAccessToServer = false;
+                    throw new IOException("Server is no longer connected.");
+                }
             }
-            else if (_connectedServer?.Connected == false || PermitAccessToServer == false)
+            else
             {
-                PermitAccessToServer = false;
-                throw new IOException("Server is no longer connected.");
+                throw new InvalidOperationException("Movement submitted on the wrong turn.");
             }
-        }
-        else
-        {
-            throw new InvalidOperationException("Movement submitted on the wrong turn.");
         }
     }
 
@@ -239,11 +239,12 @@ public class Player
     /// <summary>
     /// Asynchronously alerts <see cref="_connectedServer"/> and stops listening to responses.
     /// </summary>
-    public async Task CloseConnectionToServerAsync()
+    public async Task CloseConnectionToServerAsync(bool userIsQuitting, bool calledFromListeningTask)
     {
-        UserWantsToQuit = true;
+        UserWantsToQuit = userIsQuitting;
         if (_connectedServer is not null)
         {
+            MainTokenSource.Cancel();
             try
             {   // Command is sent first rather than at the end of client listening because, 
                 // when the token is invoked the stream cannot be sent any more messages.
@@ -259,13 +260,16 @@ public class Player
             }
             finally
             {
-                if (!MainTokenSource.IsCancellationRequested)
+                // If this method wasn't called from StartListeningAsync().
+                if (!calledFromListeningTask)
                 {
-                    MainTokenSource.Cancel();
                     if (_asyncListeningTask is not null && _asyncListeningTask.Count > 0) await Task.WhenAll(_asyncListeningTask);
                 }
                 MainTokenSource.Dispose();
+                _connectedServer.Close();
+                _connectedServer = null;
             }
+            _gui?.ServerIsUnreachable();
         }
     }
 }
