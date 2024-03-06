@@ -209,7 +209,7 @@ public class Server
                         }
                     }
 
-                    while (bothPlayersAvailable && clientPingingTasks.Count > 0)
+                    while (bothPlayersAvailable && clientPingingTasks.Any())
                     {
                         var completedTask = await Task.WhenAny(clientPingingTasks);
 
@@ -510,7 +510,7 @@ public class Server
 
                 try
                 {
-                    await Task.WhenAll(gameEndingNotificationTasks);
+                    if (gameEndingNotificationTasks.Any()) await Task.WhenAll(gameEndingNotificationTasks);
                 }
                 catch (Exception)
                 { }
