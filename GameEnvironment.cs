@@ -430,7 +430,7 @@ public class GameEnvironment
     /// </summary>
     /// <param name="newMove">Board movement used to update a <see cref="GameEnvironment"/> instance.</param>
     /// <param name="piecesAlreadyMovedOnGUI">If <see langword="true"/>, then the GUI has already been updated with <paramref name="newMove"/>.</param>
-    public void UpdateSquaresOnGUI(MovementInformation newMove, bool piecesAlreadyMovedOnGUI)
+    private void UpdateSquaresOnGUI(MovementInformation newMove, bool piecesAlreadyMovedOnGUI)
     {
         if (GameBoard is not null && Squares is not null && ActiveTeam == newMove.SubmittingTeam && !piecesAlreadyMovedOnGUI)
         {
@@ -464,7 +464,6 @@ public class GameEnvironment
                 Squares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex]!.Image = mainBox.Image;
                 mainBox.Image = null;
             }
-
         }
     }
     /// <summary>
