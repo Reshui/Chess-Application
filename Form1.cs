@@ -123,7 +123,8 @@ namespace Chess_GUi
                     Name = "Disclaimer",
                     Size = wantedDisplay.ConfirmMoveBTN.Size,
                     TabIndex = 0,
-                    Text = messageToDisplay
+                    Text = messageToDisplay,
+                    BackColor = Color.White
                 };
 
                 wantedDisplay.Controls.Add(labelToShowUser);
@@ -139,15 +140,16 @@ namespace Chess_GUi
             {
                 gameGUI.Value.Enabled = false;
             }
-            var length = 100;
-            var height = 50;
+            var length = 500;
+            var height = 250;
             var serverCloseLabel = new Label()
             {
                 Size = new Size(length, height),
-                Location = new Point(MainView.Left + MainView.Width / 2 - length / 2, MainView.Top + MainView.Height / 2 - height / 2),
+                Location = new Point(MainView.Left, MainView.Top + (MainView.Height / 2) - (height / 2)),
                 Text = "Server is unavailable",
                 Name = "Server NA",
-                BackColor = Color.Crimson
+                BackColor = Color.Crimson,
+                Font = new Font("Arial", 24, FontStyle.Bold)
             };
 
             MainView.Controls.Add(serverCloseLabel);
