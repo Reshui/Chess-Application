@@ -251,7 +251,7 @@ public class Player
                 {
                     string notifyServerCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ClientDisconnecting));
 
-                    await SendClientMessageAsync(notifyServerCommand, _connectedServer, null);
+                    await SendClientMessageAsync(notifyServerCommand, _connectedServer, CancellationToken.None);
                 }
             }
             catch (IOException e)
