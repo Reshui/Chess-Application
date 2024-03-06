@@ -77,14 +77,14 @@ public class Server
             }
         }
     }
-    public class TrackedGame
+    private class TrackedGame
     {
         public Player WhitePlayer { get => AssociatedPlayers[Team.White]; }
         public Player BlackPlayer { get => AssociatedPlayers[Team.Black]; }
         public int GameID { get; }
         public Dictionary<Team, Player> AssociatedPlayers;
         private static int _gameID = 0;
-        private static Random _rand = new();
+        private static readonly Random _rand = new();
         public TrackedGame(Player playerOne, Player playerTwo)
         {
             GameID = ++_gameID;
@@ -93,7 +93,7 @@ public class Server
             AssociatedPlayers = new()
             {
                 {Team.White, playerArray[whitePlayerIndex]},
-                {Team.Black,playerArray[whitePlayerIndex == 1 ? 0 : 1]}
+                {Team.Black, playerArray[whitePlayerIndex == 1 ? 0 : 1]}
             };
         }
     }
@@ -477,7 +477,12 @@ public class Server
                             {
                                 if (!ServerTasksCancellationToken.IsCancellationRequested)
                                 {
-                                    try { opposingUser.MainTokenSource.Cancel(); } catch (ObjectDisposedException) { }
+                                    try
+                                    {
+                                        opposingUser.MainTokenSource.Cancel();
+                                    }
+                                    catch (ObjectDisposedException)
+                                    { }
                                     // If the opposingUser isn't reachable send player notification that the opponent couldn't be reached.
                                     // Errors thrown here will be caught in outermost catch statement.
                                     var opponentDisconnectedCommand = new ServerCommand(CommandType.OpponentClientDisconnected, currentGame.GameID);

@@ -61,7 +61,7 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Constructor used for client - side code.
+    /// Initializes a new instance of the <see cref="GameEnvironment"/> instance.
     /// </summary>
     /// <param name="playerTeam"><see cref="Team"/> assigned to client-side <see cref="GameEnvironment"/> instances.</param>
     /// <param name="serverSideID">Sever generated id  assigned by server to identify this instance.</param>
