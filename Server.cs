@@ -335,8 +335,8 @@ public class Server
         do
         {
             // Incoming messages contain the length of the message in bytes within the first 4 bytes.
-            byte[] bytes = new byte[sizeof(int)];
-            int totalRecieved = -1 * bytes.Length, incomingMessageByteCount = 0;
+            byte[] adjustableBytesReciever = new byte[sizeof(int)];
+            int totalRecieved = -1 * adjustableBytesReciever.Length, incomingMessageByteCount = 0;
             bool byteCountRecieved = false;
 
             do
@@ -345,7 +345,8 @@ public class Server
                 {
                     if (stream.DataAvailable && !token.IsCancellationRequested)
                     {
-                        responseByteCount = await stream.ReadAsync(bytes, CancellationToken.None);
+                        // If a token passed to ReadAsync is cancelled then the connection will be closed.
+                        responseByteCount = await stream.ReadAsync(adjustableBytesReciever, CancellationToken.None);
                         break;
                     }
                     else
@@ -357,13 +358,13 @@ public class Server
                 if (responseByteCount > 0)
                 {
                     if (!byteCountRecieved)
-                    {   // Small test to ensure that response is 4 bytes long.
+                    {   // Ensure first 4 bytes are a number.
                         // Gets the byte count of the incoming data and sizes the bytes array to accomadate. 
                         if (responseByteCount == sizeof(int))
                         {
                             try
                             {   // Verify that the first 4 bytes are a number.
-                                incomingMessageByteCount = BitConverter.ToInt32(bytes, 0);
+                                incomingMessageByteCount = BitConverter.ToInt32(adjustableBytesReciever, 0);
                             }
                             catch (Exception)
                             {
@@ -372,12 +373,12 @@ public class Server
                             totalRecieved += responseByteCount;
                             byteCountRecieved = true;
                             // Resize the array to fit incoming data.
-                            bytes = new byte[incomingMessageByteCount];
+                            adjustableBytesReciever = new byte[incomingMessageByteCount];
                         }
                     }
                     else
                     {
-                        string textSection = Encoding.ASCII.GetString(bytes, 0, responseByteCount);
+                        string textSection = Encoding.ASCII.GetString(adjustableBytesReciever, 0, responseByteCount);
                         // If the expected number of bytes has been read then attempt to deserialize it into a ServerCommand
                         if ((totalRecieved += responseByteCount) == incomingMessageByteCount)
                         {   // All message bytes have been recieved.
