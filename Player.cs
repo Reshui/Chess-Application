@@ -139,9 +139,9 @@ public class Player
                         _gui?.DisableGame(serverSideGameID);
                         _activeGames.Remove(serverSideGameID);
                     }
-                    else if (response.CMD == CommandType.NewMove && _activeGames.ContainsKey(serverSideGameID))
+                    else if (response.CMD == CommandType.NewMove && _activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGame))
                     {
-                        _activeGames[serverSideGameID].ChangeGameBoardAndGUI(response.MoveDetails!.Value, false);
+                        FinalizeAndUpdate(targetedGame, response.MoveDetails!.Value, false);
                     }
                 }
             }
@@ -164,6 +164,17 @@ public class Player
     }
 
     /// <summary>
+    /// Submits move to Local game instance.
+    /// </summary>
+    /// <param name="targetGame">Game that chanes will target.</param>
+    /// <param name="newMove">MovementInformation used to update <paramref name="targetGame"/>.</param>
+    /// <param name="guiAlreadyUpdated"><see langword="true"/> if the GameBoard doesn't need to visually updated to reflect <paramref name="newMove"/>; otherwise, <see langword="false"/>.</param>
+    private void FinalizeAndUpdate(GameEnvironment targetGame, MovementInformation newMove, bool guiAlreadyUpdated)
+    {
+        targetGame.ChangeGameBoardAndGUI(newMove, piecesAlreadyMovedOnGUI: guiAlreadyUpdated);
+        if (targetGame.GameEnded) _gui?.DisableGame(targetGame.GameID);
+    }
+    /// <summary>
     /// Submits a chess movement <paramref name="move"/> to the <see cref="_connectedServer"/> and updates the relevant <see cref="GameEnvironment"/> instance.
     /// </summary>
     /// <param name="move">Chess movement to submit to the server.</param>
@@ -176,7 +187,7 @@ public class Player
         {
             if (targetedGameInstance.ActiveTeam == move.SubmittingTeam)
             {
-                targetedGameInstance.ChangeGameBoardAndGUI(move, piecesAlreadyMovedOnGUI: true);
+                FinalizeAndUpdate(targetedGameInstance, move, true);
 
                 if (_connectedServer is not null && PermitAccessToServer)
                 {
@@ -184,13 +195,12 @@ public class Player
                     try
                     {
                         await SendClientMessageAsync(submissionCommand, _connectedServer, MainTokenSource.Token);
-                        if (targetedGameInstance.GameEnded) _gui?.DisableGame(targetedGameInstance.GameID);
                     }
-                    catch (Exception e) when (e is IOException || e is OperationCanceledException || e is NullReferenceException)
+                    catch (Exception e) when (e is IOException || e is OperationCanceledException || e is NullReferenceException || e is InvalidOperationException)
                     {
                         targetedGameInstance.ChangeGameState(GameState.ServerUnavailable);
-                        IOException? newIOException = default;
-                        if (e is IOException)
+                        IOException? newIOException = null;
+                        if (e is IOException || e is NullReferenceException || e is InvalidOperationException)
                         {
                             // Server can't be reached.
                             PermitAccessToServer = false;
@@ -198,7 +208,7 @@ public class Player
                         }
                         else if (!UserWantsToQuit && e is OperationCanceledException)
                         {
-                            // Token was cancelled in either CloseConnectionToServerAsync() or a server shut down command was recieved.
+                            // Token was cancelled in either CloseConnectionToServerAsync().
                             newIOException = new IOException("The server is shutting down.", e);
                         }
 
@@ -209,10 +219,16 @@ public class Player
                         }
                     }
                     catch (ObjectDisposedException)
-                    {   // Token was disposed of in CloseConnectionToServerAsync()
+                    {
+                        // Token was disposed of in CloseConnectionToServerAsync() and server will be shutdown and user notified.
                     }
+                    /*catch (InvalidOperationException e)
+                    {
+                        // Stream connection is probably closed due to token invoke.
+                        Console.WriteLine(e.Message);
+                    }*/
                 }
-                else if (_connectedServer?.Connected ?? false == false || PermitAccessToServer == false)
+                else if ((_connectedServer?.Connected ?? false) == false || PermitAccessToServer == false)
                 {
                     PermitAccessToServer = false;
                     throw new IOException("Server is no longer connected.");
@@ -250,7 +266,6 @@ public class Player
                 if (PermitAccessToServer && _connectedServer.Connected)
                 {
                     string notifyServerCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ClientDisconnecting));
-
                     await SendClientMessageAsync(notifyServerCommand, _connectedServer, CancellationToken.None);
                 }
             }
@@ -265,7 +280,7 @@ public class Player
             finally
             {
                 MainTokenSource.Cancel();
-                // If this method wasn't called from StartListeningAsync().
+                // If this method wasn't called from StartListeningAsync() then wait for that Task to finish.
                 if (!calledFromListeningTask)
                 {
                     if (_asyncListeningTask is not null && _asyncListeningTask.Count > 0) await Task.WhenAll(_asyncListeningTask);
