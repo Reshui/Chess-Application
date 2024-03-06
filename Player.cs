@@ -141,7 +141,7 @@ public class Player
                     }
                     else if (response.CMD == CommandType.NewMove && _activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGame))
                     {
-                        UpdateGameInstance(targetedGame, response.MoveDetails!.Value, false);
+                        UpdateGameInstance(targetedGame, response.MoveDetails!.Value, guiAlreadyUpdated: false);
                     }
                 }
             }
