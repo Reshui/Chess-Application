@@ -369,19 +369,29 @@ public class GameEnvironment
     /// with the opposite <see cref="Team"/>.
     /// </summary>
     /// <param name="newMove"><see cref="MovementInformation"/> to submit to <see cref="GameBoard"/>.</param>
-    public void SubmitFinalizedChange(MovementInformation newMove)
+    public void SubmitFinalizedChange(MovementInformation newMove, bool piecesAlreadyMovedOnGUI)
     {
         if (newMove.SubmittingTeam == ActiveTeam && !GameEnded)
         {
-            bool localPlayerMove = ActiveTeam.Equals(PlayerTeam);
-            EditGameBoard(newMove);
+            _gameMoves.Add(newMove);
+            if (!piecesAlreadyMovedOnGUI)
+            {
+                UpdateSquaresOnGUI(newMove, piecesAlreadyMovedOnGUI);
+            }
 
-            if (newMove.CapturingSecondary) _movesSinceLastCapture = 0;
-            else ++_movesSinceLastCapture;
+            EditGameBoard(newMove);
+            if (newMove.CapturingSecondary)
+            {
+                _movesSinceLastCapture = 0;
+            }
+            else
+            {
+                ++_movesSinceLastCapture;
+            }
+
             Team newActiveTeam = ActiveTeam = ReturnOppositeTeam(ActiveTeam);
             DisableTeamVulnerabilityToEnPassant(newActiveTeam);
-            _gameMoves.Add(newMove);
-
+            bool localPlayerMove = ActiveTeam.Equals(PlayerTeam);
             // The local player isn't allowed to submit a move that will place themselves in check, So just determine if the opponent
             // has placed the local player in check.
             if (!localPlayerMove && IsKingCheckMated(PlayerTeam))
@@ -418,47 +428,43 @@ public class GameEnvironment
     /// </summary>
     /// <param name="newMove">Board movement used to update a <see cref="GameEnvironment"/> instance.</param>
     /// <param name="piecesAlreadyMovedOnGUI">If <see langword="true"/>, then the GUI has already been updated with <paramref name="newMove"/>.</param>
-    public void ChangeGameBoardAndGUI(MovementInformation newMove, bool piecesAlreadyMovedOnGUI)
+    public void UpdateSquaresOnGUI(MovementInformation newMove, bool piecesAlreadyMovedOnGUI)
     {
-        if (GameBoard is not null && Squares is not null && ActiveTeam == newMove.SubmittingTeam)
+        if (GameBoard is not null && Squares is not null && ActiveTeam == newMove.SubmittingTeam && !piecesAlreadyMovedOnGUI)
         {
-            SubmitFinalizedChange(newMove);
-
             // Updates Graphics
-            if (!piecesAlreadyMovedOnGUI)
-            {   // It is important to move the secondary piece first if available.
-                if (newMove.SecondaryCopy is not null)
-                {
-                    ChessPiece secPiece = newMove.SecondaryCopy;
-                    // Interface with the board using coordinates rather than the object.
-                    PictureBox? secBox = Squares[secPiece.CurrentRow, secPiece.CurrentColumn];
+            // It is important to move the secondary piece first if available.
+            if (newMove.SecondaryCopy is not null)
+            {
+                ChessPiece secPiece = newMove.SecondaryCopy;
+                // Interface with the board using coordinates rather than the object.
+                PictureBox? secBox = Squares[secPiece.CurrentRow, secPiece.CurrentColumn];
 
-                    if (secBox is not null)
+                if (secBox is not null)
+                {
+                    if (newMove.CapturingSecondary)
+                    {   // Setting equal to null allows the image to be replaced even if this is an en passant capture.
+                        secBox.Image = null;
+                    }
+                    else if (newMove.CastlingWithSecondary && newMove.NewSecondaryCoords is not null)
                     {
-                        if (newMove.CapturingSecondary)
-                        {   // Setting equal to null allows the image to be replaced even if this is an en passant capture.
-                            secBox.Image = null;
-                        }
-                        else if (newMove.CastlingWithSecondary && newMove.NewSecondaryCoords is not null)
-                        {
-                            Squares[(int)newMove.NewSecondaryCoords?.RowIndex!, (int)newMove.NewSecondaryCoords?.ColumnIndex!]!.Image = secBox.Image;
-                            secBox.Image = null;
-                        }
+                        Squares[(int)newMove.NewSecondaryCoords?.RowIndex!, (int)newMove.NewSecondaryCoords?.ColumnIndex!]!.Image = secBox.Image;
+                        secBox.Image = null;
                     }
                 }
-
-                ChessPiece mainPiece = newMove.MainCopy;
-                PictureBox? mainBox = Squares[mainPiece.CurrentRow, mainPiece.CurrentColumn];
-
-                if (mainBox is not null)
-                {
-                    Squares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex]!.Image = mainBox.Image;
-                    mainBox.Image = null;
-                }
             }
+
+            ChessPiece mainPiece = newMove.MainCopy;
+            PictureBox? mainBox = Squares[mainPiece.CurrentRow, mainPiece.CurrentColumn];
+
+            if (mainBox is not null)
+            {
+                Squares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex]!.Image = mainBox.Image;
+                mainBox.Image = null;
+            }
+
         }
     }
-
     /// <summary>
     /// Determines the available moves for <paramref name="piece"/> and returns the result.
     /// </summary>
@@ -585,7 +591,7 @@ public class GameEnvironment
                             else
                             {
                                 pawnAttackVector = true;
-                                # region Check for possible En Passant captures.
+                                #region Check for possible En Passant captures.
                                 if (piece.IsComparedPieceHostile(GameBoard[piece.CurrentRow, column], out ChessPiece? captureablePawn))
                                 {
                                     if (captureablePawn is not null && captureablePawn.AssignedType.Equals(PieceType.Pawn)

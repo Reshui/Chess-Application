@@ -141,7 +141,7 @@ public class Player
                     }
                     else if (response.CMD == CommandType.NewMove && _activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGame))
                     {
-                        FinalizeAndUpdate(targetedGame, response.MoveDetails!.Value, false);
+                        UpdateGameInstance(targetedGame, response.MoveDetails!.Value, false);
                     }
                 }
             }
@@ -169,10 +169,13 @@ public class Player
     /// <param name="targetGame">Game that chanes will target.</param>
     /// <param name="newMove">MovementInformation used to update <paramref name="targetGame"/>.</param>
     /// <param name="guiAlreadyUpdated"><see langword="true"/> if the GameBoard doesn't need to visually updated to reflect <paramref name="newMove"/>; otherwise, <see langword="false"/>.</param>
-    private void FinalizeAndUpdate(GameEnvironment targetGame, MovementInformation newMove, bool guiAlreadyUpdated)
+    private void UpdateGameInstance(GameEnvironment targetGame, MovementInformation newMove, bool guiAlreadyUpdated)
     {
-        targetGame.ChangeGameBoardAndGUI(newMove, piecesAlreadyMovedOnGUI: guiAlreadyUpdated);
-        if (targetGame.GameEnded) _gui?.DisableGame(targetGame.GameID);
+        targetGame.SubmitFinalizedChange(newMove, piecesAlreadyMovedOnGUI: guiAlreadyUpdated);
+        if (targetGame.GameEnded)
+        {
+            _gui?.DisableGame(targetGame.GameID);
+        }
     }
     /// <summary>
     /// Submits a chess movement <paramref name="move"/> to the <see cref="_connectedServer"/> and updates the relevant <see cref="GameEnvironment"/> instance.
@@ -187,7 +190,7 @@ public class Player
         {
             if (targetedGameInstance.ActiveTeam == move.SubmittingTeam)
             {
-                FinalizeAndUpdate(targetedGameInstance, move, true);
+                UpdateGameInstance(targetedGameInstance, move, guiAlreadyUpdated: true);
 
                 if (_connectedServer is not null && PermitAccessToServer)
                 {
