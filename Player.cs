@@ -244,13 +244,13 @@ public class Player
         UserWantsToQuit = userIsQuitting;
         if (_connectedServer is not null)
         {
-            MainTokenSource.Cancel();
             try
             {   // Command is sent first rather than at the end of client listening because, 
                 // when the token is invoked the stream cannot be sent any more messages.
                 if (PermitAccessToServer && _connectedServer.Connected)
                 {
                     string notifyServerCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ClientDisconnecting));
+
                     await SendClientMessageAsync(notifyServerCommand, _connectedServer, null);
                 }
             }
@@ -258,8 +258,13 @@ public class Player
             {
                 Console.WriteLine("Exception generated when sending disconnect to server.  " + e.ToString());
             }
+            catch (InvalidOperationException e)
+            {
+                Console.WriteLine(e.Message);
+            }
             finally
             {
+                MainTokenSource.Cancel();
                 // If this method wasn't called from StartListeningAsync().
                 if (!calledFromListeningTask)
                 {
