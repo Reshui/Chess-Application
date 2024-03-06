@@ -1,7 +1,6 @@
 namespace Pieces;
 
 using System.Numerics;
-// using Microsoft.VisualBasic.Logging;
 
 public enum GameState
 {
@@ -33,10 +32,6 @@ public class GameEnvironment
     /// <summary>List of submitted moves within the current <see cref="GameEnvironment"/> instance.</summary>
     private readonly List<MovementInformation> _gameMoves = new();
 
-    /// <summary>Server-Side integer used to identify the current <see cref="GameEnvironment"/> instance.</summary>
-    /// <remarks>Value is auto-incremented in the relevant constructors.</remarks>
-    private static int s_instanceNumber = 0;
-
     /// <summary>Gets or initializes an ID number used to track the current instance on the server.</summary>
     /// <value>The ID of the current <see cref="GameEnvironment"/> instance on the server.</value>
     public int GameID { get; init; }
@@ -54,10 +49,6 @@ public class GameEnvironment
     /// <summary>Gets or sets the current game state.</summary>
     /// <value>The current game state.</value>
     public GameState MatchState { get; private set; } = GameState.Playing;
-
-    /// <summary>Returns a boolean that represents if the instance is active and available for playing.</summary>
-    /// <returns><see langword="true"/> if <see cref="MatchState"/> equals <see cref="GameState.Playing"/>; otherwsise, <see langword="false"/>.</returns>
-    private bool IsGameActive { get => MatchState == GameState.Playing; }
 
     /// <summary>Gets a boolean that denotes whether or not a given instance has ended.</summary>
     /// <value><see langword="true"/> if the <see cref="GameEnvironment"/> instance has ended; otherwise, <see langword="false"/>.</value>
@@ -80,25 +71,6 @@ public class GameEnvironment
         PlayerTeam = playerTeam;
 
         _teamPieces = GenerateBoard();
-        AssignKings(out _whiteKing, out _blackKing);
-    }
-
-    /// <summary>
-    /// Constructor used by <see cref="Server"/> instances to track changes of active games and assign teams to <see cref="Player"/> instances.
-    /// </summary>
-    /// <param name="playerOne">First <see cref="Player"/> to be tracked.</param>
-    /// <param name="playerTwo">Second <see cref="Player"/> to track.</param>
-    public GameEnvironment(Player playerOne, Player playerTwo)
-    {
-        _teamPieces = GenerateBoard();
-        GameID = ++s_instanceNumber;
-        var playerList = new List<Player> { playerOne, playerTwo };
-        var rand = new Random();
-        var whitePlayerIndex = rand.Next(playerList.Count);
-
-        AssociatedPlayers.Add(Team.White, playerList[whitePlayerIndex]);
-        AssociatedPlayers.Add(Team.Black, playerList[(whitePlayerIndex + 1) % 2]);
-
         AssignKings(out _whiteKing, out _blackKing);
     }
 
