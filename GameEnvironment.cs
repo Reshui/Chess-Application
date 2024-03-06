@@ -456,12 +456,6 @@ public class GameEnvironment
                     mainBox.Image = null;
                 }
             }
-
-            if (IsGameActive == false)
-            {   // Send notification to GUI.
-                // MatchState already disables user interaction.
-                throw new NotImplementedException("Game ended UI changes/updates haven't been implemented.");
-            }
         }
     }
 
