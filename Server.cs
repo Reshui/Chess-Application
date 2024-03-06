@@ -112,7 +112,7 @@ public class Server
                 _clientListeningTasks.TryAdd(newPlayer.ServerAssignedID, ProcessClientDataAsync(newPlayer, newPlayer.MainTokenSource.Token).ContinueWith(x => ClientRemovalAsync(newPlayer, cancelSourceForPlayer)));
             }
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException)
         {   // Error raised if _serverTasksCancellationToken.IsCancelRequested = true .
             Console.WriteLine($"Locally hosted server: {nameof(_gameServer)}, is shutting down.");
             await Task.WhenAll(_clientListeningTasks.Values);
@@ -236,7 +236,7 @@ public class Server
                                 await SendClientMessageAsync(JsonSerializer.Serialize(startGameCommand), playerDetail.Value.Client, playerDetail.Value.MainTokenSource.Token);
                                 playersAlertedForGame.Add(playerDetail.Value);
                             }
-                            catch (Exception e) when (e is TaskCanceledException || e is IOException || e is ObjectDisposedException)
+                            catch (Exception e) when (e is OperationCanceledException || e is IOException || e is ObjectDisposedException)
                             {   // Failed to message client or client is leaving the server.
                                 matchedPlayers.Remove(playerDetail.Value);
                                 bothPlayersAvailable = false;
@@ -260,7 +260,7 @@ public class Server
                                 {
                                     await SendClientMessageAsync(JsonSerializer.Serialize(notifyOpponentDisconnectCommand), playerWaitingForOpponent.Client!, playerWaitingForOpponent.MainTokenSource.Token);
                                 }
-                                catch (Exception e) when (e is TaskCanceledException || e is IOException || e is ObjectDisposedException)
+                                catch (Exception e) when (e is OperationCanceledException || e is IOException || e is ObjectDisposedException)
                                 {
                                     matchedPlayers.Remove(playerWaitingForOpponent);
                                     try { if (e is not ObjectDisposedException) playerWaitingForOpponent.MainTokenSource.Cancel(); } catch (ObjectDisposedException) { }
@@ -275,7 +275,7 @@ public class Server
             {
                 await Task.Delay(700, ServerTasksCancellationToken);
             }
-            catch (TaskCanceledException)
+            catch (OperationCanceledException)
             {
                 break;
             }
@@ -324,7 +324,7 @@ public class Server
     /// Asynchronously waits for messages from <paramref name="stream"/>.
     /// </summary>
     /// <param name="stream"><see cref="NetworkStream"/> that is awaited for its responses.</param>
-    /// <exception cref="TaskCanceledException">Thrown if <paramref name="token"/> source is cancelled.</exception>
+    /// <exception cref="OperationCanceledException">Thrown if <paramref name="token"/> source is cancelled.</exception>
     /// <exception cref="IOException">Thrown if something goes wrong with <paramref name="stream"/>.ReadAsync().</exception>
     /// <exception cref="OperationCanceledException">Thrown if <paramref name="token"/> is invoked while using .ReadAsync().</exception>
     public static async Task<ServerCommand> RecieveCommandFromStreamAsync(NetworkStream stream, CancellationToken token)
@@ -442,7 +442,7 @@ public class Server
                             {
                                 await SendClientMessageAsync(JsonSerializer.Serialize(clientResponse), opposingUser.Client, opposingUser.MainTokenSource.Token);
                             }
-                            catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is TaskCanceledException)
+                            catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is OperationCanceledException)
                             {
                                 if (!ServerTasksCancellationToken.IsCancellationRequested)
                                 {
@@ -467,7 +467,7 @@ public class Server
                 }
             }
         }
-        catch (Exception e) when (e is IOException || e is TaskCanceledException || e is ObjectDisposedException)
+        catch (Exception e) when (e is IOException || e is OperationCanceledException || e is ObjectDisposedException)
         {   // Client has likely disconnected.
             clientDisconnected = true;
         }
