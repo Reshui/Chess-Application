@@ -14,8 +14,8 @@ public class Server
     /// <summary>Listens for user responses and connections.</summary>
     private readonly TcpListener _gameServer;
 
-    /// <summary>Dictionary of <see cref="GameEnvironment"/> instances that have been started.</summary>
-    private readonly ConcurrentDictionary<int, GameEnvironment> _startedGames = new();
+    /// <summary>Dictionary of <see cref="TrackedGame"/> instances that have been started.</summary>
+    private readonly ConcurrentDictionary<int, TrackedGame> _startedGames = new();
 
     /// <summary>Stores players that are currently waiting for a game.</summary>
     private ConcurrentQueue<Player> _waitingForGameLobby = new();
@@ -75,6 +75,26 @@ public class Server
             {
                 Name = name ?? throw new ArgumentNullException(nameof(name), $"{nameof(name)} value not provided.");
             }
+        }
+    }
+    public class TrackedGame
+    {
+        public Player WhitePlayer { get => AssociatedPlayers[Team.White]; }
+        public Player BlackPlayer { get => AssociatedPlayers[Team.Black]; }
+        public int GameID { get; }
+        public Dictionary<Team, Player> AssociatedPlayers;
+        private static int _gameID = 0;
+        private static Random _rand = new();
+        public TrackedGame(Player playerOne, Player playerTwo)
+        {
+            GameID = ++_gameID;
+            var playerArray = new Player[] { playerOne, playerTwo };
+            int whitePlayerIndex = _rand.Next(playerArray.Length);
+            AssociatedPlayers = new()
+            {
+                {Team.White, playerArray[whitePlayerIndex]},
+                {Team.Black,playerArray[whitePlayerIndex == 1 ? 0 : 1]}
+            };
         }
     }
     public Server()
@@ -224,7 +244,7 @@ public class Server
 
                     if (bothPlayersAvailable)
                     {
-                        var newGame = new GameEnvironment(matchedPlayers[0], matchedPlayers[1]);
+                        var newGame = new TrackedGame(matchedPlayers[0], matchedPlayers[1]);
                         var playersAlertedForGame = new List<Player>();
                         // Inform player code that it should start a GameEnvironment instance.
                         foreach (KeyValuePair<Team, Player> playerDetail in newGame.AssociatedPlayers)
@@ -446,7 +466,7 @@ public class Server
                     }
                     else if (clientResponse.CMD == CommandType.NewMove && clientResponse.MoveDetails is not null && userRegistered)
                     {   // Send user response to the opposing player.
-                        if (_startedGames.TryGetValue(clientResponse.GameIdentifier, out GameEnvironment? currentGame))
+                        if (_startedGames.TryGetValue(clientResponse.GameIdentifier, out TrackedGame? currentGame))
                         {
                             Player opposingUser = currentGame.AssociatedPlayers[GameEnvironment.ReturnOppositeTeam(clientResponse.MoveDetails.Value.SubmittingTeam)];
                             try
@@ -466,9 +486,9 @@ public class Server
                             }
                         }
                     }
-                    else if (_endGameCommands.Contains(clientResponse.CMD) && _startedGames.TryGetValue(clientResponse.GameIdentifier, out GameEnvironment? currentGame))
+                    else if (_endGameCommands.Contains(clientResponse.CMD) && _startedGames.TryGetValue(clientResponse.GameIdentifier, out TrackedGame? currentGame))
                     {
-                        _startedGames.TryRemove(new KeyValuePair<int, GameEnvironment>(currentGame!.GameID, currentGame));
+                        _startedGames.TryRemove(new KeyValuePair<int, TrackedGame>(currentGame!.GameID, currentGame));
                     }
                     else if (clientResponse.CMD == CommandType.ClientDisconnecting)
                     {
@@ -493,14 +513,14 @@ public class Server
 
                 var gameEndingNotificationTasks = new List<Task>();
                 // Send the opposing player a notification about their opponent disconnecting
-                foreach (GameEnvironment game in gamesToDisconnect)
+                foreach (TrackedGame game in gamesToDisconnect)
                 {
-                    bool gameFound = _startedGames.TryRemove(new KeyValuePair<int, GameEnvironment>(game.GameID, game));
+                    bool gameFound = _startedGames.TryRemove(new KeyValuePair<int, TrackedGame>(game.GameID, game));
                     // If !_serverTasksCancellationToken.IsCancellationRequested is true then the server is shutting down and there is no need to notify the opponent.
                     if (gameFound && !ServerTasksCancellationToken.IsCancellationRequested)
                     {
                         clientCommand = new ServerCommand(CommandType.OpponentClientDisconnected, game.GameID);
-                        Player opposingUser = user.Equals(game.AssociatedPlayers[Team.White]) ? game.AssociatedPlayers[Team.Black] : game.AssociatedPlayers[Team.White];
+                        Player opposingUser = user.Equals(game.WhitePlayer) ? game.BlackPlayer : game.WhitePlayer;
                         // CancellationToken.None will be used instead of ServerCancellationToken so that the stream isn't closed in case the client is about to be informed of
                         // Server shutdown.
                         gameEndingNotificationTasks.Add(SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), opposingUser.Client, CancellationToken.None));
