@@ -20,7 +20,7 @@ namespace Chess_GUi
         /// Dictionary used to keep track of started games.
         /// </summary>
         private readonly Dictionary<string, BoardGUI> _boardGuiByName = new();
-        private Task<bool>? _joinServerTask;
+
         // public event StartServerHandlerAsync ServerStart;
         public Form1()
         {
