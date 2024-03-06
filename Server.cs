@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.Eventing.Reader;
 
 public class Server
 {
@@ -128,27 +129,9 @@ public class Server
     /// </summary>
     public async Task CloseServerAsync()
     {
+        // Cancel all listening and waiting tasks.
         try
         {
-            var shutdownNotifications = new List<Task>();
-            string shutdownCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ServerIsShuttingDown));
-            foreach (var user in _connectedPlayers.Values)
-            {
-                try
-                {
-                    shutdownNotifications.Add(SendClientMessageAsync(shutdownCommand, user.Client!, user.MainTokenSource.Token));
-                }
-                catch (ObjectDisposedException)
-                { }
-            }
-
-            try
-            {
-                await Task.WhenAll(shutdownNotifications);
-            }
-            catch (Exception)
-            { }
-            // Cancel all listening and waiting tasks.
             ServerShutDownCancelSource.Cancel();
             _waitingForGameLobby.Clear();
             await Task.WhenAll(_serverTasks);
@@ -167,13 +150,18 @@ public class Server
     /// Removes <paramref name="user"/> from <see cref="_clientListeningTasks"/> and <see cref="_connectedPlayers"/>.
     /// </summary>
     /// <param name="user"><see cref="Player"/> instance that has its references removed.</param>
-    private void ClientRemovalAsync(Player user, CancellationTokenSource userPersonalSource)
+    private async Task ClientRemovalAsync(Player user, CancellationTokenSource userPersonalSource)
     {
         // Cancel the listening for response task and dispose of the token.
         if (_connectedPlayers.TryRemove(new KeyValuePair<int, Player>(user.ServerAssignedID, user)))
         {
             // If server is shutting down then send a shutdown message.
-            if (!ServerShutDownCancelSource.IsCancellationRequested && _waitingForGameLobby.Contains(user))
+            if (ServerTasksCancellationToken.IsCancellationRequested)
+            {
+                string shutdownCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ServerIsShuttingDown));
+                await SendClientMessageAsync(shutdownCommand, user.Client!, user.MainTokenSource.Token);
+            }
+            else if (_waitingForGameLobby.Contains(user))
             {   // Remove user from the LFG queue.
                 _waitingForGameLobby = new ConcurrentQueue<Player>(_waitingForGameLobby.Where(x => !x.Equals(user)));
             }
