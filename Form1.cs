@@ -31,9 +31,17 @@ namespace Chess_GUi
 
         private async void Form1_FormClosing(object sender, EventArgs evnt)
         {
-            if (_localPlayer is not null) { await _localPlayer.CloseConnectionToServerAsync(true, false); _localPlayer = null; }
+            if (_localPlayer is not null)
+            {
+                await _localPlayer.CloseConnectionToServerAsync(true, false);
+                _localPlayer = null;
+            }
 
-            if (_hostedServer is not null) { await _hostedServer.CloseServerAsync(); _hostedServer = null; }
+            if (_hostedServer is not null)
+            {
+                await _hostedServer.CloseServerAsync();
+                _hostedServer = null;
+            }
         }
         private void StartServer_Click(object sender, EventArgs e)
         {
