@@ -33,13 +33,13 @@ namespace Chess_GUi
         {
             if (_localPlayer is not null)
             {
-                await _localPlayer.CloseConnectionToServerAsync(true, false);
+                await _localPlayer.CloseConnectionToServerAsync(true, false).ConfigureAwait(false);
                 _localPlayer = null;
             }
 
             if (_hostedServer is not null)
             {
-                await _hostedServer.CloseServerAsync();
+                await _hostedServer.CloseServerAsync().ConfigureAwait(false);
                 _hostedServer = null;
             }
         }
