@@ -95,7 +95,7 @@ namespace Chess_GUi
         }
 
         /// <summary>
-        /// 
+        /// Disables any GUI that uses <paramref name="gameID"/> as a name.
         /// </summary>
         /// <param name="gameID"><see cref="GameEnvironment.GameID"/> of game to target.</param>
         /// <exception cref="NotImplementedException"></exception>
