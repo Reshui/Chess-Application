@@ -208,7 +208,7 @@ public class Server
                         }
                     }
 
-                    while (bothPlayersAvailable)
+                    while (bothPlayersAvailable && clientPingingTasks.Count > 0)
                     {
                         var completedTask = await Task.WhenAny(clientPingingTasks);
 

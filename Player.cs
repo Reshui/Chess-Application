@@ -150,7 +150,7 @@ public class Player
         {   // Couldn't reach host.
             Console.WriteLine("Host has disconnected.");
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException)
         {
             // User has decided to disconnect using CloseConnectionToServerAsync().
             // Server has already been notified or will be.
@@ -186,7 +186,7 @@ public class Player
                         await SendClientMessageAsync(submissionCommand, _connectedServer, MainTokenSource.Token);
                         if (targetedGameInstance.GameEnded) _gui?.DisableGame(targetedGameInstance.GameID);
                     }
-                    catch (Exception e) when (e is IOException || e is TaskCanceledException || e is NullReferenceException)
+                    catch (Exception e) when (e is IOException || e is OperationCanceledException || e is NullReferenceException)
                     {
                         targetedGameInstance.ChangeGameState(GameState.ServerUnavailable);
                         IOException? newIOException = default;
@@ -196,7 +196,7 @@ public class Player
                             PermitAccessToServer = false;
                             newIOException = new IOException("Unable to contact server.", e);
                         }
-                        else if (!UserWantsToQuit && e is TaskCanceledException)
+                        else if (!UserWantsToQuit && e is OperationCanceledException)
                         {
                             // Token was cancelled in either CloseConnectionToServerAsync() or a server shut down command was recieved.
                             newIOException = new IOException("The server is shutting down.", e);
