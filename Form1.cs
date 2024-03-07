@@ -45,11 +45,11 @@ namespace Chess_GUi
                         Console.WriteLine(e);
                     }
                     _localPlayer = null;
+                    if (_hostedServer is not null) await Task.Delay(1000);
                 }
 
                 if (_hostedServer is not null)
                 {
-                    await Task.Delay(2000);
                     await _hostedServer.CloseServerAsync();
                     _hostedServer = null;
                 }
