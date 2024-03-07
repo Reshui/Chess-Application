@@ -51,6 +51,7 @@ public class Player
 
     /// <summary>List used to track long-running asynchronous tasks started by the Player instance.</summary>
     private Task? _listenForServerTask;
+    public Task? PingConnectedClientTask { get; set; }
 
     /// <summary>
     /// Gets or sets a boolean that describes if the user wants to quit playing.
