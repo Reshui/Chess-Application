@@ -268,6 +268,7 @@ public class Player
             try
             {   // Command is sent first rather than at the end of client listening because, 
                 // when the token is invoked the stream cannot be sent any more messages.
+                PersonalSource.Cancel();
                 if (PermitAccessToServer && _connectedServer.Connected)
                 {
                     string notifyServerCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ClientDisconnecting));
@@ -284,7 +285,6 @@ public class Player
             }
             finally
             {
-                PersonalSource.Cancel();
                 // If this method wasn't called from StartListeningAsync() then wait for that Task to finish.
                 if (!calledFromListeningTask)
                 {
