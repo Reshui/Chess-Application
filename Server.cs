@@ -239,7 +239,6 @@ public class Server
     /// Monitors <see cref="_waitingForGameLobby"/> for added <see cref="Player"/> instances and 
     /// notifies users when a game is available.
     /// </summary>
-    /// <remarks>When 2 <see cref="Player"/> instances are in the queue they are matched and then removed from the queue.</remarks>
     private async Task MonitorLFGLobbyAsync()
     {
         List<Player> matchedPlayers = new() { Capacity = 2 };
@@ -259,7 +258,7 @@ public class Server
                     {
                         try
                         {
-                            clientPingingTasks.Add(IsClientActiveAsync(user.Client, user.PersonalSource.Token));
+                            clientPingingTasks.Add(IsClientActiveAsync(user.Client, user.CombinedSource!.Token));
                         }
                         catch (ObjectDisposedException)
                         {
@@ -284,7 +283,8 @@ public class Server
                             {
                                 user.PersonalSource.Cancel();
                             }
-                            catch (ObjectDisposedException) { }
+                            catch (ObjectDisposedException)
+                            { }
                             bothPlayersAvailable = false;
                         }
                         clientPingingTasks.Remove(completedTask);
@@ -303,21 +303,24 @@ public class Server
                                 await SendClientMessageAsync(JsonSerializer.Serialize(startGameCommand), playerDetail.Value.Client, playerDetail.Value.CombinedSource!.Token);
                                 playersAlertedForGame.Add(playerDetail.Value);
                             }
-                            catch (Exception e) when (e is OperationCanceledException || e is IOException || e is ObjectDisposedException)
-                            {   // Failed to message client or client is leaving the server.
+                            catch (Exception e) when (e is OperationCanceledException || e is IOException || e is ObjectDisposedException || e is InvalidOperationException)
+                            {
+                                // Failed to message client or client is leaving the server.
                                 matchedPlayers.Remove(playerDetail.Value);
                                 bothPlayersAvailable = false;
+
+                                if (e is InvalidOperationException)
+                                {
+                                    Console.WriteLine("Monitor LFG: InvalidOperationException while attempting start game notification.  " + e.Message);
+                                }
+
                                 try
                                 {
                                     if (e is not ObjectDisposedException) playerDetail.Value.PersonalSource.Cancel();
                                 }
-                                catch (ObjectDisposedException) { }
+                                catch (ObjectDisposedException)
+                                { }
                                 break;
-                            }
-                            catch (NullReferenceException e)
-                            {
-                                Console.WriteLine(e);
-                                throw;
                             }
                         }
                         // If there are no problems with notifying both players to start the game then track the game and clear the matchedPlayers list.
@@ -336,14 +339,21 @@ public class Server
                                 {
                                     await SendClientMessageAsync(JsonSerializer.Serialize(notifyOpponentDisconnectCommand), playerWaitingForOpponent.Client!, playerWaitingForOpponent.CombinedSource!.Token);
                                 }
-                                catch (Exception e) when (e is OperationCanceledException || e is IOException || e is ObjectDisposedException)
+                                catch (Exception e) when (e is OperationCanceledException || e is IOException || e is ObjectDisposedException || e is InvalidOperationException)
                                 {
                                     matchedPlayers.Remove(playerWaitingForOpponent);
+
+                                    if (e is InvalidOperationException)
+                                    {
+                                        Console.WriteLine("Monitor LFG: Failed to send opponent disconnect message.");
+                                    }
+
                                     try
                                     {
                                         if (e is not ObjectDisposedException) playerWaitingForOpponent.PersonalSource.Cancel();
                                     }
-                                    catch (ObjectDisposedException) { }
+                                    catch (ObjectDisposedException)
+                                    { }
                                 }
                             }
                         }
