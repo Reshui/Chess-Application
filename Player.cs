@@ -92,6 +92,7 @@ public class Player
         {
             return false;
         }
+        PingConnectedClientTask = PingClientAsync(_connectedServer, PersonalSource, PersonalSource.Token);
         _listenForServerTask = StartListeningAsync();
         return true;
     }
@@ -154,8 +155,8 @@ public class Player
         }
         catch (OperationCanceledException)
         {
-            // User has decided to disconnect using CloseConnectionToServerAsync().
-            // Server has already been notified or will be.
+            // Unable to reach server in ping task.
+            if (!UserWantsToQuit) PermitAccessToServer = false;
         }
         catch (InvalidOperationException e)
         {
@@ -164,8 +165,10 @@ public class Player
         finally
         {
             // Function has already been called if true.
-            //Console.WriteLine($"[Player]- Connection to server status at listening close: {_connectedServer.Connected}");
-            if (!UserWantsToQuit) await CloseConnectionToServerAsync(false, true);
+            if (!UserWantsToQuit)
+            {
+                await CloseConnectionToServerAsync(userIsQuitting: false, calledFromListeningTask: true);
+            }
         }
     }
 
@@ -269,7 +272,6 @@ public class Player
         UserWantsToQuit = userIsQuitting;
         if (_connectedServer is not null)
         {
-            PersonalSource.Cancel();
             try
             {   // Command is sent first rather than at the end of client listening because, 
                 // when the token is invoked the stream cannot be sent any more messages.                
@@ -289,11 +291,18 @@ public class Player
             }
             finally
             {
+                PersonalSource.Cancel();
                 // If this method wasn't called from StartListeningAsync() then wait for that Task to finish.
                 if (!calledFromListeningTask && _listenForServerTask is not null)
                 {
                     await _listenForServerTask;
                 }
+
+                if (PingConnectedClientTask is not null)
+                {
+                    await PingConnectedClientTask;
+                }
+
                 PersonalSource.Dispose();
                 _connectedServer.Close();
                 _connectedServer = null;
