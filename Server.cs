@@ -9,6 +9,7 @@ using System.Collections.Concurrent;
 
 public class Server
 {
+    private const int MaxConnectionCount = 20;
     /// <summary>List of connected <see cref="TcpClient"/> instances to the current <see cref="Server"/> instance.</summary>
     private readonly ConcurrentDictionary<int, Player> _connectedPlayers = new();
 
@@ -43,7 +44,7 @@ public class Server
     public enum CommandType
     {
         ClientDisconnecting, NewMove, OpponentClientDisconnected, StartGameInstance, DeclareForefit, LookingForGame, ServerIsShuttingDown,
-        DeclareWin, DeclareLoss, DeclareStaleMate, RegisterUser, SuccessfullyRegistered
+        DeclareWin, DeclareLoss, DeclareStaleMate, RegisterUser, DeniedAccessToServer
     }
     [Serializable]
     public class ServerCommand
@@ -125,17 +126,24 @@ public class Server
             _gameServer.Start();
             while (!ServerTasksCancellationToken.IsCancellationRequested)
             {
-                TcpClient newClient = await _gameServer.AcceptTcpClientAsync(ServerTasksCancellationToken);
-                var cancelSourceForPlayer = new CancellationTokenSource();
-                // Note: Don't call cancel on this CancellationTokenSource, just monitor the token.
-                var serverAndPlayerSource = CancellationTokenSource.CreateLinkedTokenSource(cancelSourceForPlayer.Token, ServerTasksCancellationToken);
-
-                var newPlayer = new Player(newClient, cancelSourceForPlayer, serverAndPlayerSource)
+                TcpClient newClient = await _gameServer.AcceptTcpClientAsync(ServerTasksCancellationToken).ConfigureAwait(false);
+                if (_connectedPlayers.Count < MaxConnectionCount)
                 {
-                    PingConnectedClientTask = PingClientAsync(newClient, cancelSourceForPlayer, serverAndPlayerSource.Token)
-                };
-                _connectedPlayers.TryAdd(newPlayer.ServerAssignedID, newPlayer);
-                _clientListeningTasks.TryAdd(newPlayer.ServerAssignedID, ListenForPlayerResponseAsync(newPlayer));
+                    var cancelSourceForPlayer = new CancellationTokenSource();
+                    // Note: Don't call cancel on this CancellationTokenSource, just monitor the token.
+                    var serverAndPlayerSource = CancellationTokenSource.CreateLinkedTokenSource(cancelSourceForPlayer.Token, ServerTasksCancellationToken);
+
+                    var newPlayer = new Player(newClient, cancelSourceForPlayer, serverAndPlayerSource)
+                    {
+                        PingConnectedClientTask = PingClientAsync(newClient, cancelSourceForPlayer, serverAndPlayerSource.Token)
+                    };
+                    _connectedPlayers.TryAdd(newPlayer.ServerAssignedID, newPlayer);
+                    _clientListeningTasks.TryAdd(newPlayer.ServerAssignedID, ListenForPlayerResponseAsync(newPlayer));
+                }
+                else
+                {
+                    // To Do: Send a server full message.
+                }
             }
         }
         catch (OperationCanceledException)
@@ -612,8 +620,7 @@ public class Server
         }
         catch (InvalidOperationException e)
         {
-            Console.WriteLine(e);
-            throw;
+            Console.WriteLine(e.Message);
         }
         catch (Exception e)
         {
