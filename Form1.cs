@@ -16,6 +16,7 @@ namespace Chess_GUi
         private Server? _hostedServer;
         private Player? _localPlayer;
 
+        private bool _allowClose = false;
         /// <summary>
         /// Dictionary used to keep track of started games.
         /// </summary>
@@ -25,23 +26,37 @@ namespace Chess_GUi
         public Form1()
         {
             InitializeComponent();
-            this.FormClosing += new FormClosingEventHandler(this.Form1_FormClosing!);
-            //this.JoinServer.Click += new EventHandler();
+            this.FormClosing += new FormClosingEventHandler(this.HandleDisconnectsAsync!);
         }
 
-        private async void Form1_FormClosing(object sender, EventArgs evnt)
+        private async void HandleDisconnectsAsync(object sender, FormClosingEventArgs evnt)
         {
-            if (_localPlayer is not null)
+            if (!_allowClose)
             {
-                await _localPlayer.CloseConnectionToServerAsync(true, false).ConfigureAwait(false);
-                _localPlayer = null;
+                evnt.Cancel = true;
+                if (_localPlayer is not null)
+                {
+                    try
+                    {
+                        await _localPlayer.CloseConnectionToServerAsync(true, false);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e);
+                    }
+                    _localPlayer = null;
+                }
+
+                if (_hostedServer is not null)
+                {
+                    await Task.Delay(2000);
+                    await _hostedServer.CloseServerAsync();
+                    _hostedServer = null;
+                }
+                _allowClose = true;
+                this.Close();
             }
 
-            if (_hostedServer is not null)
-            {
-                await _hostedServer.CloseServerAsync().ConfigureAwait(false);
-                _hostedServer = null;
-            }
         }
         private void StartServer_Click(object sender, EventArgs e)
         {
