@@ -400,6 +400,7 @@ public class Server
     /// Asynchronously waits for messages from <paramref name="stream"/>.
     /// </summary>
     /// <param name="stream"><see cref="NetworkStream"/> that is awaited for its responses.</param>
+    /// <param name="token">CancellationToken used to cancel asynchronous operations.</param>
     /// <exception cref="OperationCanceledException">Thrown if <paramref name="token"/> source is cancelled.</exception>
     /// <exception cref="IOException">Thrown if something goes wrong with <paramref name="stream"/>.ReadAsync().</exception>
     /// <exception cref="OperationCanceledException">Thrown if <paramref name="token"/> is invoked while using .ReadAsync().</exception>
@@ -498,7 +499,7 @@ public class Server
         {
             while (!clientDisconnected && !(user.CombinedSource?.IsCancellationRequested ?? true))
             {
-                ServerCommand clientResponse = await RecieveCommandFromStreamAsync(stream, user.CombinedSource.Token);//.ConfigureAwait(false);
+                ServerCommand clientResponse = await RecieveCommandFromStreamAsync(stream, user.CombinedSource.Token).ConfigureAwait(false);
 
                 if (clientResponse is not null)
                 {
@@ -600,8 +601,8 @@ public class Server
                             gameEndingNotificationTasks.Add(SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), opposingUser.Client, opposingUser.PersonalSource.Token));
                         }
                         catch (ObjectDisposedException)
-                        {
-                            // opposingUser.Token has been Disposed.
+                        {   // opposingUser.Token has been Disposed.
+                            break;
                         }
                     }
                 }
@@ -610,13 +611,8 @@ public class Server
                 {
                     if (gameEndingNotificationTasks.Any()) await Task.WhenAll(gameEndingNotificationTasks);
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
-                    Console.WriteLine(e);
-                    /*foreach (var failedTask in gameEndingNotificationTasks.Where(x => x.Faulted))
-                    {
-                        catch (InvalidOperationException e)
-                    }*/
                 }
             }
             await ClientRemovalAsync(user);
