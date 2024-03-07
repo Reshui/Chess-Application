@@ -50,7 +50,7 @@ public class Player
     private readonly Form1? _gui;
 
     /// <summary>List used to track long-running asynchronous tasks started by the Player instance.</summary>
-    private readonly List<Task>? _asyncListeningTask;
+    private Task? _listenForServerTask;
 
     /// <summary>
     /// Gets or sets a boolean that describes if the user wants to quit playing.
@@ -64,7 +64,6 @@ public class Player
     {
         _hostPort = 13000;
         _hostAddress = "127.0.0.1";
-        _asyncListeningTask = new();
         _gui = gui;
         PersonalSource = cancelSource;
     }
@@ -92,7 +91,7 @@ public class Player
         {
             return false;
         }
-        _asyncListeningTask?.Add(StartListeningAsync());
+        _listenForServerTask = StartListeningAsync();
         return true;
     }
 
@@ -104,7 +103,7 @@ public class Player
         var token = PersonalSource.Token;
         PermitAccessToServer = true;
         // Get a client stream for reading and writing.
-        using NetworkStream stream = _connectedServer!.GetStream();
+        NetworkStream stream = _connectedServer!.GetStream();
 
         try
         {
@@ -157,9 +156,14 @@ public class Player
             // User has decided to disconnect using CloseConnectionToServerAsync().
             // Server has already been notified or will be.
         }
+        catch (InvalidOperationException e)
+        {
+            Console.WriteLine("Waiting for server response failed. " + e.Message);
+        }
         finally
         {
             // Function has already been called if true.
+            //Console.WriteLine($"[Player]- Connection to server status at listening close: {_connectedServer.Connected}");
             if (!UserWantsToQuit) await CloseConnectionToServerAsync(false, true);
         }
     }
@@ -264,10 +268,10 @@ public class Player
         UserWantsToQuit = userIsQuitting;
         if (_connectedServer is not null)
         {
+            PersonalSource.Cancel();
             try
             {   // Command is sent first rather than at the end of client listening because, 
-                // when the token is invoked the stream cannot be sent any more messages.
-                PersonalSource.Cancel();
+                // when the token is invoked the stream cannot be sent any more messages.                
                 if (PermitAccessToServer)
                 {
                     string notifyServerCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ClientDisconnecting));
@@ -280,20 +284,20 @@ public class Player
             }
             catch (InvalidOperationException e)
             {
-                Console.WriteLine(e.Message);
+                Console.WriteLine("Failed to notify server of disconnect. " + e.Message);
             }
             finally
             {
                 // If this method wasn't called from StartListeningAsync() then wait for that Task to finish.
-                if (!calledFromListeningTask)
+                if (!calledFromListeningTask && _listenForServerTask is not null)
                 {
-                    if (_asyncListeningTask is not null && _asyncListeningTask.Count > 0) await Task.WhenAll(_asyncListeningTask);
+                    await _listenForServerTask;
                 }
                 PersonalSource.Dispose();
                 _connectedServer.Close();
                 _connectedServer = null;
+                if (!UserWantsToQuit) _gui?.ServerIsUnreachable();
             }
-            if (!UserWantsToQuit) _gui?.ServerIsUnreachable();
         }
     }
 }

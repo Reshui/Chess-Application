@@ -148,7 +148,7 @@ public class Server
             finally
             {
                 _gameServer.Stop();
-                Console.WriteLine("Server has shutdown.");
+                Console.WriteLine("[Server]: Server has shutdown.");
             }
         }
     }
@@ -161,7 +161,7 @@ public class Server
         // Cancel all listening and waiting tasks.
         try
         {
-            Console.WriteLine("Attempting server shutdown.");
+            Console.WriteLine("[Server]: Attempting server shutdown.");
             ServerShutDownCancelSource.Cancel();
             _waitingForGameLobby.Clear();
             await Task.WhenAll(_serverTasks);
@@ -184,14 +184,13 @@ public class Server
     {
         if (_connectedPlayers.TryRemove(new KeyValuePair<int, Player>(user.ServerAssignedID, user)))
         {
-            Console.WriteLine($"{user.Name}  Cancellation Token Status; Server: ( {ServerTasksCancellationToken.IsCancellationRequested} ) , Personal: ( {user.PersonalSource.IsCancellationRequested} ) , Connected: {user.Client.Connected}");
+            Console.WriteLine($"[Server]: {user.Name}  Cancellation Token Status; Server: ( {ServerTasksCancellationToken.IsCancellationRequested} ) , Personal: ( {user.PersonalSource.IsCancellationRequested} ) , Connected: {user.Client.Connected}");
             try
             {
                 // If server is shutting down then send a shutdown message.
                 if (ServerTasksCancellationToken.IsCancellationRequested && !user.PersonalSource.IsCancellationRequested)
                 {
                     bool success = false;
-                    Console.WriteLine($"Attempting shutdown notification => {user.Name}");
                     string shutdownCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ServerIsShuttingDown));
                     try
                     {
@@ -200,19 +199,19 @@ public class Server
                     }
                     catch (IOException)
                     {
-                        Console.WriteLine($"{user.Name} => couldn't be reached for shutdown notification.\n\n");
+                        Console.WriteLine($"[Server]: {user.Name} => couldn't be reached for shutdown notification.\n\n");
                     }
                     catch (InvalidOperationException e)
                     {
-                        Console.WriteLine($"{user.Name}: InvalidOperationException =>" + e.Message);
+                        Console.WriteLine($"[Server]: {user.Name}: InvalidOperationException =>" + e.Message);
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine("Server Failed to send shutdown message.\n\n" + e.Message);
+                        Console.WriteLine("[Server]: Server Failed to send shutdown message.\n\n" + e.Message);
                     }
                     finally
                     {
-                        if (success) Console.WriteLine($"Shutdown notification sent => {user.Name}");
+                        if (success) Console.WriteLine($"[Server]: Shutdown notification sent => {user.Name}");
                     }
                 }
                 else if (_waitingForGameLobby.Contains(user))
@@ -230,7 +229,7 @@ public class Server
                 user.PersonalSource.Dispose();
                 user.CombinedSource?.Dispose();
                 user.Client.Close();
-                Console.WriteLine($"{user.Name} has disconnected from the server.");
+                Console.WriteLine($"[Server]: {user.Name} has disconnected from the server.");
             }
         }
     }
@@ -311,7 +310,7 @@ public class Server
 
                                 if (e is InvalidOperationException)
                                 {
-                                    Console.WriteLine("Monitor LFG: InvalidOperationException while attempting start game notification.  " + e.Message);
+                                    Console.WriteLine("[Server]: Monitor LFG: InvalidOperationException while attempting start game notification.  " + e.Message);
                                 }
 
                                 try
@@ -345,7 +344,7 @@ public class Server
 
                                     if (e is InvalidOperationException)
                                     {
-                                        Console.WriteLine("Monitor LFG: Failed to send opponent disconnect message.");
+                                        Console.WriteLine("[Server]: Monitor LFG: Failed to send opponent disconnect message.");
                                     }
 
                                     try
@@ -506,7 +505,7 @@ public class Server
     /// <param name="user"><see cref="Player"/> instance that is monitored for its responses.</param>
     private async Task ListenForPlayerResponseAsync(Player user)
     {
-        using NetworkStream stream = user.Client.GetStream();
+        NetworkStream stream = user.Client.GetStream();
 
         (bool clientDisconnected, bool userRegistered) = (false, false);
         try
@@ -524,7 +523,9 @@ public class Server
                         {
                             user.AssignName(clientResponse.Name! + $" > {user.ServerAssignedID}");
                             userRegistered = true;
-                            Console.WriteLine($"{user.Name} has registered.");
+                            Console.WriteLine($"[Server]: {user.Name} has registered.");
+                            // Just acknowledge.
+                            await IsClientActiveAsync(user.Client, user.PersonalSource.Token);
                         }
                         catch (Exception)
                         { // Thrown if Name already has a value.
@@ -571,7 +572,7 @@ public class Server
                     {
                         user.PersonalSource.Cancel();
                         clientDisconnected = true;
-                        Console.WriteLine($"{user.Name} has sent disconnect.");
+                        Console.WriteLine($"[Server]: {user.Name} has sent disconnect.");
                     }
                 }
             }
@@ -587,7 +588,7 @@ public class Server
         }
         catch (Exception e)
         {
-            Console.WriteLine("Unhandled exception in ListenForPlayerResponsesAsync\n" + e);
+            Console.WriteLine("[Server]: Unhandled exception in ListenForPlayerResponsesAsync\n" + e);
             throw;
         }
         finally
@@ -595,7 +596,6 @@ public class Server
             // Gather all the games that user is taking part in and notify the opponent of the user's disconnect.
             if (!ServerTasksCancellationToken.IsCancellationRequested)
             {
-
                 var gamesToDisconnect = from game in _startedGames.Values
                                         where game.AssociatedPlayers.ContainsValue(user)
                                         select game;
