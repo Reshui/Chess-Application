@@ -110,22 +110,24 @@ public class Server
     /// </summary>
     public void StartServer()
     {
-        _serverTasks.Add(WaitForClientsAsync());
+        _serverTasks.Add(ListenFornNewConnectionsAsync());
         _serverTasks.Add(MonitorLFGLobbyAsync());
     }
 
     /// <summary>
-    /// Asynchronously waits for <see cref="TcpClient"/> connections to <see cref="_gameServer"/>.
+    /// Starts <see cref="_gameServer"/> and creates <see cref="Player"/> instances for every <see cref="TcpClient"/> that attempts to connect.
     /// </summary>
-    private async Task WaitForClientsAsync()
+    /// <returns>An asynchronous Task.</returns>
+    private async Task ListenFornNewConnectionsAsync()
     {
         try
         {
             _gameServer.Start();
-            while (true)
+            while (!ServerTasksCancellationToken.IsCancellationRequested)
             {
                 TcpClient newClient = await _gameServer.AcceptTcpClientAsync(ServerTasksCancellationToken);
                 var cancelSourceForPlayer = new CancellationTokenSource();
+                // Note: Don't call cancel on this CancellationTokenSource, just monitor the token.
                 var serverAndPlayerSource = CancellationTokenSource.CreateLinkedTokenSource(cancelSourceForPlayer.Token, ServerTasksCancellationToken);
 
                 var newPlayer = new Player(newClient, cancelSourceForPlayer, serverAndPlayerSource)
@@ -139,6 +141,11 @@ public class Server
         catch (OperationCanceledException)
         {   // Error raised if _serverTasksCancellationToken.IsCancelRequested = true.
         }
+        catch (SocketException)
+        {
+            ServerShutDownCancelSource.Cancel();
+            throw;
+        }
         finally
         {
             try
@@ -149,14 +156,10 @@ public class Server
             {
                 Console.WriteLine(e);
             }
-            finally
-            {
-                _gameServer.Stop();
-                Console.WriteLine("[Server]: Server has shutdown.");
-            }
+            _gameServer.Stop();
+            Console.WriteLine("[Server]: Server has shutdown.");
         }
     }
-
     /// <summary>
     /// Stops all server tasks and notifies connected <see cref="TcpClient"/>s that the server has shut down.
     /// </summary>
@@ -186,7 +189,7 @@ public class Server
     /// <param name="user"><see cref="Player"/> instance that has its references removed.</param>
     private async Task ClientRemovalAsync(Player user)
     {
-        if (_connectedPlayers.TryRemove(new KeyValuePair<int, Player>(user.ServerAssignedID, user)))
+        if (_connectedPlayers.TryRemove(user.ServerAssignedID, out _) && _clientListeningTasks.TryRemove(user.ServerAssignedID, out _))
         {
             Console.WriteLine($"[Server]: {user.Name}  Cancellation Token Status; Server: ( {ServerTasksCancellationToken.IsCancellationRequested} ) , Personal: ( {user.PersonalSource.IsCancellationRequested} ) , Connected: {user.Client.Connected}");
             try
@@ -201,9 +204,10 @@ public class Server
                         await SendClientMessageAsync(shutdownCommand, user.Client!, user.PersonalSource.Token);
                         success = true;
                     }
-                    catch (IOException)
+                    catch (IOException e)
                     {
                         Console.WriteLine($"[Server]: {user.Name} => couldn't be reached for shutdown notification.\n\n");
+                        GetPossibleSocketErrorCode(e, true);
                     }
                     catch (InvalidOperationException e)
                     {
@@ -221,7 +225,6 @@ public class Server
 
                 user.PersonalSource.Cancel();
                 if (_waitingForGameLobby.Contains(user))
-
                 {   // Remove user from the LFG queue.
                     _waitingForGameLobby = new ConcurrentQueue<Player>(_waitingForGameLobby.Where(x => !x.Equals(user)));
                 }
@@ -309,30 +312,40 @@ public class Server
                         foreach (KeyValuePair<Team, Player> playerDetail in newGame.AssociatedPlayers)
                         {
                             var startGameCommand = new ServerCommand(CommandType.StartGameInstance, newGame.GameID, assignedTeam: playerDetail.Key);
+                            bool success = false;
                             try
                             {
                                 await SendClientMessageAsync(JsonSerializer.Serialize(startGameCommand), playerDetail.Value.Client, playerDetail.Value.CombinedSource!.Token);
                                 playersAlertedForGame.Add(playerDetail.Value);
+                                success = true;
                             }
-                            catch (Exception e) when (e is OperationCanceledException || e is IOException || e is ObjectDisposedException || e is InvalidOperationException)
+                            catch (Exception e) when (e is OperationCanceledException || e is ObjectDisposedException)
+                            {
+
+                            }
+                            catch (InvalidOperationException e)
+                            {
+                                Console.WriteLine("[Server]: Monitor LFG: InvalidOperationException while attempting start game notification.  " + e.Message);
+                            }
+                            catch (IOException e)
+                            {
+                                GetPossibleSocketErrorCode(e, true);
+                            }
+                            catch (Exception)
+                            {
+                            }
+
+                            if (!success)
                             {
                                 // Failed to message client or client is leaving the server.
                                 matchedPlayers.Remove(playerDetail.Value);
                                 bothPlayersAvailable = false;
-
-                                if (e is InvalidOperationException)
+                                try
                                 {
-                                    Console.WriteLine("[Server]: Monitor LFG: InvalidOperationException while attempting start game notification.  " + e.Message);
+                                    playerDetail.Value.PersonalSource.Cancel();
                                 }
-                                else if (e is not ObjectDisposedException)
-                                {
-                                    try
-                                    {
-                                        playerDetail.Value.PersonalSource.Cancel();
-                                    }
-                                    catch (ObjectDisposedException)
-                                    { }
-                                }
+                                catch (ObjectDisposedException)
+                                { }
                                 break;
                             }
                         }
@@ -354,6 +367,7 @@ public class Server
                                 }
                                 catch (Exception e) when (e is OperationCanceledException || e is IOException || e is ObjectDisposedException || e is InvalidOperationException)
                                 {
+                                    GetPossibleSocketErrorCode(e, true);
                                     matchedPlayers.Remove(playerWaitingForOpponent);
 
                                     if (e is InvalidOperationException)
@@ -439,8 +453,8 @@ public class Server
         do
         {
             // Incoming messages contain the length of the message in bytes within the first 4 bytes.
-            byte[] adjustableBytesReciever = new byte[sizeof(int)];
-            int totalRecieved = -1 * adjustableBytesReciever.Length, incomingMessageByteCount = 0;
+            byte[] buffer = new byte[sizeof(int)];
+            int totalRecieved = -1 * buffer.Length, incomingMessageByteCount = 0;
             bool byteCountRecieved = false;
 
             do
@@ -450,7 +464,7 @@ public class Server
                     if (stream.DataAvailable && !token.IsCancellationRequested)
                     {
                         // If a token passed to ReadAsync is cancelled then the connection will be closed.
-                        responseByteCount = await stream.ReadAsync(adjustableBytesReciever, CancellationToken.None);
+                        responseByteCount = await stream.ReadAsync(buffer, CancellationToken.None);
                         break;
                     }
                     else
@@ -468,7 +482,7 @@ public class Server
                         {
                             try
                             {   // Verify that the first 4 bytes are a number.
-                                incomingMessageByteCount = BitConverter.ToInt32(adjustableBytesReciever, 0);
+                                incomingMessageByteCount = BitConverter.ToInt32(buffer, 0);
                             }
                             catch (Exception)
                             {
@@ -477,12 +491,12 @@ public class Server
                             totalRecieved += responseByteCount;
                             byteCountRecieved = true;
                             // Resize the array to fit incoming data.
-                            adjustableBytesReciever = new byte[incomingMessageByteCount];
+                            buffer = new byte[incomingMessageByteCount];
                         }
                     }
                     else
                     {
-                        string textSection = Encoding.ASCII.GetString(adjustableBytesReciever, 0, responseByteCount);
+                        string textSection = Encoding.ASCII.GetString(buffer, 0, responseByteCount);
                         // If the expected number of bytes has been read then attempt to deserialize it into a ServerCommand
                         if ((totalRecieved += responseByteCount) == incomingMessageByteCount)
                         {   // All message bytes have been recieved.
@@ -521,11 +535,11 @@ public class Server
     {
         NetworkStream stream = user.Client.GetStream();
 
-        (bool clientDisconnected, bool userRegistered) = (false, false);
+        bool userRegistered = false;
         try
         {
             //using var combinedSource = CancellationTokenSource.CreateLinkedTokenSource(ServerTasksCancellationToken, user.PersonalSource.Token);
-            while (!clientDisconnected && !(user.CombinedSource?.IsCancellationRequested ?? true))
+            while (!(user.CombinedSource?.IsCancellationRequested ?? true))
             {
                 ServerCommand clientResponse = await RecieveCommandFromStreamAsync(stream, user.CombinedSource.Token).ConfigureAwait(false);
 
@@ -559,6 +573,7 @@ public class Server
                             }
                             catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is OperationCanceledException)
                             {
+                                GetPossibleSocketErrorCode(e, true);
                                 // Failed to notify user.
                                 if (!ServerTasksCancellationToken.IsCancellationRequested)
                                 {
@@ -583,15 +598,17 @@ public class Server
                     else if (clientResponse.CMD == CommandType.ClientDisconnecting)
                     {
                         user.PersonalSource.Cancel();
-                        clientDisconnected = true;
                         Console.WriteLine($"[Server]: {user.Name} has sent disconnect.");
                     }
                 }
             }
         }
-        catch (Exception e) when (e is IOException || e is OperationCanceledException || e is ObjectDisposedException || e is TaskCanceledException)
-        {   // Client has likely disconnected.
-            clientDisconnected = true;
+        catch (IOException e)
+        {
+            GetPossibleSocketErrorCode(e, true);
+        }
+        catch (Exception e) when (e is OperationCanceledException || e is ObjectDisposedException || e is TaskCanceledException)
+        {   // Client has likely disconnected.            
         }
         catch (InvalidOperationException e)
         {
@@ -644,6 +661,22 @@ public class Server
             await ClientRemovalAsync(user);
         }
     }
+
+    /// <summary>
+    /// Gets the error code.
+    /// </summary>
+    /// <param name="e">Possible IOException to check for SocketExceptions.</param>
+    /// <param name="thrownOnServer">Determines output string.</param>
+    public static int? GetPossibleSocketErrorCode(Exception e, bool thrownOnServer)
+    {
+        int? errorCode = null;
+        if (e is IOException && e.InnerException is SocketException exception)
+        {
+            Console.WriteLine($"[{(thrownOnServer ? "Server" : "Player")}] - IOException.SoceketException     Code: {exception.ErrorCode}");
+            errorCode = exception.ErrorCode;
+        }
+        return errorCode;
+    }
     /// <summary>
     /// Asynchronoulsy pings <paramref name="clientToPing"/> until it can no longer be reached or <paramref name="pingCancellationToken"/>.IsCancellationRequested. 
     /// </summary>
@@ -653,13 +686,14 @@ public class Server
     /// <returns>An async Task.</returns>
     public static async Task PingClientAsync(TcpClient clientToPing, CancellationTokenSource sourceToInvoke, CancellationToken pingCancellationToken)
     {
+        const byte SecondsBetweenPings = 10;
         try
         {
             while (!pingCancellationToken.IsCancellationRequested)
             {
                 if (await IsClientActiveAsync(clientToPing, pingCancellationToken))
                 {
-                    await Task.Delay(1000 * 10, pingCancellationToken);
+                    await Task.Delay(1000 * SecondsBetweenPings, pingCancellationToken);
                 }
                 else
                 {
