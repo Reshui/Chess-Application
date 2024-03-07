@@ -159,7 +159,6 @@ public class Player
         }
         finally
         {
-            PermitAccessToServer = false;
             // Function has already been called if true.
             if (!UserWantsToQuit) await CloseConnectionToServerAsync(false, true);
         }
@@ -269,7 +268,7 @@ public class Player
             {   // Command is sent first rather than at the end of client listening because, 
                 // when the token is invoked the stream cannot be sent any more messages.
                 PersonalSource.Cancel();
-                if (PermitAccessToServer && _connectedServer.Connected)
+                if (PermitAccessToServer)
                 {
                     string notifyServerCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ClientDisconnecting));
                     await SendClientMessageAsync(notifyServerCommand, _connectedServer, CancellationToken.None);
