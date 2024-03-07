@@ -91,7 +91,7 @@ public class Server
             GameID = ++_gameID;
             var playerArray = new Player[] { playerOne, playerTwo };
             int whitePlayerIndex = _rand.Next(playerArray.Length);
-            AssociatedPlayers = new()
+            AssociatedPlayers = new(2)
             {
                 {Team.White, playerArray[whitePlayerIndex]},
                 {Team.Black, playerArray[whitePlayerIndex == 1 ? 0 : 1]}
@@ -670,11 +670,11 @@ public class Server
         }
         catch (OperationCanceledException)
         {
-            // Either server is shutting down or the user wants to disconnect.
+            // See pingCancellationToken.
         }
         catch (ObjectDisposedException)
         {
-            // sourceToInvoke pingCancellationToken was disposed.
+            // sourceToInvoke or pingCancellationToken was disposed.
         }
     }
 }
