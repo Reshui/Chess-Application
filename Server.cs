@@ -182,33 +182,37 @@ public class Server
     /// <param name="user"><see cref="Player"/> instance that has its references removed.</param>
     private async Task ClientRemovalAsync(Player user)
     {
-        Console.WriteLine($"{user.Name}\t Removal called; Server: ( {ServerTasksCancellationToken.IsCancellationRequested} ) , Personal: ( {user.PersonalSource.IsCancellationRequested} ) , Connected: {user.Client.Connected}");
-
         if (_connectedPlayers.TryRemove(new KeyValuePair<int, Player>(user.ServerAssignedID, user)))
         {
+            Console.WriteLine($"{user.Name}\t Removal called; Server: ( {ServerTasksCancellationToken.IsCancellationRequested} ) , Personal: ( {user.PersonalSource.IsCancellationRequested} ) , Connected: {user.Client.Connected}");
             try
             {
                 // If server is shutting down then send a shutdown message.
                 if (ServerTasksCancellationToken.IsCancellationRequested && !user.PersonalSource.IsCancellationRequested)
                 {
+                    bool success = false;
                     Console.WriteLine($"Attempting shutdown notification => {user.Name}");
+                    string shutdownCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ServerIsShuttingDown));
                     try
                     {
-                        string shutdownCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ServerIsShuttingDown));
                         await SendClientMessageAsync(shutdownCommand, user.Client!, user.PersonalSource.Token);
-                        Console.WriteLine($"Shutdown notification sent => {user.Name}");
+                        success = true;
                     }
                     catch (IOException)
                     {
-                        Console.WriteLine("Client couldn't be reached for shutdown notification.\n\n");
+                        Console.WriteLine($"{user.Name} => couldn't be reached for shutdown notification.\n\n");
                     }
                     catch (InvalidOperationException e)
                     {
-                        Console.WriteLine($"{user.Name}: " + e.Message);
+                        Console.WriteLine($"{user.Name}: InvalidOperationException =>" + e.Message);
                     }
                     catch (Exception e)
                     {
                         Console.WriteLine("Server Failed to send shutdown message.\n\n" + e.Message);
+                    }
+                    finally
+                    {
+                        if (success) Console.WriteLine($"Shutdown notification sent => {user.Name}");
                     }
                 }
                 else if (_waitingForGameLobby.Contains(user))
@@ -497,6 +501,7 @@ public class Server
         (bool clientDisconnected, bool userRegistered) = (false, false);
         try
         {
+            //using var combinedSource = CancellationTokenSource.CreateLinkedTokenSource(ServerTasksCancellationToken, user.PersonalSource.Token);
             while (!clientDisconnected && !(user.CombinedSource?.IsCancellationRequested ?? true))
             {
                 ServerCommand clientResponse = await RecieveCommandFromStreamAsync(stream, user.CombinedSource.Token).ConfigureAwait(false);
