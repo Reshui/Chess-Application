@@ -126,9 +126,10 @@ public class Server
                 TcpClient newClient = await _gameServer.AcceptTcpClientAsync(ServerTasksCancellationToken).ConfigureAwait(false);
                 var cancelSourceForPlayer = new CancellationTokenSource();
                 var serverAndPlayerSource = CancellationTokenSource.CreateLinkedTokenSource(cancelSourceForPlayer.Token, ServerTasksCancellationToken);
-                var newPlayer = new Player(newClient, serverAndPlayerSource);
+
+                var newPlayer = new Player(newClient, cancelSourceForPlayer, serverAndPlayerSource);
                 _connectedPlayers.TryAdd(newPlayer.ServerAssignedID, newPlayer);
-                _clientListeningTasks.TryAdd(newPlayer.ServerAssignedID, ProcessClientDataAsync(newPlayer, newPlayer.MainTokenSource.Token).ContinueWith(x => ClientRemovalAsync(newPlayer, cancelSourceForPlayer)));
+                _clientListeningTasks.TryAdd(newPlayer.ServerAssignedID, ProcessClientDataAsync(newPlayer).ContinueWith(x => ClientRemovalAsync(newPlayer)));
             }
         }
         catch (OperationCanceledException)
@@ -169,18 +170,26 @@ public class Server
     /// Removes <paramref name="user"/> from <see cref="_clientListeningTasks"/> and <see cref="_connectedPlayers"/>.
     /// </summary>
     /// <param name="user"><see cref="Player"/> instance that has its references removed.</param>
-    private async Task ClientRemovalAsync(Player user, CancellationTokenSource userPersonalSource)
+    private async Task ClientRemovalAsync(Player user)
     {
         // Cancel the listening for response task and dispose of the token.
         if (_connectedPlayers.TryRemove(new KeyValuePair<int, Player>(user.ServerAssignedID, user)))
         {
             // If server is shutting down then send a shutdown message.
-            if (ServerTasksCancellationToken.IsCancellationRequested && !user.MainTokenSource.IsCancellationRequested)
+            if (ServerTasksCancellationToken.IsCancellationRequested && !user.PersonalSource.IsCancellationRequested)
             {
                 try
                 {
                     string shutdownCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ServerIsShuttingDown));
-                    await SendClientMessageAsync(shutdownCommand, user.Client!, user.MainTokenSource.Token).ConfigureAwait(false);
+                    await SendClientMessageAsync(shutdownCommand, user.Client!, user.PersonalSource.Token).ConfigureAwait(false);
+                }
+                catch (IOException)
+                {
+                    Console.WriteLine("Client couldn't be reached for shutdown notification.\n\n");
+                }
+                catch (InvalidOperationException e)
+                {
+                    Console.WriteLine("InvalidOperationException when attempting to send server shutdown notification \n\n" + e);
                 }
                 catch (Exception e)
                 {
@@ -192,8 +201,8 @@ public class Server
                 _waitingForGameLobby = new ConcurrentQueue<Player>(_waitingForGameLobby.Where(x => !x.Equals(user)));
             }
 
-            userPersonalSource.Dispose();
-            user.MainTokenSource.Dispose();
+            user.PersonalSource.Dispose();
+            user.CombinedSource?.Dispose();
             user.Client.Close();
             Console.WriteLine($"{user.Name} has disconnected from the server.");
         }
@@ -223,7 +232,7 @@ public class Server
                     {
                         try
                         {
-                            clientPingingTasks.Add(IsClientActiveAsync(user.Client, user.MainTokenSource.Token));
+                            clientPingingTasks.Add(IsClientActiveAsync(user.Client, user.PersonalSource.Token));
                         }
                         catch (ObjectDisposedException)
                         {
@@ -235,7 +244,7 @@ public class Server
                         }
                     }
 
-                    while (bothPlayersAvailable && clientPingingTasks.Any())
+                    while (!ServerTasksCancellationToken.IsCancellationRequested && bothPlayersAvailable && clientPingingTasks.Any())
                     {
                         var completedTask = await Task.WhenAny(clientPingingTasks).ConfigureAwait(false);
 
@@ -244,7 +253,11 @@ public class Server
                             Player user = matchedPlayers[clientPingingTasks.IndexOf(completedTask)];
                             matchedPlayers.Remove(user);
                             // If error then Client is being actively removed.
-                            try { user.MainTokenSource.Cancel(); } catch (ObjectDisposedException) { }
+                            try
+                            {
+                                user.PersonalSource.Cancel();
+                            }
+                            catch (ObjectDisposedException) { }
                             bothPlayersAvailable = false;
                         }
                         clientPingingTasks.Remove(completedTask);
@@ -260,15 +273,24 @@ public class Server
                             var startGameCommand = new ServerCommand(CommandType.StartGameInstance, newGame.GameID, assignedTeam: playerDetail.Key);
                             try
                             {
-                                await SendClientMessageAsync(JsonSerializer.Serialize(startGameCommand), playerDetail.Value.Client, playerDetail.Value.MainTokenSource.Token).ConfigureAwait(false);
+                                await SendClientMessageAsync(JsonSerializer.Serialize(startGameCommand), playerDetail.Value.Client, playerDetail.Value.CombinedSource!.Token).ConfigureAwait(false);
                                 playersAlertedForGame.Add(playerDetail.Value);
                             }
                             catch (Exception e) when (e is OperationCanceledException || e is IOException || e is ObjectDisposedException)
                             {   // Failed to message client or client is leaving the server.
                                 matchedPlayers.Remove(playerDetail.Value);
                                 bothPlayersAvailable = false;
-                                try { if (e is not ObjectDisposedException) playerDetail.Value.MainTokenSource.Cancel(); } catch (ObjectDisposedException) { }
+                                try
+                                {
+                                    if (e is not ObjectDisposedException) playerDetail.Value.PersonalSource.Cancel();
+                                }
+                                catch (ObjectDisposedException) { }
                                 break;
+                            }
+                            catch (NullReferenceException e)
+                            {
+                                Console.WriteLine(e);
+                                throw;
                             }
                         }
                         // If there are no problems with notifying both players to start the game then track the game and clear the matchedPlayers list.
@@ -285,12 +307,16 @@ public class Server
                             {
                                 try
                                 {
-                                    await SendClientMessageAsync(JsonSerializer.Serialize(notifyOpponentDisconnectCommand), playerWaitingForOpponent.Client!, playerWaitingForOpponent.MainTokenSource.Token).ConfigureAwait(false);
+                                    await SendClientMessageAsync(JsonSerializer.Serialize(notifyOpponentDisconnectCommand), playerWaitingForOpponent.Client!, playerWaitingForOpponent.CombinedSource!.Token).ConfigureAwait(false);
                                 }
                                 catch (Exception e) when (e is OperationCanceledException || e is IOException || e is ObjectDisposedException)
                                 {
                                     matchedPlayers.Remove(playerWaitingForOpponent);
-                                    try { if (e is not ObjectDisposedException) playerWaitingForOpponent.MainTokenSource.Cancel(); } catch (ObjectDisposedException) { }
+                                    try
+                                    {
+                                        if (e is not ObjectDisposedException) playerWaitingForOpponent.PersonalSource.Cancel();
+                                    }
+                                    catch (ObjectDisposedException) { }
                                 }
                             }
                         }
@@ -441,7 +467,7 @@ public class Server
     /// <remarks>Upon exiting the main loop <paramref name="user"/> will have all of its references on the server dealt with.</remarks>
     /// <param name="user"><see cref="Player"/> instance that is monitored for its responses.</param>
     /// <param name="token">A <see cref="CancellationToken"/> made for <paramref name ="user"/>.</param>
-    private async Task ProcessClientDataAsync(Player user, CancellationToken userToken)
+    private async Task ProcessClientDataAsync(Player user)
     {
         using NetworkStream stream = user.Client.GetStream();
         ServerCommand clientCommand;
@@ -449,9 +475,9 @@ public class Server
         (bool clientDisconnected, bool userRegistered) = (false, false);
         try
         {
-            while (!clientDisconnected && !userToken.IsCancellationRequested)
+            while (!clientDisconnected && !(user.CombinedSource?.IsCancellationRequested ?? true))
             {
-                ServerCommand clientResponse = await RecieveCommandFromStreamAsync(stream, userToken).ConfigureAwait(false);
+                ServerCommand clientResponse = await RecieveCommandFromStreamAsync(stream, user.CombinedSource.Token).ConfigureAwait(false);
 
                 if (clientResponse is not null)
                 {
@@ -479,22 +505,23 @@ public class Server
                             Player opposingUser = currentGame.AssociatedPlayers[GameEnvironment.ReturnOppositeTeam(clientResponse.MoveDetails.Value.SubmittingTeam)];
                             try
                             {
-                                await SendClientMessageAsync(JsonSerializer.Serialize(clientResponse), opposingUser.Client, opposingUser.MainTokenSource.Token).ConfigureAwait(false);
+                                await SendClientMessageAsync(JsonSerializer.Serialize(clientResponse), opposingUser.Client, opposingUser.PersonalSource.Token).ConfigureAwait(false);
                             }
                             catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is OperationCanceledException)
                             {
+                                // Failed to notify user.
                                 if (!ServerTasksCancellationToken.IsCancellationRequested)
                                 {
                                     try
                                     {
-                                        opposingUser.MainTokenSource.Cancel();
+                                        opposingUser.PersonalSource.Cancel();
                                     }
                                     catch (ObjectDisposedException)
                                     { }
                                     // If the opposingUser isn't reachable send player notification that the opponent couldn't be reached.
                                     // Errors thrown here will be caught in outermost catch statement.
                                     var opponentDisconnectedCommand = new ServerCommand(CommandType.OpponentClientDisconnected, currentGame.GameID);
-                                    await SendClientMessageAsync(JsonSerializer.Serialize(opponentDisconnectedCommand), user.Client, userToken).ConfigureAwait(false);
+                                    await SendClientMessageAsync(JsonSerializer.Serialize(opponentDisconnectedCommand), user.Client, CancellationToken.None).ConfigureAwait(false);
                                 }
                             }
                         }
@@ -505,8 +532,9 @@ public class Server
                     }
                     else if (clientResponse.CMD == CommandType.ClientDisconnecting)
                     {
-                        user.MainTokenSource.Cancel();
+                        user.PersonalSource.Cancel();
                         clientDisconnected = true;
+                        Console.WriteLine("User has sent disconnect.");
                     }
                 }
             }
@@ -536,7 +564,7 @@ public class Server
                         Player opposingUser = user.Equals(game.WhitePlayer) ? game.BlackPlayer : game.WhitePlayer;
                         // CancellationToken.None will be used instead of ServerCancellationToken so that the stream isn't closed in case the client is about to be informed of
                         // Server shutdown.
-                        gameEndingNotificationTasks.Add(SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), opposingUser.Client, CancellationToken.None));
+                        gameEndingNotificationTasks.Add(SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), opposingUser.Client, opposingUser.PersonalSource.Token));
                     }
                 }
 
