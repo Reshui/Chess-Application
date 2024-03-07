@@ -83,7 +83,7 @@ public class Server
         public Player WhitePlayer { get => AssociatedPlayers[Team.White]; }
         public Player BlackPlayer { get => AssociatedPlayers[Team.Black]; }
         public int GameID { get; }
-        public Dictionary<Team, Player> AssociatedPlayers;
+        public Dictionary<Team, Player> AssociatedPlayers { get; }
         private static int _gameID = 0;
         private static readonly Random _rand = new();
         public TrackedGame(Player playerOne, Player playerTwo)
