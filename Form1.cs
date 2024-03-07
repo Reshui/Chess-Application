@@ -56,7 +56,6 @@ namespace Chess_GUi
                 _allowClose = true;
                 this.Close();
             }
-
         }
         private void StartServer_Click(object sender, EventArgs e)
         {
