@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System;
 using System.Collections.Concurrent;
+
 public class Server
 {
     /// <summary>List of connected <see cref="TcpClient"/> instances to the current <see cref="Server"/> instance.</summary>
@@ -127,7 +128,10 @@ public class Server
                 var cancelSourceForPlayer = new CancellationTokenSource();
                 var serverAndPlayerSource = CancellationTokenSource.CreateLinkedTokenSource(cancelSourceForPlayer.Token, ServerTasksCancellationToken);
 
-                var newPlayer = new Player(newClient, cancelSourceForPlayer, serverAndPlayerSource);
+                var newPlayer = new Player(newClient, cancelSourceForPlayer, serverAndPlayerSource)
+                {
+                    PingConnectedClientTask = PingClientAsync(newClient, cancelSourceForPlayer, serverAndPlayerSource.Token)
+                };
                 _connectedPlayers.TryAdd(newPlayer.ServerAssignedID, newPlayer);
                 _clientListeningTasks.TryAdd(newPlayer.ServerAssignedID, ListenForPlayerResponseAsync(newPlayer));
             }
@@ -214,9 +218,17 @@ public class Server
                         if (success) Console.WriteLine($"[Server]: Shutdown notification sent => {user.Name}");
                     }
                 }
-                else if (_waitingForGameLobby.Contains(user))
+
+                user.PersonalSource.Cancel();
+                if (_waitingForGameLobby.Contains(user))
+
                 {   // Remove user from the LFG queue.
                     _waitingForGameLobby = new ConcurrentQueue<Player>(_waitingForGameLobby.Where(x => !x.Equals(user)));
+                }
+
+                if (user.PingConnectedClientTask is not null)
+                {
+                    await user.PingConnectedClientTask;
                 }
             }
             catch (Exception e)
@@ -312,13 +324,15 @@ public class Server
                                 {
                                     Console.WriteLine("[Server]: Monitor LFG: InvalidOperationException while attempting start game notification.  " + e.Message);
                                 }
-
-                                try
+                                else if (e is not ObjectDisposedException)
                                 {
-                                    if (e is not ObjectDisposedException) playerDetail.Value.PersonalSource.Cancel();
+                                    try
+                                    {
+                                        playerDetail.Value.PersonalSource.Cancel();
+                                    }
+                                    catch (ObjectDisposedException)
+                                    { }
                                 }
-                                catch (ObjectDisposedException)
-                                { }
                                 break;
                             }
                         }
@@ -524,8 +538,6 @@ public class Server
                             user.AssignName(clientResponse.Name! + $" > {user.ServerAssignedID}");
                             userRegistered = true;
                             Console.WriteLine($"[Server]: {user.Name} has registered.");
-                            // Just acknowledge.
-                            await IsClientActiveAsync(user.Client, user.PersonalSource.Token);
                         }
                         catch (Exception)
                         { // Thrown if Name already has a value.
@@ -617,7 +629,6 @@ public class Server
                         }
                         catch (ObjectDisposedException)
                         {   // opposingUser.Token has been Disposed.
-                            break;
                         }
                     }
                 }
@@ -631,6 +642,39 @@ public class Server
                 }
             }
             await ClientRemovalAsync(user);
+        }
+    }
+    /// <summary>
+    /// Asynchronoulsy pings <paramref name="clientToPing"/> until it can no longer be reached or <paramref name="pingCancellationToken"/>.IsCancellationRequested. 
+    /// </summary>
+    /// <param name="clientToPing"><see cref="TcpClient"/> that will be pinged in a loop.</param>
+    /// <param name="sourceToInvoke"><seealso cref="CancellationTokenSource"/> that will be cancelled if <paramref name="clientToPing"/> cannot be reached.</param>
+    /// <param name="pingCancellationToken"><see cref="CancellationToken"/> used to cancel this task.</param>
+    /// <returns>An async Task.</returns>
+    public static async Task PingClientAsync(TcpClient clientToPing, CancellationTokenSource sourceToInvoke, CancellationToken pingCancellationToken)
+    {
+        try
+        {
+            while (!pingCancellationToken.IsCancellationRequested)
+            {
+                if (await IsClientActiveAsync(clientToPing, pingCancellationToken))
+                {
+                    await Task.Delay(1000 * 10, pingCancellationToken);
+                }
+                else
+                {
+                    sourceToInvoke.Cancel();
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Either server is shutting down or the user wants to disconnect.
+        }
+        catch (ObjectDisposedException)
+        {
+            // sourceToInvoke pingCancellationToken was disposed.
         }
     }
 }
