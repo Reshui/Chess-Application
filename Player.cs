@@ -43,7 +43,8 @@ public class Player
     private static int s_instanceCount = 0;
 
     /// <summary>TokenSource used to stop server listening tasks.</summary>
-    public readonly CancellationTokenSource MainTokenSource;
+    public readonly CancellationTokenSource PersonalSource;
+    public readonly CancellationTokenSource? CombinedSource = null;
 
     /// <summary>Form object used to visually represent games.</summary>
     private readonly Form1? _gui;
@@ -65,18 +66,19 @@ public class Player
         _hostAddress = "127.0.0.1";
         _asyncListeningTask = new();
         _gui = gui;
-        MainTokenSource = cancelSource;
+        PersonalSource = cancelSource;
     }
     /// <summary>
     /// Constructor used by the <see cref="Server"/> class to track clients.
     /// </summary>
-    public Player(TcpClient client, CancellationTokenSource cancelSource)
+    public Player(TcpClient client, CancellationTokenSource personalSource, CancellationTokenSource combinedSource)
     {
         _hostPort = 13000;
         _hostAddress = "127.0.0.1";
         Client = client;
         ServerAssignedID = ++s_instanceCount;
-        MainTokenSource = cancelSource;
+        PersonalSource = personalSource;
+        CombinedSource = combinedSource;
     }
     /// <summary>Joins a server and starts asynchronous tasks.</summary>
     /// <returns><see langword="true"/> if server was joined successfully; otherwise, <see langword="false"/>.</returns>
@@ -99,7 +101,7 @@ public class Player
     /// </summary>
     private async Task StartListeningAsync()
     {
-        var token = MainTokenSource.Token;
+        var token = PersonalSource.Token;
         PermitAccessToServer = true;
         // Get a client stream for reading and writing.
         using NetworkStream stream = _connectedServer!.GetStream();
@@ -111,7 +113,7 @@ public class Player
 
             foreach (ServerCommand commandToSend in new ServerCommand[2] { registerCommand, lfgCommand })
             {
-                await SendClientMessageAsync(JsonSerializer.Serialize(commandToSend), _connectedServer, MainTokenSource.Token);
+                await SendClientMessageAsync(JsonSerializer.Serialize(commandToSend), _connectedServer, PersonalSource.Token);
             }
 
             while (!token.IsCancellationRequested)
@@ -197,7 +199,7 @@ public class Player
                     string submissionCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.NewMove, serverSideGameID, move));
                     try
                     {
-                        await SendClientMessageAsync(submissionCommand, _connectedServer, MainTokenSource.Token);
+                        await SendClientMessageAsync(submissionCommand, _connectedServer, PersonalSource.Token);
                     }
                     catch (Exception e) when (e is IOException || e is OperationCanceledException || e is NullReferenceException || e is InvalidOperationException)
                     {
@@ -282,13 +284,13 @@ public class Player
             }
             finally
             {
-                MainTokenSource.Cancel();
+                PersonalSource.Cancel();
                 // If this method wasn't called from StartListeningAsync() then wait for that Task to finish.
                 if (!calledFromListeningTask)
                 {
                     if (_asyncListeningTask is not null && _asyncListeningTask.Count > 0) await Task.WhenAll(_asyncListeningTask);
                 }
-                MainTokenSource.Dispose();
+                PersonalSource.Dispose();
                 _connectedServer.Close();
                 _connectedServer = null;
             }
