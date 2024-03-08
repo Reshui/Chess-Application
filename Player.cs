@@ -3,10 +3,7 @@ namespace Pieces;
 
 using Chess_GUi;
 using static Pieces.Server;
-
 using System.Net.Sockets;
-using System.Text.Json;
-
 public class Player
 {
     /// <summary>IP address of <see cref="_connectedServer"/>.</summary>
@@ -56,7 +53,7 @@ public class Player
     /// <summary>
     /// Gets or sets a boolean that describes if the user wants to quit playing.
     /// </summary>
-    /// <value><see langword="true"/> if <see cref="CloseConnectionToServerAsync()"/> has been called; otherwise, <see langword="false"/>.</value>
+    /// <value><see langword="true"/> if <see cref="CloseConnectionToServerAsync"/> has been called from <see cref="_gui"/>; otherwise, <see langword="false"/>.</value>
     public bool UserWantsToQuit { get; private set; } = false;
     /// <summary>
     /// Client-side constructor.
@@ -265,7 +262,7 @@ public class Player
     }
 
     /// <summary>
-    /// Asynchronously alerts <see cref="_connectedServer"/> and stops listening to responses.
+    /// Asynchronously alerts <see cref="_connectedServer"/> that the user wants to quit.
     /// </summary>
     public async Task CloseConnectionToServerAsync(bool userIsQuitting, bool calledFromListeningTask)
     {
