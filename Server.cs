@@ -124,6 +124,7 @@ public class Server
         try
         {
             _gameServer.Start();
+            Console.WriteLine("Server has started.");
             while (!ServerTasksCancellationToken.IsCancellationRequested)
             {
                 TcpClient newClient = await _gameServer.AcceptTcpClientAsync(ServerTasksCancellationToken).ConfigureAwait(false);
@@ -151,9 +152,10 @@ public class Server
         catch (OperationCanceledException)
         {   // Error raised if _serverTasksCancellationToken.IsCancelRequested = true.
         }
-        catch (SocketException)
+        catch (SocketException e)
         {
             ServerShutDownCancelSource.Cancel();
+            Console.WriteLine("Server failed to start.\t" + e.Message);
             throw;
         }
         finally
