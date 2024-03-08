@@ -139,7 +139,7 @@ public class Server
                         PingConnectedClientTask = PingClientAsync(newClient, cancelSourceForPlayer, serverAndPlayerSource.Token)
                     };
                     _connectedPlayers.TryAdd(newPlayer.ServerAssignedID, newPlayer);
-                    _clientListeningTasks.TryAdd(newPlayer.ServerAssignedID, ListenForPlayerResponseAsync(newPlayer));
+                    _clientListeningTasks.TryAdd(newPlayer.ServerAssignedID, HandlePlayerResponsesAsync(newPlayer));
                 }
                 else
                 {
@@ -149,14 +149,15 @@ public class Server
                 }
             }
         }
-        catch (OperationCanceledException)
-        {   // Error raised if _serverTasksCancellationToken.IsCancelRequested = true.
-        }
         catch (SocketException e)
         {
             ServerShutDownCancelSource.Cancel();
             Console.WriteLine("Server failed to start.\t" + e.Message);
             throw;
+        }
+        catch (OperationCanceledException)
+        {
+
         }
         finally
         {
@@ -177,7 +178,6 @@ public class Server
     /// </summary>
     public async Task CloseServerAsync()
     {
-        // Cancel all listening and waiting tasks.
         try
         {
             Console.WriteLine("[Server]: Attempting server shutdown.");
@@ -185,9 +185,15 @@ public class Server
             _waitingForGameLobby.Clear();
             await Task.WhenAll(_serverTasks);
         }
-        catch (Exception e)
+        catch (Exception)
         {
-            Console.WriteLine(e.ToString());
+            foreach (var faultedTask in _serverTasks.Where(x => x.IsFaulted))
+            {
+                if (faultedTask.Exception is not null && faultedTask.Exception?.InnerException is not (OperationCanceledException or TaskCanceledException))
+                {
+                    Console.WriteLine(faultedTask.Exception!.InnerException);
+                }
+            }
         }
         finally
         {
@@ -246,10 +252,8 @@ public class Server
                     await user.PingConnectedClientTask;
                 }
             }
-            catch (Exception e)
+            catch (OperationCanceledException)
             {
-                Console.WriteLine(e.ToString());
-                throw;
             }
             finally
             {
@@ -399,7 +403,7 @@ public class Server
                     }
                 }
             }
-            await Task.Delay(700, ServerTasksCancellationToken);
+            await Task.Delay(1000, ServerTasksCancellationToken);
         }
     }
 
@@ -535,7 +539,7 @@ public class Server
     /// </summary>
     /// <remarks>Upon exiting the main loop <paramref name="user"/> will have all of its references on the server dealt with.</remarks>
     /// <param name="user"><see cref="Player"/> instance that is monitored for its responses.</param>
-    private async Task ListenForPlayerResponseAsync(Player user)
+    private async Task HandlePlayerResponsesAsync(Player user)
     {
         NetworkStream stream = user.Client.GetStream();
 
