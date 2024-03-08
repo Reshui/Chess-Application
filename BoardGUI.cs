@@ -80,9 +80,9 @@ namespace Chess_GUi
             ConfirmMoveBTN = new Button()
             {
                 BackColor = Color.FromArgb(153, 218, 56),
-                Location = new Point(710, 126),
+                Location = new Point(710, 400),
                 Name = "ConfirmMoveBTN",
-                Size = new Size(322, 75),
+                Size = new Size(200, 75),
                 TabIndex = 1,
                 Text = "Confirm Selection",
                 UseVisualStyleBackColor = false,

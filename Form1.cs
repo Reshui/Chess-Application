@@ -138,7 +138,10 @@ namespace Chess_GUi
                     Size = wantedDisplay.ConfirmMoveBTN.Size,
                     TabIndex = 0,
                     Text = messageToDisplay,
-                    BackColor = Color.White
+                    BackColor = Color.White,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    ForeColor = Color.Black,
+                    Font = new Font("Arial", 10)
                 };
 
                 wantedDisplay.Controls.Add(labelToShowUser);
@@ -150,20 +153,22 @@ namespace Chess_GUi
         /// <exception cref="NotImplementedException"></exception>
         public void ServerIsUnreachable()
         {
-            foreach (var gameGUI in _boardGuiByName)
+            foreach (var gameGUI in _boardGuiByName.Values)
             {
-                gameGUI.Value.Enabled = false;
+                gameGUI.Enabled = false;
             }
-            var length = 500;
-            var height = 250;
+            var length = 300;
+            var height = 100;
+
             var serverCloseLabel = new Label()
             {
                 Size = new Size(length, height),
                 Location = new Point(MainView.Left, MainView.Top + (MainView.Height / 2) - (height / 2)),
                 Text = "Server is unavailable",
                 Name = "Server NA",
-                BackColor = Color.Crimson,
-                Font = new Font("Arial", 24, FontStyle.Bold)
+                BackColor = Color.FromArgb(233, 217, 37),
+                Font = new Font("Arial", 15, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleCenter
             };
 
             MainView.Controls.Add(serverCloseLabel);
