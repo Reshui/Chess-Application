@@ -112,7 +112,7 @@ public class Server
     public void StartServer()
     {
         _serverTasks.Add(ListenFornNewConnectionsAsync());
-        _serverTasks.Add(MonitorLFGLobbyAsync());
+        _serverTasks.Add(ManageLookingForGroupLobbyAsync());
     }
 
     /// <summary>
@@ -155,10 +155,6 @@ public class Server
             Console.WriteLine("Server failed to start.\t" + e.Message);
             throw;
         }
-        catch (OperationCanceledException)
-        {
-
-        }
         finally
         {
             try
@@ -178,21 +174,19 @@ public class Server
     /// </summary>
     public async Task CloseServerAsync()
     {
+
+        Console.WriteLine("[Server]: Attempting server shutdown.");
+        ServerShutDownCancelSource.Cancel();
+        _waitingForGameLobby.Clear();
         try
         {
-            Console.WriteLine("[Server]: Attempting server shutdown.");
-            ServerShutDownCancelSource.Cancel();
-            _waitingForGameLobby.Clear();
             await Task.WhenAll(_serverTasks);
         }
         catch (Exception)
         {
             foreach (var faultedTask in _serverTasks.Where(x => x.IsFaulted))
             {
-                if (faultedTask.Exception is not null && faultedTask.Exception?.InnerException is not (OperationCanceledException or TaskCanceledException))
-                {
-                    Console.WriteLine(faultedTask.Exception!.InnerException);
-                }
+                Console.WriteLine(faultedTask.Exception!.InnerException);
             }
         }
         finally
@@ -202,66 +196,64 @@ public class Server
     }
 
     /// <summary>
-    /// Removes <paramref name="user"/> from <see cref="_clientListeningTasks"/> and <see cref="_connectedPlayers"/>.
+    /// Removes <paramref name="user"/> from <see cref="_clientListeningTasks"/> and <see cref="_connectedPlayers"/> and sends a server shutdown message
+    /// if conditions are met.
     /// </summary>
     /// <param name="user"><see cref="Player"/> instance that has its references removed.</param>
-    private async Task ClientRemovalAsync(Player user)
+    private async Task DisconnectUserAsync(Player user)
     {
         if (_connectedPlayers.TryRemove(user.ServerAssignedID, out _) && _clientListeningTasks.TryRemove(user.ServerAssignedID, out _))
         {
             // Console.WriteLine($"[Server]: {user.Name}  Cancellation Token Status; Server: ( {ServerTasksCancellationToken.IsCancellationRequested} ) , Personal: ( {user.PersonalSource.IsCancellationRequested} ) , Connected: {user.Client.Connected}");
-            try
+
+            // If server is shutting down then send a shutdown message.
+            if (ServerTasksCancellationToken.IsCancellationRequested && !user.PersonalSource.IsCancellationRequested)
             {
-                // If server is shutting down then send a shutdown message.
-                if (ServerTasksCancellationToken.IsCancellationRequested && !user.PersonalSource.IsCancellationRequested)
+                bool success = false;
+                var shutdownCommand = new ServerCommand(CommandType.ServerIsShuttingDown);
+                try
                 {
-                    bool success = false;
-                    var shutdownCommand = new ServerCommand(CommandType.ServerIsShuttingDown);
-                    try
-                    {
-                        await SendClientMessageAsync(shutdownCommand, user.Client!, user.PersonalSource.Token);
-                        success = true;
-                    }
-                    catch (IOException e)
-                    {
-                        Console.WriteLine($"[Server]: {user.Name} => couldn't be reached for shutdown notification.\n\n");
-                        GetPossibleSocketErrorCode(e, true);
-                    }
-                    catch (InvalidOperationException e)
-                    {
-                        Console.WriteLine($"[Server]: {user.Name}: InvalidOperationException =>" + e.Message);
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine("[Server]: Server Failed to send shutdown message.\n\n" + e.Message);
-                    }
-                    finally
-                    {
-                        if (success) Console.WriteLine($"[Server]: Shutdown notification sent => {user.Name}");
-                    }
+                    await SendClientMessageAsync(shutdownCommand, user.Client!, user.PersonalSource.Token);
+                    success = true;
                 }
-
-                user.PersonalSource.Cancel();
-                if (_waitingForGameLobby.Contains(user))
-                {   // Remove user from the LFG queue.
-                    _waitingForGameLobby = new ConcurrentQueue<Player>(_waitingForGameLobby.Where(x => !x.Equals(user)));
+                catch (IOException e)
+                {
+                    Console.WriteLine($"[Server]: {user.Name} => couldn't be reached for shutdown notification.\n\n");
+                    GetPossibleSocketErrorCode(e, true);
                 }
+                catch (InvalidOperationException e)
+                {
+                    Console.WriteLine($"[Server]: {user.Name}: InvalidOperationException =>" + e.Message);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("[Server]: Server Failed to send shutdown message.\n\n" + e.Message);
+                }
+                finally
+                {
+                    if (success) Console.WriteLine($"[Server]: Shutdown notification sent => {user.Name}");
+                }
+            }
 
-                if (user.PingConnectedClientTask is not null)
+            user.PersonalSource.Cancel();
+            if (_waitingForGameLobby.Contains(user))
+            {   // Remove user from the LFG queue.
+                _waitingForGameLobby = new ConcurrentQueue<Player>(_waitingForGameLobby.Where(x => !x.Equals(user)));
+            }
+
+            if (user.PingConnectedClientTask is not null)
+            {
+                try
                 {
                     await user.PingConnectedClientTask;
                 }
+                catch (OperationCanceledException)
+                { }
             }
-            catch (OperationCanceledException)
-            {
-            }
-            finally
-            {
-                user.PersonalSource.Dispose();
-                user.CombinedSource?.Dispose();
-                user.Client.Close();
-                Console.WriteLine($"[Server]: {user.Name} has disconnected from the server.");
-            }
+            user.PersonalSource.Dispose();
+            user.CombinedSource?.Dispose();
+            user.Client.Close();
+            Console.WriteLine($"[Server]: {user.Name} has disconnected from the server.");
         }
     }
 
@@ -269,7 +261,7 @@ public class Server
     /// Monitors <see cref="_waitingForGameLobby"/> for added <see cref="Player"/> instances and 
     /// notifies users when a game is available.
     /// </summary>
-    private async Task MonitorLFGLobbyAsync()
+    private async Task ManageLookingForGroupLobbyAsync()
     {
         List<Player> matchedPlayers = new() { Capacity = 2 };
 
@@ -428,10 +420,10 @@ public class Server
     }
 
     /// <summary>
-    /// Sends <paramref name="message"/> in byte form to a given <paramref name="client"/>.
+    /// Sends the <see cref="ServerCommand"/> <paramref name="commandToSend"/> in byte form to <paramref name="client"/>.
     /// </summary>
     /// <param name="client"><see cref="TcpClient"/> that is sent a message.</param>
-    /// <param name="message">Message to be sent to <paramref name="client"/>.</param>
+    /// <param name="commandToSend">Command to send to <paramref name="client"/>.</param>
     /// <exception cref="IOException">Raised when an error occurs while attempting to use .WriteAsync.</exception>
     /// <exception cref="ObjectDisposedException"></exception>
     /// <exception cref="InvalidOperationException"></exception>
@@ -665,7 +657,7 @@ public class Server
                 {
                 }
             }
-            await ClientRemovalAsync(user);
+            await DisconnectUserAsync(user);
         }
     }
 
@@ -698,15 +690,12 @@ public class Server
         {
             while (!pingCancellationToken.IsCancellationRequested)
             {
-                if (await IsClientActiveAsync(clientToPing, pingCancellationToken))
-                {
-                    await Task.Delay(1000 * SecondsBetweenPings, pingCancellationToken);
-                }
-                else
+                if (!await IsClientActiveAsync(clientToPing, pingCancellationToken))
                 {
                     sourceToInvoke.Cancel();
                     return;
                 }
+                await Task.Delay(1000 * SecondsBetweenPings, pingCancellationToken);
             }
         }
         catch (OperationCanceledException)
