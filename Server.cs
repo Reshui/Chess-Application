@@ -143,6 +143,8 @@ public class Server
                 else
                 {
                     // To Do: Send a server full message.
+                    var deniedAccessCommand = new ServerCommand(CommandType.DeniedAccessToServer);
+                    await SendClientMessageAsync(JsonSerializer.Serialize(deniedAccessCommand), newClient, CancellationToken.None);
                 }
             }
         }
@@ -199,7 +201,7 @@ public class Server
     {
         if (_connectedPlayers.TryRemove(user.ServerAssignedID, out _) && _clientListeningTasks.TryRemove(user.ServerAssignedID, out _))
         {
-            Console.WriteLine($"[Server]: {user.Name}  Cancellation Token Status; Server: ( {ServerTasksCancellationToken.IsCancellationRequested} ) , Personal: ( {user.PersonalSource.IsCancellationRequested} ) , Connected: {user.Client.Connected}");
+            // Console.WriteLine($"[Server]: {user.Name}  Cancellation Token Status; Server: ( {ServerTasksCancellationToken.IsCancellationRequested} ) , Personal: ( {user.PersonalSource.IsCancellationRequested} ) , Connected: {user.Client.Connected}");
             try
             {
                 // If server is shutting down then send a shutdown message.
@@ -395,15 +397,7 @@ public class Server
                     }
                 }
             }
-
-            try
-            {
-                await Task.Delay(700, ServerTasksCancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
+            await Task.Delay(700, ServerTasksCancellationToken);
         }
     }
 
@@ -530,7 +524,6 @@ public class Server
                 }
                 // While the entire message hasn't been recieved.
             } while (totalRecieved < incomingMessageByteCount);
-
         } while (true);
     }
 
