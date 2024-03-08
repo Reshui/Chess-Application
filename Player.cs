@@ -114,7 +114,7 @@ public class Player
 
             foreach (ServerCommand commandToSend in new ServerCommand[2] { registerCommand, lfgCommand })
             {
-                await SendClientMessageAsync(JsonSerializer.Serialize(commandToSend), _connectedServer, PersonalSource.Token);
+                await SendClientMessageAsync(commandToSend, _connectedServer, PersonalSource.Token);
             }
 
             while (!token.IsCancellationRequested)
@@ -203,7 +203,7 @@ public class Player
 
                 if (_connectedServer is not null && PermitAccessToServer)
                 {
-                    string submissionCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.NewMove, serverSideGameID, move));
+                    var submissionCommand = new ServerCommand(CommandType.NewMove, serverSideGameID, move);
                     try
                     {
                         await SendClientMessageAsync(submissionCommand, _connectedServer, PersonalSource.Token);
@@ -277,7 +277,7 @@ public class Player
                 // when the token is invoked the stream cannot be sent any more messages.                
                 if (PermitAccessToServer)
                 {
-                    string notifyServerCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ClientDisconnecting));
+                    var notifyServerCommand = new ServerCommand(CommandType.ClientDisconnecting);
                     await SendClientMessageAsync(notifyServerCommand, _connectedServer, CancellationToken.None);
                 }
             }

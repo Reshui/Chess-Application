@@ -145,7 +145,7 @@ public class Server
                 {
                     // To Do: Send a server full message.
                     var deniedAccessCommand = new ServerCommand(CommandType.DeniedAccessToServer);
-                    await SendClientMessageAsync(JsonSerializer.Serialize(deniedAccessCommand), newClient, CancellationToken.None);
+                    await SendClientMessageAsync(deniedAccessCommand, newClient, CancellationToken.None);
                 }
             }
         }
@@ -210,7 +210,7 @@ public class Server
                 if (ServerTasksCancellationToken.IsCancellationRequested && !user.PersonalSource.IsCancellationRequested)
                 {
                     bool success = false;
-                    string shutdownCommand = JsonSerializer.Serialize(new ServerCommand(CommandType.ServerIsShuttingDown));
+                    var shutdownCommand = new ServerCommand(CommandType.ServerIsShuttingDown);
                     try
                     {
                         await SendClientMessageAsync(shutdownCommand, user.Client!, user.PersonalSource.Token);
@@ -327,7 +327,7 @@ public class Server
                             bool success = false;
                             try
                             {
-                                await SendClientMessageAsync(JsonSerializer.Serialize(startGameCommand), playerDetail.Value.Client, playerDetail.Value.CombinedSource!.Token);
+                                await SendClientMessageAsync(startGameCommand, playerDetail.Value.Client, playerDetail.Value.CombinedSource!.Token);
                                 playersAlertedForGame.Add(playerDetail.Value);
                                 success = true;
                             }
@@ -375,7 +375,7 @@ public class Server
                             {
                                 try
                                 {
-                                    await SendClientMessageAsync(JsonSerializer.Serialize(notifyOpponentDisconnectCommand), playerWaitingForOpponent.Client!, playerWaitingForOpponent.CombinedSource!.Token);
+                                    await SendClientMessageAsync(notifyOpponentDisconnectCommand, playerWaitingForOpponent.Client!, playerWaitingForOpponent.CombinedSource!.Token);
                                 }
                                 catch (Exception e) when (e is OperationCanceledException || e is IOException || e is ObjectDisposedException || e is InvalidOperationException)
                                 {
@@ -431,8 +431,9 @@ public class Server
     /// <exception cref="IOException">Raised when an error occurs while attempting to use .WriteAsync.</exception>
     /// <exception cref="ObjectDisposedException"></exception>
     /// <exception cref="InvalidOperationException"></exception>
-    public static async Task SendClientMessageAsync(string message, TcpClient client, CancellationToken token)
+    public static async Task SendClientMessageAsync(ServerCommand commandToSend, TcpClient client, CancellationToken token)
     {
+        string message = JsonSerializer.Serialize(commandToSend);
         byte[] msg = Encoding.ASCII.GetBytes(message);
         List<byte> constructedMessage = BitConverter.GetBytes(msg.Length).ToList();
         constructedMessage.AddRange(msg);
@@ -572,7 +573,7 @@ public class Server
                             Player opposingUser = currentGame.AssociatedPlayers[GameEnvironment.ReturnOppositeTeam(clientResponse.MoveDetails.Value.SubmittingTeam)];
                             try
                             {
-                                await SendClientMessageAsync(JsonSerializer.Serialize(clientResponse), opposingUser.Client, opposingUser.PersonalSource.Token);
+                                await SendClientMessageAsync(clientResponse, opposingUser.Client, opposingUser.PersonalSource.Token);
                             }
                             catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is OperationCanceledException)
                             {
@@ -589,7 +590,7 @@ public class Server
                                     // If the opposingUser isn't reachable send player notification that the opponent couldn't be reached.
                                     // Errors thrown here will be caught in outermost catch statement.
                                     var opponentDisconnectedCommand = new ServerCommand(CommandType.OpponentClientDisconnected, currentGame.GameID);
-                                    await SendClientMessageAsync(JsonSerializer.Serialize(opponentDisconnectedCommand), user.Client, CancellationToken.None);
+                                    await SendClientMessageAsync(opponentDisconnectedCommand, user.Client, CancellationToken.None);
                                 }
                             }
                         }
@@ -644,7 +645,7 @@ public class Server
 
                         try
                         {
-                            gameEndingNotificationTasks.Add(SendClientMessageAsync(JsonSerializer.Serialize(clientCommand), opposingUser.Client, opposingUser.PersonalSource.Token));
+                            gameEndingNotificationTasks.Add(SendClientMessageAsync(clientCommand, opposingUser.Client, opposingUser.PersonalSource.Token));
                         }
                         catch (ObjectDisposedException)
                         {   // opposingUser.Token has been Disposed.
