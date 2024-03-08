@@ -345,40 +345,51 @@ public class GameEnvironment
     {
         if (newMove.SubmittingTeam == ActiveTeam && !GameEnded)
         {
-            _gameMoves.Add(newMove);
-            if (!piecesAlreadyMovedOnGUI)
-            {
-                UpdateSquaresOnGUI(newMove, piecesAlreadyMovedOnGUI);
-            }
-            EditGameBoard(newMove);
-            if (newMove.CapturingSecondary)
-            {
-                _movesSinceLastCapture = 0;
-            }
-            else
-            {
-                ++_movesSinceLastCapture;
-            }
-
             bool localPlayerMove = ActiveTeam.Equals(PlayerTeam);
-            // The local player isn't allowed to submit a move that will place themselves in check, So just determine if the opponent
-            // has placed the local player in check.
-            if (!localPlayerMove && IsKingCheckMated(PlayerTeam))
+            var hostileMoveCheck = from possibleMoves in AvailableMoves(GetPieceFromMovement(newMove, true))
+                                   where possibleMoves.MainCopy.ID.Equals(newMove.MainCopy.ID) && possibleMoves.MainNewLocation.Equals(newMove.NewMainCoords)
+                                   select true;
+
+            if (localPlayerMove || hostileMoveCheck.Any())
             {
-                ChangeGameState(GameState.LocalLoss);
-            }
-            else if (localPlayerMove && IsKingCheckMated(ReturnOppositeTeam(PlayerTeam)))
-            {
-                ChangeGameState(GameState.LocalWin);
-            }
-            else if (IsStalemate())
-            {
-                ChangeGameState(GameState.GameDraw);
+                _gameMoves.Add(newMove);
+                if (!piecesAlreadyMovedOnGUI)
+                {
+                    UpdateSquaresOnGUI(newMove, piecesAlreadyMovedOnGUI);
+                }
+                EditGameBoard(newMove);
+                if (newMove.CapturingSecondary)
+                {
+                    _movesSinceLastCapture = 0;
+                }
+                else
+                {
+                    ++_movesSinceLastCapture;
+                }
+
+                // The local player isn't allowed to submit a move that will place themselves in check, So just determine if the opponent
+                // has placed the local player in check.
+                if (!localPlayerMove && IsKingCheckMated(PlayerTeam))
+                {
+                    ChangeGameState(GameState.LocalLoss);
+                }
+                else if (localPlayerMove && IsKingCheckMated(ReturnOppositeTeam(PlayerTeam)))
+                {
+                    ChangeGameState(GameState.LocalWin);
+                }
+                else if (IsStalemate())
+                {
+                    ChangeGameState(GameState.GameDraw);
+                }
+                else
+                {
+                    Team newActiveTeam = ActiveTeam = ReturnOppositeTeam(ActiveTeam);
+                    DisableTeamVulnerabilityToEnPassant(newActiveTeam);
+                }
             }
             else
             {
-                Team newActiveTeam = ActiveTeam = ReturnOppositeTeam(ActiveTeam);
-                DisableTeamVulnerabilityToEnPassant(newActiveTeam);
+                throw new Exception("Opponent has submitted an invalid move.");
             }
         }
         else
