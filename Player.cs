@@ -141,7 +141,10 @@ public class Player
                     }
                     else if (response.CMD == CommandType.NewMove && _activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGame))
                     {
-                        UpdateGameInstance(targetedGame, response.MoveDetails!.Value, guiAlreadyUpdated: false);
+                        if (!TryUpdateGameInstance(targetedGame, response.MoveDetails!.Value, guiAlreadyUpdated: false))
+                        {
+                            throw new NotImplementedException("Send server message that the move was invalid");
+                        }
                     }
                 }
             }
@@ -175,20 +178,12 @@ public class Player
     /// <param name="targetGame">Game that chanes will target.</param>
     /// <param name="newMove">MovementInformation used to update <paramref name="targetGame"/>.</param>
     /// <param name="guiAlreadyUpdated"><see langword="true"/> if the GameBoard doesn't need to visually updated to reflect <paramref name="newMove"/>; otherwise, <see langword="false"/>.</param>
-    private void UpdateGameInstance(GameEnvironment targetGame, MovementInformation newMove, bool guiAlreadyUpdated)
+    private bool TryUpdateGameInstance(GameEnvironment targetGame, MovementInformation newMove, bool guiAlreadyUpdated)
     {
-        if (targetGame.SubmitFinalizedChange(newMove, piecesAlreadyMovedOnGUI: guiAlreadyUpdated))
-        {
-            if (targetGame.GameEnded)
-            {
-                _gui?.DisableGame(targetGame.GameID);
-            }
-        }
-        else
-        {
-            targetGame.ChangeGameState(GameState.GameDraw);
-            _gui?.DisableGame(targetGame.GameID);
-        }
+        bool success = targetGame.SubmitFinalizedChange(newMove, piecesAlreadyMovedOnGUI: guiAlreadyUpdated);
+        if (!success) targetGame.ChangeGameState(GameState.GameDraw);
+        if (targetGame.GameEnded) _gui?.DisableGame(targetGame.GameID);
+        return success;
     }
     /// <summary>
     /// Submits a chess movement <paramref name="move"/> to the <see cref="_connectedServer"/> and updates the relevant <see cref="GameEnvironment"/> instance.
@@ -201,10 +196,8 @@ public class Player
     {
         if (_activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGameInstance))
         {
-            if (targetedGameInstance.ActiveTeam == move.SubmittingTeam)
+            if (TryUpdateGameInstance(targetedGameInstance, move, guiAlreadyUpdated: true))
             {
-                UpdateGameInstance(targetedGameInstance, move, guiAlreadyUpdated: true);
-
                 if (_connectedServer is not null && PermitAccessToServer)
                 {
                     var submissionCommand = new ServerCommand(CommandType.NewMove, serverSideGameID, move);
