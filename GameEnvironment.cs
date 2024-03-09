@@ -341,13 +341,14 @@ public class GameEnvironment
     /// with the opposite <see cref="Team"/>.
     /// </summary>
     /// <param name="newMove"><see cref="MovementInformation"/> to submit to <see cref="GameBoard"/>.</param>
-    public void SubmitFinalizedChange(MovementInformation newMove, bool piecesAlreadyMovedOnGUI)
+    // /// <exception cref="InvalidOperationException">If an invalid move is submitted or a move on the wrong turn is detected.</exception>
+    public bool SubmitFinalizedChange(MovementInformation newMove, bool piecesAlreadyMovedOnGUI)
     {
         if (newMove.SubmittingTeam == ActiveTeam && !GameEnded)
         {
             bool localPlayerMove = ActiveTeam.Equals(PlayerTeam);
             var hostileMoveCheck = from possibleMoves in AvailableMoves(GetPieceFromMovement(newMove, true))
-                                   where possibleMoves.MainCopy.ID.Equals(newMove.MainCopy.ID) && possibleMoves.MainNewLocation.Equals(newMove.NewMainCoords)
+                                   where possibleMoves.MainCopy.ID.Equals(newMove.MainCopy.ID) && possibleMoves.MainNewLocation.Equals(newMove.MainNewLocation)
                                    select true;
 
             if (localPlayerMove || hostileMoveCheck.Any())
@@ -389,13 +390,16 @@ public class GameEnvironment
             }
             else
             {
-                throw new Exception("Opponent has submitted an invalid move.");
+                //throw new InvalidOperationException("Opponent has submitted an invalid move.");
+                return false;
             }
         }
         else
         {
-            throw new Exception("The wrong team has submitted a move.");
+            //throw new InvalidOperationException("The wrong team has submitted a move.");
+            return false;
         }
+        return true;
     }
 
     /// <summary>Disables vulnerability to En Passant for the current <paramref name="activeTeam"/>.</summary>
@@ -457,6 +461,10 @@ public class GameEnvironment
     public List<MovementInformation> AvailableMoves(ChessPiece piece)
     {
         var viableMoves = new List<MovementInformation>();
+        if (piece.Captured)
+        {
+            return viableMoves;
+        }
         bool targetSquareIsEmpty;
         ChessPiece copyOfPiece = piece.Copy();
 

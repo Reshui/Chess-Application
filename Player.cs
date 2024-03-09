@@ -177,9 +177,16 @@ public class Player
     /// <param name="guiAlreadyUpdated"><see langword="true"/> if the GameBoard doesn't need to visually updated to reflect <paramref name="newMove"/>; otherwise, <see langword="false"/>.</param>
     private void UpdateGameInstance(GameEnvironment targetGame, MovementInformation newMove, bool guiAlreadyUpdated)
     {
-        targetGame.SubmitFinalizedChange(newMove, piecesAlreadyMovedOnGUI: guiAlreadyUpdated);
-        if (targetGame.GameEnded)
+        if (targetGame.SubmitFinalizedChange(newMove, piecesAlreadyMovedOnGUI: guiAlreadyUpdated))
         {
+            if (targetGame.GameEnded)
+            {
+                _gui?.DisableGame(targetGame.GameID);
+            }
+        }
+        else
+        {
+            targetGame.ChangeGameState(GameState.GameDraw);
             _gui?.DisableGame(targetGame.GameID);
         }
     }
