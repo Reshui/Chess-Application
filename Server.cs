@@ -44,7 +44,7 @@ public class Server
     public enum CommandType
     {
         ClientDisconnecting, NewMove, OpponentClientDisconnected, StartGameInstance, DeclareForefit, LookingForGame, ServerIsShuttingDown,
-        DeclareWin, DeclareLoss, DeclareStaleMate, RegisterUser, DeniedAccessToServer
+        DeclareWin, DeclareLoss, DeclareStaleMate, RegisterUser, DeniedAccessToServer, InvalidMove
     }
     [Serializable]
     public class ServerCommand
