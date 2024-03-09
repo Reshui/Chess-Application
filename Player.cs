@@ -25,6 +25,10 @@ public class Player
 
     /// <summary>Stores a list of games that the user is involved in.</summary>
     private readonly Dictionary<int, GameEnvironment> _activeGames = new();
+    /// <summary>
+    /// Gets or sets a value that will limit the user from sending messages to <see cref="_connectedServer"/>.
+    /// </summary>
+    /// <value><see langword="true"/> if messages shouldn't be sent to the server; otherwise, <see langword="false"/>.</value>
     private bool PermitAccessToServer { get; set; } = false;
     /// <summary>ID used by server to track players.</summary>
     public int ServerAssignedID { get; init; }
@@ -36,7 +40,7 @@ public class Player
     /// <summary>The name assigned to this <see cref="Player"/> instance.</summary>
     private string? _name = null;
 
-    /// <summary>Static variable used by the <see cref="Player(TcpClient)"/> constructor to generate a value for <see cref="ServerAssignedID"/>.</summary>
+    /// <summary>Static variable used by the server side constructor to generate a value for <see cref="ServerAssignedID"/>.</summary>
     private static int s_instanceCount = 0;
 
     /// <summary>TokenSource used to stop server listening tasks.</summary>
@@ -143,8 +147,14 @@ public class Player
                     {
                         if (!TryUpdateGameInstance(targetedGame, response.MoveDetails!.Value, guiAlreadyUpdated: false))
                         {
-                            throw new NotImplementedException("Send server message that the move was invalid");
+                            var invalidMoveFromOpponent = new ServerCommand(CommandType.InvalidMove, targetedGame.GameID, response.MoveDetails.Value);
+                            await SendClientMessageAsync(invalidMoveFromOpponent, _connectedServer, PersonalSource.Token);
                         }
+                    }
+                    else if (response.CMD == CommandType.InvalidMove && _activeGames.TryGetValue(serverSideGameID, out targetedGame))
+                    {
+                        targetedGame.ChangeGameState(GameState.GameDraw);
+                        _gui?.DisableGame(targetedGame.GameID);
                     }
                 }
             }
