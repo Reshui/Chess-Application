@@ -344,29 +344,23 @@ public class GameEnvironment
     // /// <exception cref="InvalidOperationException">If an invalid move is submitted or a move on the wrong turn is detected.</exception>
     public bool SubmitFinalizedChange(MovementInformation newMove, bool piecesAlreadyMovedOnGUI)
     {
+        bool success = false;
         if (newMove.SubmittingTeam == ActiveTeam && !GameEnded)
         {
             bool localPlayerMove = ActiveTeam.Equals(PlayerTeam);
-            var hostileMoveCheck = from possibleMoves in AvailableMoves(GetPieceFromMovement(newMove, true))
-                                   where possibleMoves.MainCopy.ID.Equals(newMove.MainCopy.ID) && possibleMoves.MainNewLocation.Equals(newMove.MainNewLocation)
+            var hostileMoveCheck = from possibleMove in AvailableMoves(GetPieceFromMovement(newMove, true))
+                                   where possibleMove.MainCopy.ID.Equals(newMove.MainCopy.ID) && possibleMove.MainNewLocation.Equals(newMove.MainNewLocation)
                                    select true;
 
             if (localPlayerMove || hostileMoveCheck.Any())
             {
                 _gameMoves.Add(newMove);
-                if (!piecesAlreadyMovedOnGUI)
-                {
-                    UpdateSquaresOnGUI(newMove, piecesAlreadyMovedOnGUI);
-                }
+                if (!piecesAlreadyMovedOnGUI) UpdateSquaresOnGUI(newMove, piecesAlreadyMovedOnGUI);
+
                 EditGameBoard(newMove);
-                if (newMove.CapturingSecondary)
-                {
-                    _movesSinceLastCapture = 0;
-                }
-                else
-                {
-                    ++_movesSinceLastCapture;
-                }
+
+                if (newMove.CapturingSecondary) _movesSinceLastCapture = 0;
+                else ++_movesSinceLastCapture;
 
                 // The local player isn't allowed to submit a move that will place themselves in check, So just determine if the opponent
                 // has placed the local player in check.
@@ -387,19 +381,18 @@ public class GameEnvironment
                     Team newActiveTeam = ActiveTeam = ReturnOppositeTeam(ActiveTeam);
                     DisableTeamVulnerabilityToEnPassant(newActiveTeam);
                 }
+                success = true;
             }
             else
             {
-                //throw new InvalidOperationException("Opponent has submitted an invalid move.");
-                return false;
+                throw new InvalidOperationException("Opponent has submitted an invalid move.");
             }
         }
         else
         {
-            //throw new InvalidOperationException("The wrong team has submitted a move.");
-            return false;
+            throw new InvalidOperationException("The wrong team has submitted a move.");
         }
-        return true;
+        return success;
     }
 
     /// <summary>Disables vulnerability to En Passant for the current <paramref name="activeTeam"/>.</summary>
