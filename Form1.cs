@@ -174,24 +174,16 @@ namespace Chess_GUi
             MainView.Controls.Add(serverCloseLabel);
             serverCloseLabel.BringToFront();
 
-            try
-            {
-                _localPlayer = null;
-            }
-            catch (ObjectDisposedException)
-            {
-            }
-            finally
-            {
-                JoinServer.BackColor = Color.FromArgb(34, 82, 57);
-                JoinServer.ForeColor = Color.White;
+            _localPlayer = null;
 
-                StartServer.BackColor = Color.FromArgb(34, 82, 57);
-                StartServer.ForeColor = Color.White;
+            JoinServer.BackColor = Color.FromArgb(34, 82, 57);
+            JoinServer.ForeColor = Color.White;
 
-                JoinServer.Enabled = true;
-                StartServer.Enabled = true;
-            }
+            StartServer.BackColor = Color.FromArgb(34, 82, 57);
+            StartServer.ForeColor = Color.White;
+
+            JoinServer.Enabled = true;
+            StartServer.Enabled = true;
         }
         private void GameTracker_SelectedIndexChanged(object sender, EventArgs e)
         {
