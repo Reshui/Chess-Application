@@ -244,7 +244,7 @@ public class GameEnvironment
         // Count Pieces on Board
         int piecesRemaining = (from teams in _chessPiecesByTeam.Values
                                from piece in teams.Values
-                               where piece.Captured == false
+                               where piece.Captured == false || piece.IsKing()
                                select piece).Count();
 
         if (piecesRemaining == 2) return true;
