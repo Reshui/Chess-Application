@@ -44,7 +44,7 @@ public class Server
     public enum CommandType
     {
         ClientDisconnecting, NewMove, OpponentClientDisconnected, StartGameInstance, DeclareForefit, LookingForGame, ServerIsShuttingDown,
-        DeclareWin, DeclareLoss, DeclareStaleMate, RegisterUser, DeniedAccessToServer, InvalidMove
+        DeclareWin, DeclareLoss, DeclareStaleMate, RegisterUser, ServerFull, InvalidMove
     }
     [Serializable]
     public class ServerCommand
@@ -59,12 +59,13 @@ public class Server
         public int GameIdentifier { get; set; } = 0;
         /// <summary>Optional parameter used to assign a name to a <see cref="Player"/> instance.</summary>
         public string? Name { get; set; }
+        public string? Message { get; set; }
 
-        public ServerCommand(CommandType cmd, int gameIdentifier = 0, MovementInformation? moveDetails = null, Team? assignedTeam = null, string? name = null)
+        public ServerCommand(CommandType cmd, int gameIdentifier = 0, MovementInformation? moveDetails = null, Team? assignedTeam = null, string? name = null, string? message = null)
         {
             CMD = cmd;
             GameIdentifier = gameIdentifier;
-
+            Message = message;
             if (cmd == CommandType.NewMove)
             {
                 MoveDetails = moveDetails ?? throw new ArgumentNullException(nameof(moveDetails), "A new move command has been submitted without a non-null MovementInformation struct.");
@@ -144,7 +145,7 @@ public class Server
                 else
                 {
                     // To Do: Send a server full message.
-                    var deniedAccessCommand = new ServerCommand(CommandType.DeniedAccessToServer);
+                    var deniedAccessCommand = new ServerCommand(CommandType.ServerFull, message: $"The server is full {MaxConnectionCount}/{MaxConnectionCount} users are connected.");
                     await SendClientMessageAsync(deniedAccessCommand, newClient, CancellationToken.None);
                 }
             }
@@ -153,7 +154,6 @@ public class Server
         {
             ServerShutDownCancelSource.Cancel();
             Console.WriteLine("Server failed to start.\t" + e.Message);
-            throw;
         }
         finally
         {
@@ -263,7 +263,7 @@ public class Server
     /// </summary>
     private async Task ManageLookingForGroupLobbyAsync()
     {
-        List<Player> matchedPlayers = new() { Capacity = 2 };
+        List<Player> matchedPlayers = new(2);
 
         while (!ServerTasksCancellationToken.IsCancellationRequested)
         {
@@ -275,7 +275,7 @@ public class Server
                 {
                     bool bothPlayersAvailable = true;
 
-                    List<Task<bool>> clientPingingTasks = new();
+                    List<Task<bool>> clientPingingTasks = new(2);
                     foreach (Player user in matchedPlayers)
                     {
                         try
@@ -295,10 +295,10 @@ public class Server
                     while (!ServerTasksCancellationToken.IsCancellationRequested && bothPlayersAvailable && clientPingingTasks.Any())
                     {
                         var completedTask = await Task.WhenAny(clientPingingTasks);
+                        Player user = matchedPlayers[clientPingingTasks.IndexOf(completedTask)];
 
-                        if (!completedTask.Result)
+                        if (!completedTask.Result || !_connectedPlayers.ContainsKey(user.ServerAssignedID))
                         {
-                            Player user = matchedPlayers[clientPingingTasks.IndexOf(completedTask)];
                             matchedPlayers.Remove(user);
                             // If error then Client is being actively removed.
                             try
