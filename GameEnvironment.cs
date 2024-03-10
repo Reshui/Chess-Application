@@ -238,19 +238,19 @@ public class GameEnvironment
 
     /// <summary>Determines if a stalemate has been reached for the current instance.</summary>
     /// <returns><see langword="true"/> if a stalemate has been reached; otherwise, <see langword="false"/>.</returns>
-    public bool IsStalemate()
+    private bool IsStalemate()
     {
         if (_movesSinceLastCapture >= 50) return true;
         // Count Pieces on Board
         int piecesRemaining = (from teams in _chessPiecesByTeam.Values
                                from piece in teams.Values
-                               where piece.Captured == false || piece.IsKing()
+                               where piece.Captured == false
                                select piece).Count();
 
         if (piecesRemaining == 2) return true;
 
         var moveAvailableForActiveTeam = (from piece in _chessPiecesByTeam[ActiveTeam].Values
-                                          where AvailableMoves(piece).Any()
+                                          where !piece.Captured && AvailableMoves(piece).Any()
                                           select true).Any();
         return !moveAvailableForActiveTeam;
     }
@@ -366,22 +366,21 @@ public class GameEnvironment
                 if (newMove.CapturingSecondary) _movesSinceLastCapture = 0;
                 else ++_movesSinceLastCapture;
 
-                // The local player isn't allowed to submit a move that will place themselves in check, So just determine if the opponent
-                // has placed the local player in check.
-
                 Team newActiveTeam = ActiveTeam = ReturnOppositeTeam(ActiveTeam);
                 DisableTeamVulnerabilityToEnPassant(newActiveTeam);
-                if (IsStalemate())
-                {
-                    ChangeGameState(GameState.GameDraw);
-                }
-                else if (!localPlayerMove && IsKingCheckMated(PlayerTeam))
+                // The local player isn't allowed to submit a move that will place themselves in check, So just determine if the opponent
+                // has placed the local player in check.
+                if (!localPlayerMove && IsKingCheckMated(PlayerTeam))
                 {
                     ChangeGameState(GameState.LocalLoss);
                 }
                 else if (localPlayerMove && IsKingCheckMated(ReturnOppositeTeam(PlayerTeam)))
                 {
                     ChangeGameState(GameState.LocalWin);
+                }
+                else if (IsStalemate())
+                {
+                    ChangeGameState(GameState.GameDraw);
                 }
                 success = true;
             }
