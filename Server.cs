@@ -146,7 +146,7 @@ public class Server
                 {
                     // To Do: Send a server full message.
                     var deniedAccessCommand = new ServerCommand(CommandType.ServerFull, message: $"The server is full {MaxConnectionCount}/{MaxConnectionCount} users are connected.");
-                    await SendClientMessageAsync(deniedAccessCommand, newClient, CancellationToken.None);
+                    await SendClientMessageAsync(deniedAccessCommand, newClient, CancellationToken.None).ConfigureAwait(false);
                 }
             }
         }
@@ -159,7 +159,7 @@ public class Server
         {
             try
             {
-                await Task.WhenAll(_clientListeningTasks.Values);
+                await Task.WhenAll(_clientListeningTasks.Values).ConfigureAwait(false);
             }
             catch (Exception e)
             {
@@ -180,7 +180,7 @@ public class Server
         _waitingForGameLobby.Clear();
         try
         {
-            await Task.WhenAll(_serverTasks);
+            await Task.WhenAll(_serverTasks).ConfigureAwait(false);
         }
         catch (Exception)
         {
@@ -213,7 +213,7 @@ public class Server
                 var shutdownCommand = new ServerCommand(CommandType.ServerIsShuttingDown);
                 try
                 {
-                    await SendClientMessageAsync(shutdownCommand, user.Client!, user.PersonalSource.Token);
+                    await SendClientMessageAsync(shutdownCommand, user.Client!, user.PersonalSource.Token).ConfigureAwait(false);
                     success = true;
                 }
                 catch (IOException e)
@@ -245,7 +245,7 @@ public class Server
             {
                 try
                 {
-                    await user.PingConnectedClientTask;
+                    await user.PingConnectedClientTask.ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 { }
@@ -294,7 +294,7 @@ public class Server
 
                     while (!ServerTasksCancellationToken.IsCancellationRequested && bothPlayersAvailable && clientPingingTasks.Any())
                     {
-                        var completedTask = await Task.WhenAny(clientPingingTasks);
+                        var completedTask = await Task.WhenAny(clientPingingTasks).ConfigureAwait(false);
                         Player user = matchedPlayers[clientPingingTasks.IndexOf(completedTask)];
 
                         if (!completedTask.Result || !_connectedPlayers.ContainsKey(user.ServerAssignedID))
@@ -323,7 +323,7 @@ public class Server
                             bool success = false;
                             try
                             {
-                                await SendClientMessageAsync(startGameCommand, playerDetail.Value.Client, playerDetail.Value.CombinedSource!.Token);
+                                await SendClientMessageAsync(startGameCommand, playerDetail.Value.Client, playerDetail.Value.CombinedSource!.Token).ConfigureAwait(false);
                                 playersAlertedForGame.Add(playerDetail.Value);
                                 success = true;
                             }
@@ -371,7 +371,7 @@ public class Server
                             {
                                 try
                                 {
-                                    await SendClientMessageAsync(notifyOpponentDisconnectCommand, playerWaitingForOpponent.Client!, playerWaitingForOpponent.CombinedSource!.Token);
+                                    await SendClientMessageAsync(notifyOpponentDisconnectCommand, playerWaitingForOpponent.Client!, playerWaitingForOpponent.CombinedSource!.Token).ConfigureAwait(false);
                                 }
                                 catch (Exception e) when (e is OperationCanceledException || e is IOException || e is ObjectDisposedException || e is InvalidOperationException)
                                 {
@@ -395,7 +395,7 @@ public class Server
                     }
                 }
             }
-            await Task.Delay(1000, ServerTasksCancellationToken);
+            await Task.Delay(1000, ServerTasksCancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -410,7 +410,7 @@ public class Server
 
         try
         {   // Send 0 bytes to test the connection.
-            await client.GetStream().WriteAsync(data.AsMemory(0, 0), token);
+            await client.GetStream().WriteAsync(data.AsMemory(0, 0), token).ConfigureAwait(false);
         }
         catch (Exception)
         {
@@ -435,7 +435,7 @@ public class Server
         constructedMessage.AddRange(msg);
         byte[] msgConverted = constructedMessage.ToArray();
 
-        await client.GetStream().WriteAsync(msgConverted, token);
+        await client.GetStream().WriteAsync(msgConverted, token).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -465,12 +465,12 @@ public class Server
                     if (stream.DataAvailable && !token.IsCancellationRequested)
                     {
                         // If a token passed to ReadAsync is cancelled then the connection will be closed.
-                        responseByteCount = await stream.ReadAsync(buffer, CancellationToken.None);
+                        responseByteCount = await stream.ReadAsync(buffer, CancellationToken.None).ConfigureAwait(false);
                         break;
                     }
                     else
                     {
-                        await Task.Delay(400, token);
+                        await Task.Delay(400, token).ConfigureAwait(false);
                     }
                 } while (true);
 
@@ -569,7 +569,7 @@ public class Server
                             Player opposingUser = currentGame.AssociatedPlayers[GameEnvironment.ReturnOppositeTeam(clientResponse.MoveDetails.Value.SubmittingTeam)];
                             try
                             {
-                                await SendClientMessageAsync(clientResponse, opposingUser.Client, opposingUser.PersonalSource.Token);
+                                await SendClientMessageAsync(clientResponse, opposingUser.Client, opposingUser.PersonalSource.Token).ConfigureAwait(false);
                             }
                             catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is OperationCanceledException)
                             {
@@ -586,7 +586,7 @@ public class Server
                                     // If the opposingUser isn't reachable send player notification that the opponent couldn't be reached.
                                     // Errors thrown here will be caught in outermost catch statement.
                                     var opponentDisconnectedCommand = new ServerCommand(CommandType.OpponentClientDisconnected, currentGame.GameID);
-                                    await SendClientMessageAsync(opponentDisconnectedCommand, user.Client, CancellationToken.None);
+                                    await SendClientMessageAsync(opponentDisconnectedCommand, user.Client, CancellationToken.None).ConfigureAwait(false);
                                 }
                             }
                         }
@@ -651,13 +651,13 @@ public class Server
 
                 try
                 {
-                    if (gameEndingNotificationTasks.Any()) await Task.WhenAll(gameEndingNotificationTasks);
+                    if (gameEndingNotificationTasks.Any()) await Task.WhenAll(gameEndingNotificationTasks).ConfigureAwait(false);
                 }
                 catch (Exception)
                 {
                 }
             }
-            await DisconnectUserAsync(user);
+            await DisconnectUserAsync(user).ConfigureAwait(false);
         }
     }
 
@@ -690,12 +690,12 @@ public class Server
         {
             while (!pingCancellationToken.IsCancellationRequested)
             {
-                if (!await IsClientActiveAsync(clientToPing, pingCancellationToken))
+                if (!await IsClientActiveAsync(clientToPing, pingCancellationToken).ConfigureAwait(false))
                 {
                     sourceToInvoke.Cancel();
                     return;
                 }
-                await Task.Delay(1000 * SecondsBetweenPings, pingCancellationToken);
+                await Task.Delay(1000 * SecondsBetweenPings, pingCancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
