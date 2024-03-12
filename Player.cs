@@ -317,4 +317,12 @@ public class Player
             }
         }
     }
+    public async Task JoinWaitingLobby()
+    {
+        if (_connectedServer?.Connected ?? false && !PersonalSource.IsCancellationRequested && PermitAccessToServer)
+        {
+            var lfgCommand = new ServerCommand(CommandType.LookingForGame);
+            await SendClientMessageAsync(lfgCommand, _connectedServer, PersonalSource.Token).ConfigureAwait(false);
+        }
+    }
 }
