@@ -27,6 +27,25 @@ namespace Chess_GUi
         {
             InitializeComponent();
             this.FormClosing += new FormClosingEventHandler(this.HandleDisconnectsAsync!);
+
+
+
+
+        }
+        private void AddControls()
+        {
+            var JoinLobbyBTN = new Button()
+            {
+                Size = StartServer.Size,
+                Location = new Point(GameTracker.Left, GameTracker.Bottom + 20),
+                Enabled = false,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Text = "Look For Game",
+                Visible = false,
+                Name = "LFG"
+            };
+            JoinLobbyBTN.Click += new EventHandler(JoinLobby_Click!);
+            panel1.Controls.Add(JoinLobbyBTN);
         }
 
         private async void HandleDisconnectsAsync(object sender, FormClosingEventArgs evnt)
@@ -45,6 +64,11 @@ namespace Chess_GUi
                         Console.WriteLine(e);
                     }
                     _localPlayer = null;
+
+                    var btn = panel1.Controls["LFG"];
+                    btn.Visible = false;
+                    btn.Enabled = false;
+
                     if (_hostedServer is not null) await Task.Delay(1000);
                 }
 
@@ -90,7 +114,15 @@ namespace Chess_GUi
                 {
                     throw new NotImplementedException();
                 }
+                panel1.Controls["LFG"].Enabled = true;
+                panel1.Controls["LFG"].Visible = true;
             }
+        }
+
+        private void JoinLobby_Click(object sender, EventArgs e)
+        {
+            // _localPlayer is null if not connected to a server.
+            _localPlayer?.JoinWaitingLobby();
         }
 
         public void AddGame(GameEnvironment newGame)

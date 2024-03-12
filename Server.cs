@@ -560,7 +560,7 @@ public class Server
                     }
                     else if (clientResponse.CMD == CommandType.LookingForGame && userRegistered && !_waitingForGameLobby.Contains(user))
                     {   // Only add the user to the queue if they aren't already in it.
-                        _waitingForGameLobby.Enqueue(user);
+                        if (!_waitingForGameLobby.Contains(user)) _waitingForGameLobby.Enqueue(user);
                     }
                     else if (clientResponse.CMD == CommandType.NewMove && clientResponse.MoveDetails is not null && userRegistered)
                     {   // Send user response to the opposing player.
@@ -685,7 +685,7 @@ public class Server
     /// <param name="clientToPing"><see cref="TcpClient"/> that will be pinged in a loop.</param>
     /// <param name="sourceToInvoke"><seealso cref="CancellationTokenSource"/> that will be cancelled if <paramref name="clientToPing"/> cannot be reached.</param>
     /// <param name="pingCancellationToken"><see cref="CancellationToken"/> used to cancel this task.</param>
-    /// <returns>An async Task.</returns>
+    /// <returns>An asynchronous Task.</returns>
     public static async Task PingClientAsync(TcpClient clientToPing, CancellationTokenSource sourceToInvoke, CancellationToken pingCancellationToken)
     {
         const byte SecondsBetweenPings = 10;
