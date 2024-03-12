@@ -345,7 +345,7 @@ public class GameEnvironment
     /// with the opposite <see cref="Team"/>.
     /// </summary>
     /// <param name="newMove"><see cref="MovementInformation"/> to submit to <see cref="GameBoard"/>.</param>
-    // /// <exception cref="InvalidOperationException">If an invalid move is submitted or a move on the wrong turn is detected.</exception>
+    /// <param name="piecesAlreadyMovedOnGUI">true if chesspieces on the GUI have already been updated; otherwise, false.</param>
     public bool SubmitFinalizedChange(MovementInformation newMove, bool piecesAlreadyMovedOnGUI)
     {
         bool success = false;
