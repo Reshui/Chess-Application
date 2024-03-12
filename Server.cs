@@ -651,7 +651,10 @@ public class Server
 
                 try
                 {
-                    if (gameEndingNotificationTasks.Any()) await Task.WhenAll(gameEndingNotificationTasks).ConfigureAwait(false);
+                    if (gameEndingNotificationTasks.Any())
+                    {
+                        await Task.WhenAll(gameEndingNotificationTasks).ConfigureAwait(false);
+                    }
                 }
                 catch (Exception)
                 {

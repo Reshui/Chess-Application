@@ -27,7 +27,7 @@ public class GameEnvironment
     public Dictionary<Team, Player> AssociatedPlayers = new();
 
     /// <summary>Dictionary of <see cref="ChessPiece"/> objects keyed to a <see cref="Team"/> enum.</summary>
-    private readonly Dictionary<Team, Dictionary<string, ChessPiece>> _chessPiecesByTeam;
+    private readonly Dictionary<Team, Dictionary<string, ChessPiece>> _chessPieceByIdByTeam;
 
     /// <summary>List of submitted moves within the current <see cref="GameEnvironment"/> instance.</summary>
     private readonly List<MovementInformation> _gameMoves = new();
@@ -70,7 +70,7 @@ public class GameEnvironment
         GameID = serverSideID;
         PlayerTeam = playerTeam;
 
-        _chessPiecesByTeam = GenerateBoard();
+        _chessPieceByIdByTeam = GenerateBoard();
         AssignKings(out _whiteKing, out _blackKing);
     }
 
@@ -225,7 +225,7 @@ public class GameEnvironment
         if (!IsKingChecked(teamToCheck)) return false;
 
         // Determine if there are any moves that can be done to prevent the current check.
-        foreach (ChessPiece friendlyChessPiece in _chessPiecesByTeam[teamToCheck].Values.Where(x => !x.Captured))
+        foreach (ChessPiece friendlyChessPiece in _chessPieceByIdByTeam[teamToCheck].Values.Where(x => !x.Captured))
         {
             foreach (var movement in AvailableMoves(friendlyChessPiece))
             {
@@ -242,14 +242,14 @@ public class GameEnvironment
     {
         if (_movesSinceLastCapture >= 50) return true;
         // Count Pieces on Board
-        int piecesRemaining = (from teams in _chessPiecesByTeam.Values
+        int piecesRemaining = (from teams in _chessPieceByIdByTeam.Values
                                from piece in teams.Values
                                where piece.Captured == false
                                select piece).Count();
 
         if (piecesRemaining == 2) return true;
 
-        var moveAvailableForActiveTeam = (from piece in _chessPiecesByTeam[ActiveTeam].Values
+        var moveAvailableForActiveTeam = (from piece in _chessPieceByIdByTeam[ActiveTeam].Values
                                           where !piece.Captured && AvailableMoves(piece).Any()
                                           select true).Any();
         return !moveAvailableForActiveTeam;
@@ -264,7 +264,7 @@ public class GameEnvironment
     {
         var teamMoves = new Dictionary<string, List<MovementInformation>>();
 
-        foreach (ChessPiece chessPiece in _chessPiecesByTeam[queriedTeam].Values.Where(x => !x.Captured))
+        foreach (ChessPiece chessPiece in _chessPieceByIdByTeam[queriedTeam].Values.Where(x => !x.Captured))
         {
             teamMoves.Add(chessPiece.ID, AvailableMoves(chessPiece));
         }
@@ -400,7 +400,7 @@ public class GameEnvironment
     /// <param name="activeTeam">The Team that will have its Pawns be no longer captureable via En Passant.</param>
     private void DisableTeamVulnerabilityToEnPassant(Team activeTeam)
     {
-        foreach (ChessPiece chessPiece in _chessPiecesByTeam[activeTeam].Values.Where(x => x.CanBeCapturedViaEnPassant))
+        foreach (ChessPiece chessPiece in _chessPieceByIdByTeam[activeTeam].Values.Where(x => x.CanBeCapturedViaEnPassant))
         {
             chessPiece.DisableEnPassantCaptures();
         }
@@ -638,7 +638,7 @@ public class GameEnvironment
         {
             Team wantedTeam = (wantPrimary || move.CastlingWithSecondary) ? move.SubmittingTeam : ReturnOppositeTeam(move.SubmittingTeam);
             string pieceID = wantPrimary ? move.MainCopy.ID : move.SecondaryCopy!.ID;
-            pieceFromMove = _chessPiecesByTeam[wantedTeam][pieceID];
+            pieceFromMove = _chessPieceByIdByTeam[wantedTeam][pieceID];
         }
         catch (KeyNotFoundException e)
         {
