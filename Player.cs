@@ -110,6 +110,7 @@ public class Player
 
         try
         {
+            var gamesToIgnore = new List<int>();
             var registerCommand = new ServerCommand(CommandType.RegisterUser, name: Name);
             var lfgCommand = new ServerCommand(CommandType.LookingForGame);
 
@@ -127,10 +128,18 @@ public class Player
                     int serverSideGameID = response.GameIdentifier;
 
                     if (response.CMD == CommandType.StartGameInstance)
-                    {   // Create a GameEnvironmentInstance, track it and send to the main GUi as well.
-                        var newGame = new GameEnvironment(serverSideGameID, (Team)response.AssignedTeam!);
-                        _activeGames.Add(serverSideGameID, newGame);
-                        _gui?.AddGame(newGame);
+                    {
+                        if (!gamesToIgnore.Contains(serverSideGameID))
+                        {
+                            // Create a GameEnvironmentInstance, track it and send to the main GUi as well.
+                            var newGame = new GameEnvironment(serverSideGameID, (Team)response.AssignedTeam!);
+                            _activeGames.Add(serverSideGameID, newGame);
+                            _gui?.AddGame(newGame);
+                        }
+                        else
+                        {
+                            gamesToIgnore.Remove(serverSideGameID);
+                        }
                     }
                     else if (response.CMD == CommandType.ServerIsShuttingDown)
                     {
@@ -142,6 +151,10 @@ public class Player
                         _activeGames[serverSideGameID].ChangeGameState(GameState.OpponentDisconnected);
                         _gui?.DisableGame(serverSideGameID);
                         _activeGames.Remove(serverSideGameID);
+                    }
+                    else if (response.CMD == CommandType.OpponentClientDisconnected && !_activeGames.ContainsKey(serverSideGameID))
+                    {
+                        gamesToIgnore.Add(serverSideGameID);
                     }
                     else if (response.CMD == CommandType.NewMove && _activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGame))
                     {
