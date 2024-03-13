@@ -29,7 +29,7 @@ public class Player
     /// Gets or sets a value that will limit the user from sending messages to <see cref="_connectedServer"/>.
     /// </summary>
     /// <value><see langword="true"/> if messages shouldn't be sent to the server; otherwise, <see langword="false"/>.</value>
-    private bool PermitAccessToServer { get; set; } = false;
+    private bool AllowedToMessageServer { get; set; } = false;
     /// <summary>ID used by server to track players.</summary>
     public int ServerAssignedID { get; init; }
 
@@ -104,7 +104,7 @@ public class Player
     private async Task ListenForServerResponseAsync()
     {
         var token = PersonalSource.Token;
-        PermitAccessToServer = true;
+        AllowedToMessageServer = true;
         // Get a client stream for reading and writing.
         NetworkStream stream = _connectedServer!.GetStream();
 
@@ -143,7 +143,7 @@ public class Player
                     }
                     else if (response.CMD == CommandType.ServerIsShuttingDown)
                     {
-                        PermitAccessToServer = false;
+                        AllowedToMessageServer = false;
                         throw new IOException("Shutdwon command recieved.");
                     }
                     else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames.ContainsKey(serverSideGameID))
@@ -179,7 +179,7 @@ public class Player
         catch (OperationCanceledException)
         {
             // Unable to reach server in ping task.
-            if (!UserWantsToQuit) PermitAccessToServer = false;
+            if (!UserWantsToQuit) AllowedToMessageServer = false;
         }
         catch (InvalidOperationException e)
         {
@@ -221,7 +221,7 @@ public class Player
         {
             if (TryUpdateGameInstance(targetedGameInstance, move, guiAlreadyUpdated: true))
             {
-                if (_connectedServer is not null && PermitAccessToServer)
+                if (_connectedServer is not null && AllowedToMessageServer)
                 {
                     var submissionCommand = new ServerCommand(CommandType.NewMove, serverSideGameID, move);
                     try
@@ -235,7 +235,7 @@ public class Player
                         if (e is IOException || e is NullReferenceException || e is InvalidOperationException)
                         {
                             // Server can't be reached.
-                            PermitAccessToServer = false;
+                            AllowedToMessageServer = false;
                             newIOException = new IOException("Unable to contact server.", e);
                         }
                         else if (!UserWantsToQuit && e is OperationCanceledException)
@@ -260,9 +260,9 @@ public class Player
                         Console.WriteLine(e.Message);
                     }*/
                 }
-                else if ((_connectedServer?.Connected ?? false) == false || PermitAccessToServer == false)
+                else if ((_connectedServer?.Connected ?? false) == false || AllowedToMessageServer == false)
                 {
-                    PermitAccessToServer = false;
+                    AllowedToMessageServer = false;
                     throw new IOException("Server is no longer connected.");
                 }
             }
@@ -295,7 +295,7 @@ public class Player
             try
             {   // Command is sent first rather than at the end of client listening because, 
                 // when the token is invoked the stream cannot be sent any more messages.                
-                if (PermitAccessToServer)
+                if (AllowedToMessageServer)
                 {
                     var notifyServerCommand = new ServerCommand(CommandType.ClientDisconnecting);
                     await SendClientMessageAsync(notifyServerCommand, _connectedServer, CancellationToken.None).ConfigureAwait(false);
@@ -332,7 +332,7 @@ public class Player
     }
     public async Task JoinWaitingLobby()
     {
-        if (_connectedServer?.Connected ?? false && !PersonalSource.IsCancellationRequested && PermitAccessToServer)
+        if (_connectedServer?.Connected ?? false && !PersonalSource.IsCancellationRequested && AllowedToMessageServer)
         {
             var lfgCommand = new ServerCommand(CommandType.LookingForGame);
             await SendClientMessageAsync(lfgCommand, _connectedServer, PersonalSource.Token).ConfigureAwait(false);
