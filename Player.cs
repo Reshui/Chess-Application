@@ -116,12 +116,12 @@ public class Player
 
             foreach (ServerCommand commandToSend in new ServerCommand[2] { registerCommand, lfgCommand })
             {
-                await SendClientMessageAsync(commandToSend, _connectedServer, PersonalSource.Token);
+                await SendClientMessageAsync(commandToSend, _connectedServer, PersonalSource.Token).ConfigureAwait(false);
             }
 
             while (!token.IsCancellationRequested)
             {
-                ServerCommand response = await RecieveCommandFromStreamAsync(stream, token);
+                ServerCommand response = await RecieveCommandFromStreamAsync(stream, token).ConfigureAwait(false);
 
                 if (response is not null)
                 {
@@ -161,7 +161,7 @@ public class Player
                         if (!TryUpdateGameInstance(targetedGame, response.MoveDetails!.Value, guiAlreadyUpdated: false))
                         {
                             var invalidMoveFromOpponent = new ServerCommand(CommandType.InvalidMove, targetedGame.GameID, response.MoveDetails.Value);
-                            await SendClientMessageAsync(invalidMoveFromOpponent, _connectedServer, PersonalSource.Token);
+                            await SendClientMessageAsync(invalidMoveFromOpponent, _connectedServer, PersonalSource.Token).ConfigureAwait(false);
                         }
                     }
                     else if (response.CMD == CommandType.InvalidMove && _activeGames.TryGetValue(serverSideGameID, out targetedGame))
@@ -190,7 +190,7 @@ public class Player
             // Function has already been called if true.
             if (!UserWantsToQuit)
             {
-                await CloseConnectionToServerAsync(userIsQuitting: false, calledFromListeningTask: true);
+                await CloseConnectionToServerAsync(userIsQuitting: false, calledFromListeningTask: true).ConfigureAwait(false);
             }
         }
     }
@@ -226,7 +226,7 @@ public class Player
                     var submissionCommand = new ServerCommand(CommandType.NewMove, serverSideGameID, move);
                     try
                     {
-                        await SendClientMessageAsync(submissionCommand, _connectedServer, PersonalSource.Token);
+                        await SendClientMessageAsync(submissionCommand, _connectedServer, PersonalSource.Token).ConfigureAwait(false);
                     }
                     catch (Exception e) when (e is IOException || e is OperationCanceledException || e is NullReferenceException || e is InvalidOperationException)
                     {
@@ -246,7 +246,7 @@ public class Player
 
                         if (newIOException is not null)
                         {
-                            await CloseConnectionToServerAsync(false, false);
+                            await CloseConnectionToServerAsync(false, false).ConfigureAwait(false);
                             throw newIOException;
                         }
                     }
@@ -298,7 +298,7 @@ public class Player
                 if (PermitAccessToServer)
                 {
                     var notifyServerCommand = new ServerCommand(CommandType.ClientDisconnecting);
-                    await SendClientMessageAsync(notifyServerCommand, _connectedServer, CancellationToken.None);
+                    await SendClientMessageAsync(notifyServerCommand, _connectedServer, CancellationToken.None).ConfigureAwait(false);
                 }
             }
             catch (IOException e)
@@ -315,12 +315,12 @@ public class Player
                 // If this method wasn't called from ListenForServerResponseAsync() then wait for that Task to finish.
                 if (!calledFromListeningTask && _listenForServerTask is not null)
                 {
-                    await _listenForServerTask;
+                    await _listenForServerTask.ConfigureAwait(false);
                 }
 
                 if (PingConnectedClientTask is not null)
                 {
-                    await PingConnectedClientTask;
+                    await PingConnectedClientTask.ConfigureAwait(false);
                 }
 
                 PersonalSource.Dispose();
