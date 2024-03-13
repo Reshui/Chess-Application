@@ -484,60 +484,57 @@ public class Server
     /// <exception cref="OperationCanceledException">Thrown if <paramref name="token"/> source is cancelled.</exception>
     /// <exception cref="IOException">Thrown if something goes wrong with <paramref name="stream"/>.ReadAsync().</exception>
     /// <exception cref="OperationCanceledException">Thrown if <paramref name="token"/> is invoked while using .ReadAsync().</exception>
-    public static async Task<ServerCommand> RecieveCommandFromStreamAsync(NetworkStream stream, CancellationToken token)
+    public static async Task<ServerCommand?> RecieveCommandFromStreamAsync(NetworkStream stream, CancellationToken token)
     {
         var builder = new StringBuilder();
-        int responseByteCount;
-
+        int bufferByteCount = 0;
         do
         {
             // Incoming messages contain the length of the message in bytes within the first 4 bytes.
             byte[] buffer = new byte[sizeof(int)];
-            int totalRecieved = -1 * buffer.Length, incomingMessageByteCount = 0;
+            int bytesReadCount = -1 * buffer.Length, totalBytesToRead = 0;
             bool byteCountRecieved = false;
 
             do
             {
+                // While the entire message hasn't been recieved.
                 do
                 {
                     if (stream.DataAvailable && !token.IsCancellationRequested)
                     {
                         // If a token passed to ReadAsync is cancelled then the connection will be closed.
-                        responseByteCount = await stream.ReadAsync(buffer, CancellationToken.None).ConfigureAwait(false);
+                        bufferByteCount = await stream.ReadAsync(buffer, CancellationToken.None).ConfigureAwait(false);
                         break;
                     }
                     else
                     {
-                        await Task.Delay(400, token).ConfigureAwait(false);
+                        await Task.Delay(700, CancellationToken.None).ConfigureAwait(false);
                     }
-                } while (true);
+                } while (!token.IsCancellationRequested);
 
-                if (responseByteCount > 0)
+                if (!token.IsCancellationRequested && bufferByteCount > 0)
                 {
-                    if (!byteCountRecieved)
+                    if (!byteCountRecieved && bufferByteCount == sizeof(int))
                     {   // Ensure first 4 bytes are a number.
                         // Gets the byte count of the incoming data and sizes the bytes array to accomadate. 
-                        if (responseByteCount == sizeof(int))
-                        {
-                            try
-                            {   // Verify that the first 4 bytes are a number.
-                                incomingMessageByteCount = BitConverter.ToInt32(buffer, 0);
-                            }
-                            catch (Exception)
-                            {
-                                continue;
-                            }
-                            totalRecieved += responseByteCount;
-                            byteCountRecieved = true;
-                            // Resize the array to fit incoming data.
-                            buffer = new byte[incomingMessageByteCount];
+                        try
+                        {   // Verify that the first 4 bytes are a number.
+                            totalBytesToRead = BitConverter.ToInt32(buffer, 0);
                         }
+                        catch (Exception)
+                        {
+                            continue;
+                        }
+                        bytesReadCount += bufferByteCount;
+                        byteCountRecieved = true;
+                        // Resize the array to fit incoming data.
+                        buffer = new byte[totalBytesToRead];
                     }
-                    else
+                    else if (byteCountRecieved)
                     {
-                        string textSection = Encoding.ASCII.GetString(buffer, 0, responseByteCount);
+                        string textSection = Encoding.ASCII.GetString(buffer, 0, bufferByteCount);
                         // If the expected number of bytes has been read then attempt to deserialize it into a ServerCommand
-                        if ((totalRecieved += responseByteCount) == incomingMessageByteCount)
+                        if ((bytesReadCount += bufferByteCount) == totalBytesToRead)
                         {   // All message bytes have been recieved.
                             if (builder.Length > 0) textSection = builder.Append(textSection).ToString();
 
@@ -548,8 +545,8 @@ public class Server
                             }
                             catch (Exception)
                             {
-                                if (builder.Length > 0) builder = new StringBuilder();
                                 // Start waiting for another response.
+                                if (builder.Length > 0) builder = new StringBuilder();
                                 break;
                             }
                         }
@@ -559,9 +556,9 @@ public class Server
                         }
                     }
                 }
-                // While the entire message hasn't been recieved.
-            } while (totalRecieved < incomingMessageByteCount);
-        } while (true);
+            } while (!token.IsCancellationRequested && bytesReadCount < totalBytesToRead);
+        } while (!token.IsCancellationRequested);
+        return null;
     }
 
     /// <summary>
@@ -579,7 +576,7 @@ public class Server
             //using var combinedSource = CancellationTokenSource.CreateLinkedTokenSource(ServerTasksCancellationToken, user.PersonalSource.Token);
             while (!(user.CombinedSource?.IsCancellationRequested ?? true))
             {
-                ServerCommand clientResponse = await RecieveCommandFromStreamAsync(stream, user.CombinedSource.Token).ConfigureAwait(false);
+                ServerCommand? clientResponse = await RecieveCommandFromStreamAsync(stream, user.CombinedSource.Token).ConfigureAwait(false);
 
                 if (clientResponse is not null)
                 {
