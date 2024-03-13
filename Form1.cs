@@ -26,11 +26,8 @@ namespace Chess_GUi
         public Form1()
         {
             InitializeComponent();
-            this.FormClosing += new FormClosingEventHandler(this.HandleDisconnectsAsync!);
-
-
-
-
+            this.FormClosing += new FormClosingEventHandler(this.ClosingEventsAsync!);
+            AddControls();
         }
         private void AddControls()
         {
@@ -42,13 +39,14 @@ namespace Chess_GUi
                 TextAlign = ContentAlignment.MiddleCenter,
                 Text = "Look For Game",
                 Visible = false,
-                Name = "LFG"
+                Name = "LFG",
+                ForeColor = Color.White
             };
             JoinLobbyBTN.Click += new EventHandler(JoinLobby_Click!);
             panel1.Controls.Add(JoinLobbyBTN);
         }
 
-        private async void HandleDisconnectsAsync(object sender, FormClosingEventArgs evnt)
+        private async void ClosingEventsAsync(object sender, FormClosingEventArgs evnt)
         {
             if (!_allowClose)
             {
