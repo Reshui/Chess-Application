@@ -116,12 +116,12 @@ public class Player
 
             foreach (ServerCommand commandToSend in new ServerCommand[2] { registerCommand, lfgCommand })
             {
-                await SendClientMessageAsync(commandToSend, _connectedServer, PersonalSource.Token).ConfigureAwait(false);
+                await SendClientMessageAsync(commandToSend, _connectedServer, PersonalSource.Token);//.ConfigureAwait(false);
             }
 
             while (!token.IsCancellationRequested)
             {
-                ServerCommand response = await RecieveCommandFromStreamAsync(stream, token).ConfigureAwait(false);
+                ServerCommand? response = await RecieveCommandFromStreamAsync(stream, token);//.ConfigureAwait(false);
 
                 if (response is not null)
                 {
@@ -144,6 +144,7 @@ public class Player
                     else if (response.CMD == CommandType.ServerIsShuttingDown)
                     {
                         AllowedToMessageServer = false;
+                        PersonalSource.Cancel();
                         Console.WriteLine("Host has disconnected.");
                         break;
                     }
@@ -162,7 +163,7 @@ public class Player
                         if (!TryUpdateGameInstance(targetedGame, response.MoveDetails!.Value, guiAlreadyUpdated: false))
                         {
                             var invalidMoveFromOpponent = new ServerCommand(CommandType.InvalidMove, targetedGame.GameID, response.MoveDetails.Value);
-                            await SendClientMessageAsync(invalidMoveFromOpponent, _connectedServer, PersonalSource.Token).ConfigureAwait(false);
+                            await SendClientMessageAsync(invalidMoveFromOpponent, _connectedServer, PersonalSource.Token);//.ConfigureAwait(false);
                         }
                     }
                     else if (response.CMD == CommandType.InvalidMove && _activeGames.TryGetValue(serverSideGameID, out targetedGame))
@@ -230,6 +231,10 @@ public class Player
                     {
                         await SendClientMessageAsync(submissionCommand, _connectedServer, PersonalSource.Token).ConfigureAwait(false);
                     }
+                    catch (ObjectDisposedException)
+                    {
+                        // Token was disposed of in CloseConnectionToServerAsync() and server will be shutdown and user notified.
+                    }
                     catch (Exception e) when (e is IOException || e is OperationCanceledException || e is NullReferenceException || e is InvalidOperationException)
                     {
                         targetedGameInstance.ChangeGameState(GameState.ServerUnavailable);
@@ -251,10 +256,6 @@ public class Player
                             await CloseConnectionToServerAsync(false, false).ConfigureAwait(false);
                             throw newIOException;
                         }
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        // Token was disposed of in CloseConnectionToServerAsync() and server will be shutdown and user notified.
                     }
                     /*catch (InvalidOperationException e)
                     {
@@ -313,6 +314,7 @@ public class Player
             }
             finally
             {
+                AllowedToMessageServer = false;
                 PersonalSource.Cancel();
                 // If this method wasn't called from ListenForServerResponseAsync() then wait for that Task to finish.
                 if (!calledFromListeningTask && _listenForServerTask is not null)
