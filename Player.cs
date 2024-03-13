@@ -144,7 +144,8 @@ public class Player
                     else if (response.CMD == CommandType.ServerIsShuttingDown)
                     {
                         AllowedToMessageServer = false;
-                        throw new IOException("Shutdwon command recieved.");
+                        Console.WriteLine("Host has disconnected.");
+                        break;
                     }
                     else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames.ContainsKey(serverSideGameID))
                     {
@@ -174,7 +175,8 @@ public class Player
         }
         catch (IOException)
         {   // Couldn't reach host.
-            Console.WriteLine("Host has disconnected.");
+            Console.WriteLine("Host can't be reached.");
+            AllowedToMessageServer = false;
         }
         catch (OperationCanceledException)
         {
