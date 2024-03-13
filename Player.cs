@@ -166,7 +166,7 @@ public class Player
                             await SendClientMessageAsync(invalidMoveFromOpponent, _connectedServer, PersonalSource.Token);//.ConfigureAwait(false);
                         }
                     }
-                    else if (response.CMD == CommandType.InvalidMove && _activeGames.TryGetValue(serverSideGameID, out targetedGame))
+                    else if (response.CMD == CommandType.InvalidMove && _activeGames.Remove(serverSideGameID, out targetedGame))
                     {
                         targetedGame.ChangeGameState(GameState.GameDraw);
                         _gui?.DisableGame(targetedGame.GameID);
@@ -186,7 +186,7 @@ public class Player
         }
         catch (InvalidOperationException e)
         {
-            Console.WriteLine("Waiting for server response failed. " + e.Message);
+            Console.WriteLine(e);
         }
         finally
         {
