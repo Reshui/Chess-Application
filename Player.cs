@@ -94,14 +94,14 @@ public class Player
             return false;
         }
         PingConnectedClientTask = PingClientAsync(_connectedServer, PersonalSource, PersonalSource.Token);
-        _listenForServerTask = StartListeningAsync();
+        _listenForServerTask = ListenForServerResponseAsync();
         return true;
     }
 
     /// <summary>
     /// Asynchonously connects to a server and starts waiting for server responses.
     /// </summary>
-    private async Task StartListeningAsync()
+    private async Task ListenForServerResponseAsync()
     {
         var token = PersonalSource.Token;
         PermitAccessToServer = true;
@@ -299,7 +299,7 @@ public class Player
             finally
             {
                 PersonalSource.Cancel();
-                // If this method wasn't called from StartListeningAsync() then wait for that Task to finish.
+                // If this method wasn't called from ListenForServerResponseAsync() then wait for that Task to finish.
                 if (!calledFromListeningTask && _listenForServerTask is not null)
                 {
                     await _listenForServerTask;
