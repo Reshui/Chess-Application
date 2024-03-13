@@ -240,6 +240,44 @@ public class Server
             {   // Remove user from the LFG queue.
                 _waitingForGameLobby = new ConcurrentQueue<Player>(_waitingForGameLobby.Where(x => !x.Equals(user)));
             }
+            // Gather all the games that user is taking part in and notify the opponent of the user's disconnect.
+            if (!ServerTasksCancellationToken.IsCancellationRequested)
+            {
+                var gamesToDisconnect = from game in _startedGames.Values
+                                        where game.AssociatedPlayers.ContainsValue(user)
+                                        select game;
+
+                var gameEndingNotificationTasks = new List<Task>();
+                // Send the opposing player a notification about their opponent disconnecting
+                foreach (TrackedGame game in gamesToDisconnect)
+                {
+                    bool gameFound = _startedGames.TryRemove(new KeyValuePair<int, TrackedGame>(game.GameID, game));
+                    // If !_serverTasksCancellationToken.IsCancellationRequested is true then the server is shutting down and there is no need to notify the opponent.
+                    if (gameFound && !ServerTasksCancellationToken.IsCancellationRequested)
+                    {
+                        var clientCommand = new ServerCommand(CommandType.OpponentClientDisconnected, game.GameID);
+                        Player opposingUser = user.Equals(game.WhitePlayer) ? game.BlackPlayer : game.WhitePlayer;
+                        try
+                        {
+                            gameEndingNotificationTasks.Add(SendClientMessageAsync(clientCommand, opposingUser.Client, opposingUser.PersonalSource.Token));
+                        }
+                        catch (ObjectDisposedException)
+                        {   // opposingUser.Token has been Disposed.
+                        }
+                    }
+                }
+
+                try
+                {
+                    if (gameEndingNotificationTasks.Any() && !ServerTasksCancellationToken.IsCancellationRequested)
+                    {
+                        await Task.WhenAll(gameEndingNotificationTasks).ConfigureAwait(false);
+                    }
+                }
+                catch (Exception)
+                {
+                }
+            }
 
             if (user.PingConnectedClientTask is not null)
             {
@@ -621,45 +659,6 @@ public class Server
         }
         finally
         {
-            // Gather all the games that user is taking part in and notify the opponent of the user's disconnect.
-            if (!ServerTasksCancellationToken.IsCancellationRequested)
-            {
-                var gamesToDisconnect = from game in _startedGames.Values
-                                        where game.AssociatedPlayers.ContainsValue(user)
-                                        select game;
-
-                var gameEndingNotificationTasks = new List<Task>();
-                // Send the opposing player a notification about their opponent disconnecting
-                foreach (TrackedGame game in gamesToDisconnect)
-                {
-                    bool gameFound = _startedGames.TryRemove(new KeyValuePair<int, TrackedGame>(game.GameID, game));
-                    // If !_serverTasksCancellationToken.IsCancellationRequested is true then the server is shutting down and there is no need to notify the opponent.
-                    if (gameFound && !ServerTasksCancellationToken.IsCancellationRequested)
-                    {
-                        var clientCommand = new ServerCommand(CommandType.OpponentClientDisconnected, game.GameID);
-                        Player opposingUser = user.Equals(game.WhitePlayer) ? game.BlackPlayer : game.WhitePlayer;
-
-                        try
-                        {
-                            gameEndingNotificationTasks.Add(SendClientMessageAsync(clientCommand, opposingUser.Client, opposingUser.PersonalSource.Token));
-                        }
-                        catch (ObjectDisposedException)
-                        {   // opposingUser.Token has been Disposed.
-                        }
-                    }
-                }
-
-                try
-                {
-                    if (gameEndingNotificationTasks.Any())
-                    {
-                        await Task.WhenAll(gameEndingNotificationTasks).ConfigureAwait(false);
-                    }
-                }
-                catch (Exception)
-                {
-                }
-            }
             await DisconnectUserAsync(user).ConfigureAwait(false);
         }
     }
