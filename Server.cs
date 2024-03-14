@@ -653,7 +653,7 @@ public class Server
         {
             GetPossibleSocketErrorCode(e, true);
         }
-        catch (Exception e) when (e is OperationCanceledException || e is ObjectDisposedException || e is TaskCanceledException)
+        catch (Exception e) when (e is OperationCanceledException || e is ObjectDisposedException)
         {   // Client has likely disconnected.            
         }
         catch (InvalidOperationException e)
