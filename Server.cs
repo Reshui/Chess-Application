@@ -644,7 +644,7 @@ public class Server
                     else if (clientResponse.CMD == CommandType.ClientDisconnecting)
                     {
                         user.PersonalSource.Cancel();
-                        Console.WriteLine($"[Server]: {user.Name} has sent disconnect.");
+                        // Console.WriteLine($"[Server]: {user.Name} has sent disconnect.");
                     }
                 }
             }
