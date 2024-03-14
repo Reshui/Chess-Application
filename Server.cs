@@ -447,7 +447,7 @@ public class Server
     /// <param name="client"><see cref="TcpClient"/> that is tested.</param>
     public static async Task<bool> IsClientActiveAsync(TcpClient client, CancellationToken token)
     {
-        byte[] data = new byte[1];
+        byte[] data = Array.Empty<byte>();
 
         try
         {   // Send 0 bytes to test the connection.
@@ -496,7 +496,7 @@ public class Server
             // Incoming messages contain the length of the message in bytes within the first 4 bytes.
             byte[] buffer = new byte[sizeof(int)];
 
-            int bytesReadCount = -1 * buffer.Length, totalBytesToRead = 0, bufferOffset = 0;
+            int bytesReadCount = -1 * buffer.Length, totalBytesToRead = 0, bufferOffset = 0, prefixBytesReadCount = 0;
             bool byteCountRecieved = false;
 
             do
@@ -507,7 +507,7 @@ public class Server
                     if (stream.DataAvailable && !token.IsCancellationRequested)
                     {
                         // If a token passed to ReadAsync is cancelled then the connection will be closed.
-                        bufferByteCount = await stream.ReadAsync(buffer.AsMemory(bufferOffset, buffer.Length - bufferOffset), CancellationToken.None).ConfigureAwait(false);
+                        bufferByteCount = await stream.ReadAsync(buffer.AsMemory(bufferOffset), CancellationToken.None).ConfigureAwait(false);
                         //bufferByteCount = await stream.ReadAsync(buffer, bufferOffset, buffer.Length - bufferOffset, CancellationToken.None).ConfigureAwait(false);
                         break;
                     }
@@ -521,11 +521,9 @@ public class Server
                 {
                     if (!byteCountRecieved)
                     {
-                        // bytesReadCound starts at -4.
-                        bytesReadCount += bufferByteCount;
-                        // Ensure first 4 bytes are a number.
+                        prefixBytesReadCount += bufferByteCount;
                         // Gets the byte count of the incoming data and sizes the bytes array to accomadate.
-                        if (bytesReadCount == 0)
+                        if (prefixBytesReadCount == sizeof(int))
                         {
                             try
                             {   // Verify that the first 4 bytes are a number.
@@ -535,13 +533,13 @@ public class Server
                             {
                                 continue;
                             }
-
+                            bytesReadCount += prefixBytesReadCount;
                             byteCountRecieved = true;
                             // Resize the array to fit incoming data.
                             buffer = new byte[totalBytesToRead];
                             bufferOffset = 0;
                         }
-                        else if (bytesReadCount < 0)
+                        else if (prefixBytesReadCount < sizeof(int))
                         {
                             bufferOffset += bufferByteCount;
                         }
