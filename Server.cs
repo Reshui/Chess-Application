@@ -476,7 +476,7 @@ public class Server
         constructedMessage.AddRange(msg);
         byte[] msgConverted = constructedMessage.ToArray();
 
-        await client.GetStream().WriteAsync(msgConverted, token).ConfigureAwait(false);
+        await client.GetStream().WriteAsync(msgConverted.AsMemory(0, msgConverted.Length), token).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -508,7 +508,6 @@ public class Server
                     {
                         // If a token passed to ReadAsync is cancelled then the connection will be closed.
                         bufferByteCount = await stream.ReadAsync(buffer.AsMemory(bufferOffset), CancellationToken.None).ConfigureAwait(false);
-                        //bufferByteCount = await stream.ReadAsync(buffer, bufferOffset, buffer.Length - bufferOffset, CancellationToken.None).ConfigureAwait(false);
                         break;
                     }
                     else
@@ -635,7 +634,7 @@ public class Server
                                     // If the opposingUser isn't reachable send player notification that the opponent couldn't be reached.
                                     // Errors thrown here will be caught in outermost catch statement.
                                     var opponentDisconnectedCommand = new ServerCommand(CommandType.OpponentClientDisconnected, currentGame.GameID);
-                                    await SendClientMessageAsync(opponentDisconnectedCommand, user.Client, CancellationToken.None).ConfigureAwait(false);
+                                    await SendClientMessageAsync(opponentDisconnectedCommand, user.Client, user.PersonalSource.Token).ConfigureAwait(false);
                                 }
                             }
                         }
