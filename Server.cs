@@ -472,6 +472,7 @@ public class Server
     {
         string message = JsonSerializer.Serialize(commandToSend);
         byte[] msg = Encoding.ASCII.GetBytes(message);
+
         List<byte> constructedMessage = BitConverter.GetBytes(msg.Length).ToList();
         constructedMessage.AddRange(msg);
         byte[] msgConverted = constructedMessage.ToArray();
@@ -508,12 +509,9 @@ public class Server
                     {
                         // If a token passed to ReadAsync is cancelled then the connection will be closed.
                         bufferByteCount = await stream.ReadAsync(buffer.AsMemory(bufferOffset), CancellationToken.None).ConfigureAwait(false);
-                        break;
+                        if (bufferByteCount > 0) break;
                     }
-                    else
-                    {
-                        await Task.Delay(700, CancellationToken.None).ConfigureAwait(false);
-                    }
+                    if (!token.IsCancellationRequested) await Task.Delay(700, CancellationToken.None).ConfigureAwait(false);
                 } while (!token.IsCancellationRequested);
 
                 if (!token.IsCancellationRequested && bufferByteCount > 0)
