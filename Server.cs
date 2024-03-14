@@ -60,8 +60,9 @@ public class Server
         /// <summary>Optional parameter used to assign a name to a <see cref="Player"/> instance.</summary>
         public string? Name { get; set; }
         public string? Message { get; set; }
+        public string? OpponentName { get; set; }
 
-        public ServerCommand(CommandType cmd, int gameIdentifier = 0, MovementInformation? moveDetails = null, Team? assignedTeam = null, string? name = null, string? message = null)
+        public ServerCommand(CommandType cmd, int gameIdentifier = 0, MovementInformation? moveDetails = null, Team? assignedTeam = null, string? name = null, string? message = null, string? opponentName = null)
         {
             CMD = cmd;
             GameIdentifier = gameIdentifier;
@@ -73,6 +74,7 @@ public class Server
             else if (cmd == CommandType.StartGameInstance)
             {
                 AssignedTeam = assignedTeam ?? throw new ArgumentNullException(nameof(assignedTeam), "Value cannot be null with the given Command Type.");
+                OpponentName = opponentName ?? throw new ArgumentNullException(nameof(opponentName), "The opponents name cannot be null if starting a new game.");
             }
             else if (cmd == CommandType.RegisterUser)
             {
@@ -357,7 +359,8 @@ public class Server
                         // Inform player code that it should start a GameEnvironment instance.
                         foreach (KeyValuePair<Team, Player> playerDetail in newGame.AssociatedPlayers)
                         {
-                            var startGameCommand = new ServerCommand(CommandType.StartGameInstance, newGame.GameID, assignedTeam: playerDetail.Key);
+                            string nameOfOpponent = playerDetail.Key.Equals(Team.Black) ? newGame.WhitePlayer.Name! : newGame.BlackPlayer.Name!;
+                            var startGameCommand = new ServerCommand(CommandType.StartGameInstance, newGame.GameID, assignedTeam: playerDetail.Key, opponentName: nameOfOpponent);
                             bool success = false;
                             try
                             {
