@@ -507,7 +507,7 @@ public class Server
                     if (stream.DataAvailable && !token.IsCancellationRequested)
                     {
                         // If a token passed to ReadAsync is cancelled then the connection will be closed.
-                        bufferByteCount = await stream.ReadAsync(buffer, bufferOffset, buffer.Length - bufferOffset, CancellationToken.None).ConfigureAwait(false);
+                        bufferByteCount = await stream.ReadAsync(buffer.AsMemory(bufferOffset, buffer.Length - bufferOffset), CancellationToken.None).ConfigureAwait(false);
                         //bufferByteCount = await stream.ReadAsync(buffer, bufferOffset, buffer.Length - bufferOffset, CancellationToken.None).ConfigureAwait(false);
                         break;
                     }
