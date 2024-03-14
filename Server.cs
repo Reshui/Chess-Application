@@ -495,7 +495,8 @@ public class Server
         {
             // Incoming messages contain the length of the message in bytes within the first 4 bytes.
             byte[] buffer = new byte[sizeof(int)];
-            int bytesReadCount = -1 * buffer.Length, totalBytesToRead = 0;
+
+            int bytesReadCount = -1 * buffer.Length, totalBytesToRead = 0, bufferOffset = 0;
             bool byteCountRecieved = false;
 
             do
@@ -506,7 +507,8 @@ public class Server
                     if (stream.DataAvailable && !token.IsCancellationRequested)
                     {
                         // If a token passed to ReadAsync is cancelled then the connection will be closed.
-                        bufferByteCount = await stream.ReadAsync(buffer, CancellationToken.None).ConfigureAwait(false);
+                        bufferByteCount = await stream.ReadAsync(buffer, bufferOffset, buffer.Length - bufferOffset, CancellationToken.None).ConfigureAwait(false);
+                        //bufferByteCount = await stream.ReadAsync(buffer, bufferOffset, buffer.Length - bufferOffset, CancellationToken.None).ConfigureAwait(false);
                         break;
                     }
                     else
@@ -517,21 +519,32 @@ public class Server
 
                 if (!token.IsCancellationRequested && bufferByteCount > 0)
                 {
-                    if (!byteCountRecieved && bufferByteCount == sizeof(int))
-                    {   // Ensure first 4 bytes are a number.
-                        // Gets the byte count of the incoming data and sizes the bytes array to accomadate. 
-                        try
-                        {   // Verify that the first 4 bytes are a number.
-                            totalBytesToRead = BitConverter.ToInt32(buffer, 0);
-                        }
-                        catch (Exception)
-                        {
-                            continue;
-                        }
+                    if (!byteCountRecieved)
+                    {
+                        // bytesReadCound starts at -4.
                         bytesReadCount += bufferByteCount;
-                        byteCountRecieved = true;
-                        // Resize the array to fit incoming data.
-                        buffer = new byte[totalBytesToRead];
+                        // Ensure first 4 bytes are a number.
+                        // Gets the byte count of the incoming data and sizes the bytes array to accomadate.
+                        if (bytesReadCount == 0)
+                        {
+                            try
+                            {   // Verify that the first 4 bytes are a number.
+                                totalBytesToRead = BitConverter.ToInt32(buffer, 0);
+                            }
+                            catch (Exception)
+                            {
+                                continue;
+                            }
+
+                            byteCountRecieved = true;
+                            // Resize the array to fit incoming data.
+                            buffer = new byte[totalBytesToRead];
+                            bufferOffset = 0;
+                        }
+                        else if (bytesReadCount < 0)
+                        {
+                            bufferOffset += bufferByteCount;
+                        }
                     }
                     else if (byteCountRecieved)
                     {
