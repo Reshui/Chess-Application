@@ -146,7 +146,6 @@ public class Player
                         AllowedToMessageServer = false;
                         PersonalSource.Cancel();
                         Console.WriteLine("Host has disconnected.");
-                        break;
                     }
                     else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames.ContainsKey(serverSideGameID))
                     {
