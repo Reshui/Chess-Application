@@ -223,17 +223,13 @@ public class GameEnvironment
     {
         // It isn't possible to be checkmated without being in check first.
         if (!IsKingChecked(teamToCheck)) return false;
-
         // Determine if there are any moves that can be done to prevent the current check.
-        foreach (ChessPiece friendlyChessPiece in _chessPieceByIdByTeam[teamToCheck].Values.Where(x => !x.Captured))
-        {
-            foreach (var movement in AvailableMoves(friendlyChessPiece))
-            {
-                if (WillChangeResultInCheck(movement, teamToCheck) == false) return false;
-            }
-        }
-        // Previous checks have failed. Return true.
-        return true;
+        var moveThatDeniesCheckAvailable = !(from piece in _chessPieceByIdByTeam[teamToCheck].Values
+                                             where !piece.Captured
+                                             from move in AvailableMoves(piece)
+                                             where !WillChangeResultInCheck(move, teamToCheck)
+                                             select true).Any();
+        return moveThatDeniesCheckAvailable;
     }
 
     /// <summary>Determines if a stalemate has been reached for the current instance.</summary>
