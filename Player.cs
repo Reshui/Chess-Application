@@ -62,10 +62,10 @@ public class Player
     /// <summary>
     /// Client-side constructor.
     /// </summary>
-    public Player(Form1 gui, CancellationTokenSource cancelSource)
+    public Player(Form1 gui, CancellationTokenSource cancelSource, int portToConnectTo, string serverAddress)
     {
-        _hostPort = 13000;
-        _hostAddress = "127.0.0.1";
+        _hostPort = portToConnectTo;
+        _hostAddress = serverAddress;
         _gui = gui;
         PersonalSource = cancelSource;
     }
@@ -104,71 +104,79 @@ public class Player
     private async Task ListenForServerResponseAsync()
     {
         var token = PersonalSource.Token;
-        AllowedToMessageServer = true;
+        AllowedToMessageServer = false;
         // Get a client stream for reading and writing.
         NetworkStream stream = _connectedServer!.GetStream();
-
+        bool serverDeclinedConnectionAttempt = true;
         try
         {
-            var gamesToIgnore = new List<int>();
-            var registerCommand = new ServerCommand(CommandType.RegisterUser, name: Name);
-            var lfgCommand = new ServerCommand(CommandType.LookingForGame);
+            // Just waiting for welcome message.
+            ServerCommand? response = await RecieveCommandFromStreamAsync(stream, token);
 
-            foreach (ServerCommand commandToSend in new ServerCommand[2] { registerCommand, lfgCommand })
+            if (response is not null && response.CMD == CommandType.WelcomeToServer)
             {
-                await SendClientMessageAsync(commandToSend, _connectedServer, PersonalSource.Token);//.ConfigureAwait(false);
-            }
+                AllowedToMessageServer = true;
+                serverDeclinedConnectionAttempt = false;
+                var gamesToIgnore = new List<int>();
+                var registerCommand = new ServerCommand(CommandType.RegisterUser, name: Name);
+                var lfgCommand = new ServerCommand(CommandType.LookingForGame);
 
-            while (!token.IsCancellationRequested)
-            {
-                ServerCommand? response = await RecieveCommandFromStreamAsync(stream, token);//.ConfigureAwait(false);
-
-                if (response is not null)
+                foreach (ServerCommand commandToSend in new ServerCommand[2] { registerCommand, lfgCommand })
                 {
-                    int serverSideGameID = response.GameIdentifier;
+                    await SendClientMessageAsync(commandToSend, _connectedServer, PersonalSource.Token);//.ConfigureAwait(false);
+                }
 
-                    if (response.CMD == CommandType.StartGameInstance)
+                while (!token.IsCancellationRequested)
+                {
+                    response = await RecieveCommandFromStreamAsync(stream, token);//.ConfigureAwait(false);
+
+                    if (response is not null)
                     {
-                        if (!gamesToIgnore.Contains(serverSideGameID))
+                        int serverSideGameID = response.GameIdentifier;
+
+                        if (response.CMD == CommandType.StartGameInstance)
                         {
-                            // Create a GameEnvironmentInstance, track it and send to the main GUi as well.
-                            var newGame = new GameEnvironment(serverSideGameID, (Team)response.AssignedTeam!);
-                            _activeGames.Add(serverSideGameID, newGame);
-                            _gui?.AddGame(newGame);
+                            if (!gamesToIgnore.Contains(serverSideGameID))
+                            {
+                                // Create a GameEnvironmentInstance, track it and send to the main GUi as well.
+                                var newGame = new GameEnvironment(serverSideGameID, (Team)response.AssignedTeam!);
+                                _activeGames.Add(serverSideGameID, newGame);
+                                _gui?.AddGame(newGame);
+                            }
+                            else
+                            {
+                                gamesToIgnore.Remove(serverSideGameID);
+                            }
                         }
-                        else
+                        else if (response.CMD == CommandType.ServerIsShuttingDown)
                         {
-                            gamesToIgnore.Remove(serverSideGameID);
+                            AllowedToMessageServer = false;
+                            PersonalSource.Cancel();
+                            Console.WriteLine("Host has disconnected.");
                         }
-                    }
-                    else if (response.CMD == CommandType.ServerIsShuttingDown)
-                    {
-                        AllowedToMessageServer = false;
-                        PersonalSource.Cancel();
-                        Console.WriteLine("Host has disconnected.");
-                    }
-                    else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames.ContainsKey(serverSideGameID))
-                    {
-                        _activeGames[serverSideGameID].ChangeGameState(GameState.OpponentDisconnected);
-                        _gui?.DisableGame(serverSideGameID);
-                        _activeGames.Remove(serverSideGameID);
-                    }
-                    else if (response.CMD == CommandType.OpponentClientDisconnected && !_activeGames.ContainsKey(serverSideGameID))
-                    {
-                        gamesToIgnore.Add(serverSideGameID);
-                    }
-                    else if (response.CMD == CommandType.NewMove && _activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGame))
-                    {
-                        if (!TryUpdateGameInstance(targetedGame, response.MoveDetails!.Value, guiAlreadyUpdated: false))
+                        else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames.ContainsKey(serverSideGameID))
                         {
-                            var invalidMoveFromOpponent = new ServerCommand(CommandType.InvalidMove, targetedGame.GameID, response.MoveDetails.Value);
-                            await SendClientMessageAsync(invalidMoveFromOpponent, _connectedServer, PersonalSource.Token);//.ConfigureAwait(false);
+                            _activeGames[serverSideGameID].ChangeGameState(GameState.OpponentDisconnected);
+                            _gui?.DisableGame(serverSideGameID);
+                            _activeGames.Remove(serverSideGameID);
                         }
-                    }
-                    else if (response.CMD == CommandType.InvalidMove && _activeGames.Remove(serverSideGameID, out targetedGame))
-                    {
-                        targetedGame.ChangeGameState(GameState.GameDraw);
-                        _gui?.DisableGame(targetedGame.GameID);
+                        else if (response.CMD == CommandType.OpponentClientDisconnected && !_activeGames.ContainsKey(serverSideGameID))
+                        {
+                            gamesToIgnore.Add(serverSideGameID);
+                        }
+                        else if (response.CMD == CommandType.NewMove && _activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGame))
+                        {
+                            if (!TryUpdateGameInstance(targetedGame, response.MoveDetails!.Value, guiAlreadyUpdated: false))
+                            {
+                                var invalidMoveFromOpponent = new ServerCommand(CommandType.InvalidMove, targetedGame.GameID, response.MoveDetails.Value);
+                                await SendClientMessageAsync(invalidMoveFromOpponent, _connectedServer, PersonalSource.Token);//.ConfigureAwait(false);
+                            }
+                        }
+                        else if (response.CMD == CommandType.InvalidMove && _activeGames.Remove(serverSideGameID, out targetedGame))
+                        {
+                            targetedGame.ChangeGameState(GameState.GameDraw);
+                            _gui?.DisableGame(targetedGame.GameID);
+                        }
                     }
                 }
             }
@@ -192,7 +200,7 @@ public class Player
             // Function has already been called if true.
             if (!UserWantsToQuit)
             {
-                await CloseConnectionToServerAsync(userIsQuitting: false, calledFromListeningTask: true).ConfigureAwait(false);
+                await CloseConnectionToServerAsync(userIsQuitting: false, calledFromListeningTask: true, serverDeniedConnection: serverDeclinedConnectionAttempt).ConfigureAwait(false);
             }
         }
     }
@@ -252,7 +260,7 @@ public class Player
 
                         if (newIOException is not null)
                         {
-                            await CloseConnectionToServerAsync(false, false).ConfigureAwait(false);
+                            await CloseConnectionToServerAsync(false, false, false).ConfigureAwait(false);
                             throw newIOException;
                         }
                     }
@@ -289,7 +297,7 @@ public class Player
     /// <summary>
     /// Asynchronously alerts <see cref="_connectedServer"/> that the user wants to quit.
     /// </summary>
-    public async Task CloseConnectionToServerAsync(bool userIsQuitting, bool calledFromListeningTask)
+    public async Task CloseConnectionToServerAsync(bool userIsQuitting, bool calledFromListeningTask, bool serverDeniedConnection)
     {
         UserWantsToQuit = userIsQuitting;
         if (_connectedServer is not null)
@@ -329,7 +337,7 @@ public class Player
                 PersonalSource.Dispose();
                 _connectedServer.Close();
                 _connectedServer = null;
-                if (!UserWantsToQuit) _gui?.ServerIsUnreachable();
+                if (!UserWantsToQuit && !serverDeniedConnection) _gui?.ServerIsUnreachable();
             }
         }
     }

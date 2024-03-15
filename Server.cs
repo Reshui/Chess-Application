@@ -44,7 +44,7 @@ public class Server
     public enum CommandType
     {
         ClientDisconnecting, NewMove, OpponentClientDisconnected, StartGameInstance, DeclareForefit, LookingForGame, ServerIsShuttingDown,
-        DeclareWin, DeclareLoss, DeclareStaleMate, RegisterUser, ServerFull, InvalidMove
+        DeclareWin, DeclareLoss, DeclareStaleMate, RegisterUser, ServerFull, InvalidMove, WelcomeToServer
     }
     [Serializable]
     public class ServerCommand
@@ -578,6 +578,7 @@ public class Server
         bool userRegistered = false;
         try
         {
+            await SendClientMessageAsync(new ServerCommand(CommandType.WelcomeToServer), user.Client, user.CombinedSource!.Token);
             //using var combinedSource = CancellationTokenSource.CreateLinkedTokenSource(ServerTasksCancellationToken, user.PersonalSource.Token);
             while (!(user.CombinedSource?.IsCancellationRequested ?? true))
             {
