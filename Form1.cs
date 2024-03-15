@@ -83,7 +83,7 @@ namespace Chess_GUi
         {
             if (_hostedServer is null)
             {
-                _hostedServer = new Server();
+                _hostedServer = new Server(13000, "127.0.0.1");
                 _hostedServer.StartServer();
                 StartServer.BackColor = Color.Wheat;
                 StartServer.ForeColor = Color.Black;
