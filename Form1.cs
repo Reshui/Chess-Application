@@ -55,7 +55,7 @@ namespace Chess_GUi
                 {
                     try
                     {
-                        await _localPlayer.CloseConnectionToServerAsync(true, false);
+                        await _localPlayer.CloseConnectionToServerAsync(true, false, false);
                     }
                     catch (Exception e)
                     {
@@ -83,7 +83,7 @@ namespace Chess_GUi
         {
             if (_hostedServer is null)
             {
-                _hostedServer = new Server(13000, "127.0.0.1");
+                _hostedServer = new Server(13_000, "127.0.0.1");
                 _hostedServer.StartServer();
                 StartServer.BackColor = Color.Wheat;
                 StartServer.ForeColor = Color.Black;
@@ -97,7 +97,7 @@ namespace Chess_GUi
 
             if (userName != string.Empty && _localPlayer is null)
             {
-                _localPlayer = new Player(this, new CancellationTokenSource());
+                _localPlayer = new Player(this, new CancellationTokenSource(), 13_000, "127.0.0.1");
                 _localPlayer.AssignName(userName);
 
                 if (_localPlayer.JoinServer())
