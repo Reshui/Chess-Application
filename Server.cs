@@ -313,6 +313,11 @@ public class Server
 
                 if (matchedPlayers.Count == 2)
                 {
+                    if (matchedPlayers[0].ServerAssignedID == matchedPlayers[1].ServerAssignedID)
+                    {
+                        matchedPlayers.RemoveAt(1);
+                        continue;
+                    }
                     bool bothPlayersAvailable = true;
 
                     List<Task<bool>> clientPingingTasks = new(2);
@@ -606,7 +611,7 @@ public class Server
                     }
                     else if (clientResponse.CMD == CommandType.LookingForGame && userRegistered && !_waitingForGameLobby.Contains(user))
                     {   // Only add the user to the queue if they aren't already in it.
-                        if (!_waitingForGameLobby.Contains(user)) _waitingForGameLobby.Enqueue(user);
+                        _waitingForGameLobby.Enqueue(user);
                     }
                     else if (clientResponse.CMD == CommandType.NewMove && clientResponse.MoveDetails is not null && userRegistered)
                     {   // Send user response to the opposing player.
@@ -634,6 +639,10 @@ public class Server
                                     var opponentDisconnectedCommand = new ServerCommand(CommandType.OpponentClientDisconnected, currentGame.GameID);
                                     await SendClientMessageAsync(opponentDisconnectedCommand, user.Client, user.PersonalSource.Token).ConfigureAwait(false);
                                 }
+                            }
+                            catch (InvalidOperationException)
+                            {
+                                // Unable to reach opponent.
                             }
                         }
                     }
