@@ -102,10 +102,9 @@ public class Server
             };
         }
     }
-    public Server()
+    public Server(int port, string ipAddress)
     {   // Set the TcpListener on port 13000.
-        int port = 13000;
-        IPAddress localAddr = IPAddress.Parse("127.0.0.1");
+        IPAddress localAddr = IPAddress.Parse(ipAddress);
         // TcpListener server = new TcpListener(port);
         _gameServer = new TcpListener(localAddr, port);
     }
@@ -448,7 +447,7 @@ public class Server
     /// <summary>
     /// Asynchronously tests if a given <paramref name="client"/> is still responsive.
     /// </summary>
-    /// <returns><see cref="Task{bool}"/> : <see langword="true"/> if socket is still connected; otherwise, <see langword="false"/>.</returns>
+    /// <returns>A <see cref="Task{bool}"/> that represents the async operation.: <see langword="true"/> if socket is still connected; otherwise, <see langword="false"/>.</returns>
     /// <param name="client"><see cref="TcpClient"/> that is tested.</param>
     public static async Task<bool> IsClientActiveAsync(TcpClient client, CancellationToken token)
     {
@@ -511,21 +510,19 @@ public class Server
                 do
                 {
                     if (stream.DataAvailable && !token.IsCancellationRequested)
-                    {
-                        // If a token passed to ReadAsync is cancelled then the connection will be closed.
+                    {   // If a token passed to ReadAsync is cancelled then the connection will be closed.
                         bufferByteCount = await stream.ReadAsync(buffer.AsMemory(bufferOffset), CancellationToken.None).ConfigureAwait(false);
                         if (bufferByteCount > 0) break;
                     }
-                    if (!token.IsCancellationRequested) await Task.Delay(700, CancellationToken.None).ConfigureAwait(false);
+                    await Task.Delay(700, token).ConfigureAwait(false);
                 } while (!token.IsCancellationRequested);
 
                 if (!token.IsCancellationRequested && bufferByteCount > 0)
                 {
                     if (!messageByteCountKnown)
                     {
-                        prefixBytesReadCount += bufferByteCount;
                         // Gets the byte count of the incoming data and sizes the bytes array to accomadate.
-                        if (prefixBytesReadCount == sizeof(int))
+                        if ((prefixBytesReadCount += bufferByteCount) == sizeof(int))
                         {
                             totalBytesToRead = BitConverter.ToInt32(buffer, 0);
                             bytesReadCount += prefixBytesReadCount;
