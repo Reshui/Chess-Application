@@ -503,7 +503,7 @@ public class Server
             byte[] buffer = new byte[sizeof(int)];
 
             int bytesReadCount = -1 * buffer.Length, totalBytesToRead = 0, bufferOffset = 0, prefixBytesReadCount = 0;
-            bool byteCountRecieved = false;
+            bool messageByteCountKnown = false;
 
             do
             {
@@ -521,23 +521,15 @@ public class Server
 
                 if (!token.IsCancellationRequested && bufferByteCount > 0)
                 {
-                    if (!byteCountRecieved)
+                    if (!messageByteCountKnown)
                     {
                         prefixBytesReadCount += bufferByteCount;
                         // Gets the byte count of the incoming data and sizes the bytes array to accomadate.
                         if (prefixBytesReadCount == sizeof(int))
                         {
-                            try
-                            {   // Verify that the first 4 bytes are a number.
-                                totalBytesToRead = BitConverter.ToInt32(buffer, 0);
-                            }
-                            catch (Exception)
-                            {
-                                continue;
-                            }
+                            totalBytesToRead = BitConverter.ToInt32(buffer, 0);
                             bytesReadCount += prefixBytesReadCount;
-                            byteCountRecieved = true;
-                            // Resize the array to fit incoming data.
+                            messageByteCountKnown = true;
                             buffer = new byte[totalBytesToRead];
                             bufferOffset = 0;
                         }
@@ -546,12 +538,12 @@ public class Server
                             bufferOffset += bufferByteCount;
                         }
                     }
-                    else if (byteCountRecieved)
+                    else
                     {
                         string textSection = Encoding.ASCII.GetString(buffer, 0, bufferByteCount);
                         // If the expected number of bytes has been read then attempt to deserialize it into a ServerCommand
                         if ((bytesReadCount += bufferByteCount) == totalBytesToRead)
-                        {   // All message bytes have been recieved.
+                        {
                             if (builder.Length > 0) textSection = builder.Append(textSection).ToString();
 
                             try
@@ -562,7 +554,7 @@ public class Server
                             catch (Exception)
                             {
                                 // Start waiting for another response.
-                                if (builder.Length > 0) builder = new StringBuilder();
+                                if (builder.Length > 0) builder.Clear();
                                 break;
                             }
                         }
