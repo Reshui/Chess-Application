@@ -83,7 +83,7 @@ public class Player
     }
     /// <summary>Joins a server and starts asynchronous tasks.</summary>
     /// <returns><see langword="true"/> if server was joined successfully; otherwise, <see langword="false"/>.</returns>
-    public bool JoinServer()
+    public bool TryJoinServer()
     {
         try
         {

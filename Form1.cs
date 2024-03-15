@@ -100,20 +100,20 @@ namespace Chess_GUi
                 _localPlayer = new Player(this, new CancellationTokenSource(), 13_000, "127.0.0.1");
                 _localPlayer.AssignName(userName);
 
-                if (_localPlayer.JoinServer())
+                if (_localPlayer.TryJoinServer())
                 {
                     JoinServer.BackColor = Color.FromArgb(144, 12, 63);
                     JoinServer.ForeColor = Color.AntiqueWhite;
 
                     JoinServer.Enabled = false;
                     StartServer.Enabled = false;
+                    panel1.Controls["LFG"].Enabled = true;
+                    panel1.Controls["LFG"].Visible = true;
                 }
                 else
                 {
                     throw new NotImplementedException();
                 }
-                panel1.Controls["LFG"].Enabled = true;
-                panel1.Controls["LFG"].Visible = true;
             }
         }
 
