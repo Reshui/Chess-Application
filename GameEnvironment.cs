@@ -246,7 +246,7 @@ public class GameEnvironment
         if (piecesRemaining == 2) return true;
 
         var moveAvailableForActiveTeam = (from piece in _chessPieceByIdByTeam[ActiveTeam].Values
-                                          where !piece.Captured && AvailableMoves(piece).Any()
+                                          where !piece.Captured && AvailableMoves(piece).Count > 0
                                           select true).Any();
         return !moveAvailableForActiveTeam;
     }
