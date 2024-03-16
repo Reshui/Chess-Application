@@ -9,7 +9,9 @@ using System.Collections.Concurrent;
 
 public class Server
 {
+    /// <summary>Maximum number of users allowed to connect to connect to the server.</summary>
     private const int MaxConnectionCount = 20;
+
     /// <summary>List of connected <see cref="TcpClient"/> instances to the current <see cref="Server"/> instance.</summary>
     private readonly ConcurrentDictionary<int, Player> _connectedPlayers = new();
 
@@ -86,9 +88,13 @@ public class Server
     {
         public Player WhitePlayer { get => AssociatedPlayers[Team.White]; }
         public Player BlackPlayer { get => AssociatedPlayers[Team.Black]; }
+        /// <summary>Id used to track relevant information for started <see cref="GameEnvironment"/> instances.</summary>
         public int GameID { get; }
+        /// <summary>Holds <see cref="Player"/> instances keyed to their assigned team.</summary>
         public Dictionary<Team, Player> AssociatedPlayers { get; }
+        /// <summary>Static variable used to track the number of tracked games on the server.</summary>
         private static int _gameID = 0;
+        /// <summary>Random number generator used to assign teams to added <see cref="Player"/> instances.</summary>
         private static readonly Random _rand = new();
         public TrackedGame(Player playerOne, Player playerTwo)
         {
@@ -501,7 +507,7 @@ public class Server
             // Incoming messages contain the length of the message in bytes within the first 4 bytes.
             byte[] buffer = new byte[sizeof(int)];
 
-            int bytesReadCount = -1 * buffer.Length, totalBytesToRead = 0, bufferOffset = 0, prefixBytesReadCount = 0;
+            int bytesReadFromMessage = -1 * buffer.Length, totalBytesToRead = 0, bufferOffset = 0, prefixBytesReadCount = 0;
             bool messageByteCountKnown = false;
 
             do
@@ -525,7 +531,7 @@ public class Server
                         if ((prefixBytesReadCount += bufferByteCount) == sizeof(int))
                         {
                             totalBytesToRead = BitConverter.ToInt32(buffer, 0);
-                            bytesReadCount += prefixBytesReadCount;
+                            bytesReadFromMessage += prefixBytesReadCount;
                             messageByteCountKnown = true;
                             buffer = new byte[totalBytesToRead];
                             bufferOffset = 0;
@@ -539,7 +545,7 @@ public class Server
                     {
                         string textSection = Encoding.ASCII.GetString(buffer, 0, bufferByteCount);
                         // If the expected number of bytes has been read then attempt to deserialize it into a ServerCommand
-                        if ((bytesReadCount += bufferByteCount) == totalBytesToRead)
+                        if ((bytesReadFromMessage += bufferByteCount) == totalBytesToRead)
                         {
                             if (builder.Length > 0) textSection = builder.Append(textSection).ToString();
 
@@ -561,7 +567,7 @@ public class Server
                         }
                     }
                 }
-            } while (!token.IsCancellationRequested && bytesReadCount < totalBytesToRead);
+            } while (!token.IsCancellationRequested && bytesReadFromMessage < totalBytesToRead);
         } while (!token.IsCancellationRequested);
         return null;
     }
