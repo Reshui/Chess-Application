@@ -227,7 +227,6 @@ public class GameEnvironment
         var moveThatDeniesCheckUnavailable = !(from piece in _chessPieceByIdByTeam[teamToCheck].Values
                                                where !piece.Captured
                                                from move in AvailableMoves(piece)
-                                               where !WillChangeResultInCheck(move, teamToCheck)
                                                select true).Any();
         return moveThatDeniesCheckUnavailable;
     }
