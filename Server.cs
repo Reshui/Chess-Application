@@ -270,7 +270,7 @@ public class Server
 
                 try
                 {
-                    if (gameEndingNotificationTasks.Any() && !ServerTasksCancellationToken.IsCancellationRequested)
+                    if (gameEndingNotificationTasks.Count > 0 && !ServerTasksCancellationToken.IsCancellationRequested)
                     {
                         await Task.WhenAll(gameEndingNotificationTasks).ConfigureAwait(false);
                     }
@@ -336,7 +336,7 @@ public class Server
                         }
                     }
 
-                    while (!ServerTasksCancellationToken.IsCancellationRequested && bothPlayersAvailable && clientPingingTasks.Any())
+                    while (!ServerTasksCancellationToken.IsCancellationRequested && bothPlayersAvailable && clientPingingTasks.Count > 0)
                     {
                         var completedTask = await Task.WhenAny(clientPingingTasks).ConfigureAwait(false);
                         Player user = matchedPlayers[clientPingingTasks.IndexOf(completedTask)];
@@ -408,7 +408,7 @@ public class Server
                             _startedGames.TryAdd(newGame.GameID, newGame);
                             matchedPlayers.Clear();
                         }
-                        else if (playersAlertedForGame.Any())
+                        else if (playersAlertedForGame.Count > 0)
                         {
                             var notifyOpponentDisconnectCommand = new ServerCommand(CommandType.OpponentClientDisconnected, newGame.GameID);
                             // Inform players that are waiting for their opponent that they have disconnected.
