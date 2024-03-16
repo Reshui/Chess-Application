@@ -225,8 +225,7 @@ public class GameEnvironment
         if (!IsKingChecked(teamToCheck)) return false;
         // Determine if there are any moves that can be done to prevent the current check.
         var moveThatDeniesCheckUnavailable = !(from piece in _chessPieceByIdByTeam[teamToCheck].Values
-                                               where !piece.Captured
-                                               from move in AvailableMoves(piece)
+                                               where !piece.Captured && AvailableMoves(piece).Count > 0
                                                select true).Any();
         return moveThatDeniesCheckUnavailable;
     }
