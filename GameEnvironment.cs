@@ -224,12 +224,12 @@ public class GameEnvironment
         // It isn't possible to be checkmated without being in check first.
         if (!IsKingChecked(teamToCheck)) return false;
         // Determine if there are any moves that can be done to prevent the current check.
-        var moveThatDeniesCheckAvailable = !(from piece in _chessPieceByIdByTeam[teamToCheck].Values
-                                             where !piece.Captured
-                                             from move in AvailableMoves(piece)
-                                             where !WillChangeResultInCheck(move, teamToCheck)
-                                             select true).Any();
-        return moveThatDeniesCheckAvailable;
+        var moveThatDeniesCheckUnavailable = !(from piece in _chessPieceByIdByTeam[teamToCheck].Values
+                                               where !piece.Captured
+                                               from move in AvailableMoves(piece)
+                                               where !WillChangeResultInCheck(move, teamToCheck)
+                                               select true).Any();
+        return moveThatDeniesCheckUnavailable;
     }
 
     /// <summary>Determines if a stalemate has been reached for the current instance.</summary>
