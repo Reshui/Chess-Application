@@ -569,10 +569,21 @@ public class Server
                                 // Unable to reach opponent.
                             }
                         }
+                        else
+                        {
+                            // User is sending a command for a game that they are not linked to.
+                        }
                     }
-                    else if (_endGameCommands.Contains(clientResponse.CMD) && _startedGames.TryGetValue(clientResponse.GameIdentifier, out TrackedGame? currentGame) && currentGame.AssociatedPlayers.ContainsValue(connectedUser))
+                    else if (_endGameCommands.Contains(clientResponse.CMD) && _startedGames.TryGetValue(clientResponse.GameIdentifier, out TrackedGame? currentGame))
                     {
-                        _startedGames.TryRemove(new KeyValuePair<int, TrackedGame>(currentGame!.GameID, currentGame));
+                        if (currentGame.AssociatedPlayers.ContainsValue(connectedUser))
+                        {
+                            _startedGames.TryRemove(new KeyValuePair<int, TrackedGame>(currentGame!.GameID, currentGame));
+                        }
+                        else
+                        {
+                            // User is sending a command for a game that they are not linked to.
+                        }
                     }
                     else if (clientResponse.CMD == CommandType.ClientDisconnecting)
                     {
