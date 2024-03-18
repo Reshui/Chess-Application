@@ -7,10 +7,10 @@ using System.Net.Sockets;
 public class Player
 {
     /// <summary>IP address of <see cref="_connectedServer"/>.</summary>
-    private readonly string _hostAddress;
+    private readonly string? _hostAddress=null;
 
     /// <summary>Port to connect to <see cref="_connectedServer"/> on.</summary>
-    private readonly int _hostPort;
+    private readonly int? _hostPort=null;
 
     /// <summary>Connection to the server if it exists used by the <see cref="Server"/> class.</summary>
     public TcpClient Client
@@ -31,7 +31,7 @@ public class Player
     /// <value><see langword="true"/> if messages shouldn't be sent to the server; otherwise, <see langword="false"/>.</value>
     private bool AllowedToMessageServer { get; set; } = false;
     /// <summary>ID used by server to track players.</summary>
-    public int ServerAssignedID { get; init; }
+    public int ServerAssignedID { get; private set; }
 
     /// <summary>Gets the player name assigned to this instance</summary>
     /// <value>The current value of <see cref="_name"/>.</value>
@@ -74,8 +74,6 @@ public class Player
     /// </summary>
     public Player(TcpClient client, CancellationTokenSource personalSource, CancellationTokenSource combinedSource)
     {
-        _hostPort = 13000;
-        _hostAddress = "127.0.0.1";
         Client = client;
         ServerAssignedID = ++s_instanceCount;
         PersonalSource = personalSource;
@@ -87,7 +85,7 @@ public class Player
     {
         try
         {
-            _connectedServer = new TcpClient(_hostAddress, _hostPort);
+            _connectedServer = new TcpClient(_hostAddress!, (int)_hostPort!);
         }
         catch (SocketException)
         {
