@@ -84,7 +84,7 @@ public class GameEnvironment
     /// Creates chess pieces for both teams and places them within the <see cref="GameBoard"/> array.
     /// </summary>
     /// <returns>A dictionary of pieces keyed to their Ids keyed to the team they are on.</returns>
-    Dictionary<Team, Dictionary<string, ChessPiece>> GenerateBoard()
+    private Dictionary<Team, Dictionary<string, ChessPiece>> GenerateBoard()
     {
         var piecesPerTeam = new Dictionary<Team, Dictionary<string, ChessPiece>>
         {
@@ -130,7 +130,7 @@ public class GameEnvironment
     /// </summary>
     /// <param name="teamToCheck">The team you want the checked status for.</param>
     /// <returns><see langword="true"/> if the King associated with <paramref name="teamToCheck"/> is checked; else <see langword="false"/>.</returns>
-    public bool IsKingChecked(Team teamToCheck)
+    private bool IsKingChecked(Team teamToCheck)
     {
         // This variable is needed to determine if a king can be attacked by an enemy pawn(pawns can only attack towards on side of the board.).
         ChessPiece queriedKing = ReturnKing(teamToCheck);
@@ -207,7 +207,7 @@ public class GameEnvironment
     /// <param name="moveInfo">Readonly struct with details on the movement to test.</param>
     /// <param name="teamToCheck">Used to determines which Team should be queried for a checked state.</param>
     /// <returns><see langword="true"/> if the king associated with <paramref name="teamToCheck"/> will be checked; otherwise, <see langword="false"/>.</returns>
-    public bool WillChangeResultInCheck(MovementInformation moveInfo, Team teamToCheck)
+    private bool WillChangeResultInCheck(MovementInformation moveInfo, Team teamToCheck)
     {
         EditGameBoard(moveInfo);
         bool returnValue = IsKingChecked(teamToCheck);
@@ -219,7 +219,7 @@ public class GameEnvironment
     /// <summary>Determins if the king is checked and if so, determines if any move can undo the check.</summary>
     /// <returns><see langword="true"/> if the team associated with <paramref name="teamToCheck"/> is check-mated; otherwise, <see langword="false"/>.</returns>
     /// <param name ="teamToCheck">Used to determine which king should be queried for a check-mate state.</param>
-    public bool IsKingCheckMated(Team teamToCheck)
+    private bool IsKingCheckMated(Team teamToCheck)
     {
         // It isn't possible to be checkmated without being in check first.
         if (!IsKingChecked(teamToCheck)) return false;
@@ -650,5 +650,5 @@ public class GameEnvironment
     /// <summary>A friendly King from the current board.</summary>
     /// <param name="teamColor">Enum to determine which team to return a king for.</param>
     /// <returns>A friendly <see cref="ChessPiece"/> object with a <see cref="ChessPiece._pieceType"/> property of <see cref="PieceType.King"/>.</returns>
-    public ChessPiece ReturnKing(Team teamColor) => teamColor == Team.White ? _whiteKing : _blackKing;
+    private ChessPiece ReturnKing(Team teamColor) => teamColor == Team.White ? _whiteKing : _blackKing;
 }
