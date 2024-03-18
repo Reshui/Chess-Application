@@ -7,10 +7,10 @@ using System.Net.Sockets;
 public class Player
 {
     /// <summary>IP address of <see cref="_connectedServer"/>.</summary>
-    private readonly string? _hostAddress=null;
+    private readonly string? _hostAddress = null;
 
     /// <summary>Port to connect to <see cref="_connectedServer"/> on.</summary>
-    private readonly int? _hostPort=null;
+    private readonly int? _hostPort = null;
 
     /// <summary>Connection to the server if it exists used by the <see cref="Server"/> class.</summary>
     public TcpClient Client
@@ -40,12 +40,8 @@ public class Player
     /// <summary>The name assigned to this <see cref="Player"/> instance.</summary>
     private string? _name = null;
 
-    /// <summary>Static variable used by the server side constructor to generate a value for <see cref="ServerAssignedID"/>.</summary>
-    private static int s_instanceCount = 0;
-
     /// <summary>TokenSource used to stop server listening tasks.</summary>
     public readonly CancellationTokenSource PersonalSource;
-    public readonly CancellationTokenSource? CombinedSource = null;
 
     /// <summary>Form object used to visually represent games.</summary>
     private readonly Form1? _gui;
@@ -69,16 +65,7 @@ public class Player
         _gui = gui;
         PersonalSource = cancelSource;
     }
-    /// <summary>
-    /// Constructor used by the <see cref="Server"/> class to track clients.
-    /// </summary>
-    public Player(TcpClient client, CancellationTokenSource personalSource, CancellationTokenSource combinedSource)
-    {
-        Client = client;
-        ServerAssignedID = ++s_instanceCount;
-        PersonalSource = personalSource;
-        CombinedSource = combinedSource;
-    }
+
     /// <summary>Joins a server and starts asynchronous tasks.</summary>
     /// <returns><see langword="true"/> if server was joined successfully; otherwise, <see langword="false"/>.</returns>
     public bool TryJoinServer()
