@@ -539,7 +539,7 @@ public class Server
                     }
                     else if (clientResponse.CMD == CommandType.NewMove && clientResponse.MoveDetails is not null && userRegistered)
                     {   // Send user response to the opposing player.
-                        if (_startedGames.TryGetValue(clientResponse.GameIdentifier, out TrackedGame? currentGame))
+                        if (_startedGames.TryGetValue(clientResponse.GameIdentifier, out TrackedGame? currentGame) && currentGame.AssociatedPlayers.ContainsValue(connectedUser))
                         {
                             TrackedUser opposingUser = currentGame.AssociatedPlayers[GameEnvironment.ReturnOppositeTeam(clientResponse.MoveDetails.Value.SubmittingTeam)];
                             try
@@ -570,7 +570,7 @@ public class Server
                             }
                         }
                     }
-                    else if (_endGameCommands.Contains(clientResponse.CMD) && _startedGames.TryGetValue(clientResponse.GameIdentifier, out TrackedGame? currentGame))
+                    else if (_endGameCommands.Contains(clientResponse.CMD) && _startedGames.TryGetValue(clientResponse.GameIdentifier, out TrackedGame? currentGame) && currentGame.AssociatedPlayers.ContainsValue(connectedUser))
                     {
                         _startedGames.TryRemove(new KeyValuePair<int, TrackedGame>(currentGame!.GameID, currentGame));
                     }
