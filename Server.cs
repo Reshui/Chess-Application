@@ -4,7 +4,6 @@ using System.Net.Sockets;
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using System;
 using System.Collections.Concurrent;
 
 public class Server
@@ -420,34 +419,39 @@ public class Server
                             // Inform players that are waiting for their opponent that they have disconnected.
                             foreach (Player playerWaitingForOpponent in playersAlertedForGame)
                             {
+                                bool success = false, objectDisposed = false;
                                 try
                                 {
                                     await SendClientMessageAsync(notifyOpponentDisconnectCommand, playerWaitingForOpponent.Client!, playerWaitingForOpponent.CombinedSource!.Token).ConfigureAwait(false);
+                                    success = true;
                                 }
-                                catch (Exception e) when (e is OperationCanceledException || e is IOException || e is ObjectDisposedException || e is InvalidOperationException)
+                                catch (OperationCanceledException)
+                                {
+                                }
+                                catch (IOException e)
                                 {
                                     GetPossibleSocketErrorCode(e, true);
+                                }
+                                catch (ObjectDisposedException)
+                                {
+                                    objectDisposed = true;
+                                }
+                                catch (InvalidOperationException)
+                                {
+                                    Console.WriteLine("[Server]: Monitor LFG: Failed to send opponent disconnect message.");
+                                }
+                                finally
+                                {
+                                    if (!objectDisposed && !success) playerWaitingForOpponent.PersonalSource.Cancel();
                                     matchedPlayers.Remove(playerWaitingForOpponent);
-
-                                    if (e is InvalidOperationException)
-                                    {
-                                        Console.WriteLine("[Server]: Monitor LFG: Failed to send opponent disconnect message.");
-                                    }
-
-                                    try
-                                    {
-                                        if (e is not ObjectDisposedException) playerWaitingForOpponent.PersonalSource.Cancel();
-                                    }
-                                    catch (ObjectDisposedException)
-                                    { }
                                 }
                             }
                         }
                     }
                 }
             }
-            await Task.Delay(1000, ServerTasksCancellationToken).ConfigureAwait(false);
         }
+        await Task.Delay(1000, ServerTasksCancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -494,9 +498,9 @@ public class Server
     /// Asynchronously waits for messages from <paramref name="stream"/>.
     /// </summary>
     /// <param name="stream"><see cref="NetworkStream"/> that is awaited for its responses.</param>
-    /// <param name="token">CancellationToken used to cancel asynchronous operations.</param>
+    /// <param name="token"><see cref="CancellationToken"/> used to cancel asynchronous operations.</param>
     /// <exception cref="OperationCanceledException">Thrown if <paramref name="token"/> source is cancelled.</exception>
-    /// <exception cref="IOException">Thrown if something goes wrong with <paramref name="stream"/>.ReadAsync().</exception>
+    /// <exception cref="IOException">Thrown if something goes wrong with <paramref name="stream.ReadAsync()"/>.</exception>
     /// <exception cref="OperationCanceledException">Thrown if <paramref name="token"/> is invoked while using .ReadAsync().</exception>
     public static async Task<ServerCommand?> RecieveCommandFromStreamAsync(NetworkStream stream, CancellationToken token)
     {
@@ -692,7 +696,7 @@ public class Server
         return errorCode;
     }
     /// <summary>
-    /// Asynchronoulsy pings <paramref name="clientToPing"/> until it can no longer be reached or <paramref name="pingCancellationToken"/>.IsCancellationRequested. 
+    /// Asynchronoulsy pings <paramref name="clientToPing"/> until it can no longer be reached or <paramref name="pingCancellationToken"/>.IsCancellationRequested returns <see langword="true"/>. 
     /// </summary>
     /// <param name="clientToPing"><see cref="TcpClient"/> that will be pinged in a loop.</param>
     /// <param name="sourceToInvoke"><seealso cref="CancellationTokenSource"/> that will be cancelled if <paramref name="clientToPing"/> cannot be reached.</param>
