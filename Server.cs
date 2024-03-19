@@ -289,7 +289,7 @@ public class Server
                     if (!ServerTasksCancellationToken.IsCancellationRequested && bothPlayersAvailable)
                     {
                         var newGame = new TrackedGame(matchedPlayers[0], matchedPlayers[1]);
-                        var playersAlertedForGame = new List<TrackedUser>();
+                        var playersAlertedForGame = new List<TrackedUser>(2);
                         // Inform player code that it should start a GameEnvironment instance.
                         foreach (KeyValuePair<Team, TrackedUser> playerDetail in newGame.AssociatedPlayers)
                         {
@@ -375,8 +375,8 @@ public class Server
                     }
                 }
             }
+            await Task.Delay(1000, ServerTasksCancellationToken).ConfigureAwait(false);
         }
-        await Task.Delay(1000, ServerTasksCancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -546,27 +546,26 @@ public class Server
                             {
                                 await SendClientMessageAsync(clientResponse, opposingUser.UserClient, opposingUser.PersonalCTS.Token).ConfigureAwait(false);
                             }
-                            catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is OperationCanceledException)
+                            catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is OperationCanceledException || e is InvalidOperationException)
                             {
                                 GetPossibleSocketErrorCode(e, true);
-                                // Failed to notify user.
+                                // Send user that submitted the move a message to end the game as a draw.
                                 if (!ServerTasksCancellationToken.IsCancellationRequested)
                                 {
                                     try
                                     {
                                         opposingUser.PersonalCTS.Cancel();
+
                                     }
                                     catch (ObjectDisposedException)
-                                    { }
+                                    {
+
+                                    }
                                     // If the opposingUser isn't reachable send player notification that the opponent couldn't be reached.
                                     // Errors thrown here will be caught in outermost catch statement.
                                     var opponentDisconnectedCommand = new ServerCommand(CommandType.OpponentClientDisconnected, currentGame.GameID);
                                     await SendClientMessageAsync(opponentDisconnectedCommand, connectedUser!.UserClient, connectedUser.PersonalCTS.Token).ConfigureAwait(false);
                                 }
-                            }
-                            catch (InvalidOperationException)
-                            {
-                                // Unable to reach opponent.
                             }
                         }
                         else
@@ -625,7 +624,7 @@ public class Server
         int? errorCode = null;
         if (e is IOException && e.InnerException is SocketException exception)
         {
-            Console.WriteLine($"[{(thrownOnServer ? "Server" : "TrackedUser")}] - IOException.SoceketException     Code: {exception.ErrorCode}");
+            Console.WriteLine($"[{(thrownOnServer ? "Server" : "Player")}] - IOException.SoceketException     Code: {exception.ErrorCode}");
             errorCode = exception.ErrorCode;
         }
         return errorCode;
@@ -662,20 +661,48 @@ public class Server
         }
     }
 
+    /// <summary>
+    /// Represents data related to connected users.
+    /// </summary>
     private class TrackedUser : IDisposable
     {
+        /// <summary>
+        /// Static variable used to assign unique <see cref="UserID"/>s.
+        /// </summary>
         private static int s_currentServerID = 0;
+        /// <summary>
+        /// Gets a unique identification code for the current instance.
+        /// </summary>
         public int UserID { get; }
+        /// <summary>
+        /// Gets a <see cref="TcpClient"/> used to send messages to and recieve messages from the connected user.
+        /// </summary>
         public TcpClient UserClient { get; }
+        /// <summary>
+        /// Gets or sets a username sent by <see cref="UserClient"/>.
+        /// </summary>
         public string? UserName { get; set; } = null;
+        /// <summary>
+        /// Gets a <see cref="CancellationTokenSource"/> used to cancel server independent tasks.
+        /// </summary>
         public CancellationTokenSource PersonalCTS { get; } = new();
+        /// <summary>
+        /// Gets a <see cref="CancellationTokenSource"/> that combines a unique <see cref="CancellationToken"/> and a cancellation token from the server.
+        /// </summary>
         public CancellationTokenSource ServerCombinedCTS { get; }
+        /// <summary>
+        /// Gets or sets a Task that will ping <see cref="UserClient"/> until it can't be reacehd or a token is cancelled.
+        /// </summary>
         public Task? PingConnectedClientTask { get; set; }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TrackedUser"/> class.
+        /// </summary>
+        /// <param name="associatedClient">A <see cref="TcpClient"/> client used to recieve or send messages to a connected client.</param>
+        /// <param name="serverToken">Server-side <see cref="CancellationToken"/> used to create a linked token source.</param>
         public TrackedUser(TcpClient associatedClient, CancellationToken serverToken)
         {
             UserID = ++s_currentServerID;
             UserClient = associatedClient;
-            // UserName = userName;
             ServerCombinedCTS = CancellationTokenSource.CreateLinkedTokenSource(PersonalCTS.Token, serverToken);
         }
         public void Dispose()
@@ -687,9 +714,15 @@ public class Server
     }
     private class TrackedGame
     {
+        /// <summary>
+        /// Gets the <see cref="TrackedUser"/> associated with <see cref="Team.White"/>.
+        /// </summary>
         public TrackedUser WhitePlayer { get => AssociatedPlayers[Team.White]; }
+        /// <summary>
+        /// Gets the <see cref="TrackedUser"/> associated with <see cref="Team.Black"/>.
+        /// </summary>
         public TrackedUser BlackPlayer { get => AssociatedPlayers[Team.Black]; }
-        /// <summary>Id used to track relevant information for started <see cref="GameEnvironment"/> instances.</summary>
+        /// <summary>Gets an identification code used to track relevant information for started <see cref="GameEnvironment"/> instances.</summary>
         public int GameID { get; }
         /// <summary>Holds <see cref="TrackedUser"/> instances keyed to their assigned team.</summary>
         public Dictionary<Team, TrackedUser> AssociatedPlayers { get; }
