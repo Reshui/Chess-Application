@@ -142,7 +142,6 @@ namespace Chess_GUi
         /// Disables any GUI that uses <paramref name="gameID"/> as a name.
         /// </summary>
         /// <param name="gameID"><see cref="GameEnvironment.GameID"/> of game to target.</param>
-        /// <exception cref="NotImplementedException"></exception>
         public void DisableGame(int gameID)
         {
             if (_localPlayer is not null && !_localPlayer.UserWantsToQuit)
@@ -180,7 +179,6 @@ namespace Chess_GUi
         /// <summary>
         /// Makes changes to the GUI to reflect that the server that <see cref="_localPlayer"/> is connected too has disconnected.
         /// </summary>
-        /// <exception cref="NotImplementedException"></exception>
         public void ServerIsUnreachable()
         {
             foreach (var gameGUI in _boardGuiByName.Values)
