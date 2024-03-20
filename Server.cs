@@ -76,7 +76,6 @@ public class Server
                 }
                 else
                 {
-                    // To Do: Send a server full message.
                     var deniedAccessCommand = new ServerCommand(CommandType.ServerFull, message: $"The server is full {MaxConnectionCount}/{MaxConnectionCount} users are connected.");
                     await SendClientMessageAsync(deniedAccessCommand, newClient, CancellationToken.None).ConfigureAwait(false);
                     newClient.Close();
@@ -107,7 +106,6 @@ public class Server
     /// </summary>
     public async Task CloseServerAsync()
     {
-
         Console.WriteLine("[Server]: Attempting server shutdown.");
         ServerShutDownCancelSource.Cancel();
         _waitingForGameLobby.Clear();
@@ -140,7 +138,7 @@ public class Server
             // Console.WriteLine($"[Server]: {user.UserName}  Cancellation Token Status; Server: ( {ServerTasksCancellationToken.IsCancellationRequested} ) , Personal: ( {user.PersonalCTS.IsCancellationRequested} ) , Connected: {user.UserClient.Connected}");
 
             // If server is shutting down then send a shutdown message.
-            if (ServerTasksCancellationToken.IsCancellationRequested && !user.PersonalCTS.IsCancellationRequested)
+            if (ServerTasksCancellationToken.IsCancellationRequested && !user.PersonalCTS.IsCancellationRequested && user.UserClient.Connected)
             {
                 bool success = false;
                 var shutdownCommand = new ServerCommand(CommandType.ServerIsShuttingDown);
@@ -202,7 +200,7 @@ public class Server
 
                 try
                 {
-                    if (gameEndingNotificationTasks.Count > 0 && !ServerTasksCancellationToken.IsCancellationRequested)
+                    if (!ServerTasksCancellationToken.IsCancellationRequested)
                     {
                         await Task.WhenAll(gameEndingNotificationTasks).ConfigureAwait(false);
                     }
@@ -426,7 +424,7 @@ public class Server
     /// <param name="token"><see cref="CancellationToken"/> used to cancel asynchronous operations.</param>
     /// <exception cref="OperationCanceledException">Thrown if <paramref name="token"/> source is cancelled.</exception>
     /// <exception cref="IOException">Thrown if something goes wrong with <paramref name="stream.ReadAsync()"/>.</exception>
-    /// <exception cref="OperationCanceledException">Thrown if <paramref name="token"/> is invoked while using .ReadAsync().</exception>
+    /// <exception cref="InvalidOperationException">Thrown if <paramref name="stream"/> is closed.</exception>
     public static async Task<ServerCommand?> RecieveCommandFromStreamAsync(NetworkStream stream, CancellationToken token)
     {
         var builder = new StringBuilder();
@@ -508,86 +506,89 @@ public class Server
     /// <param name="connectedUser"><see cref="TrackedUser"/> instance that is monitored for its responses.</param>
     private async Task HandlePlayerResponsesAsync(TrackedUser connectedUser)
     {
-        bool userRegistered = false;
         try
         {
             NetworkStream stream = connectedUser.UserClient.GetStream();
-            await SendClientMessageAsync(new ServerCommand(CommandType.WelcomeToServer), connectedUser.UserClient, ServerTasksCancellationToken);
-            var token = connectedUser.ServerCombinedCTS.Token;
+            await SendClientMessageAsync(new ServerCommand(CommandType.WelcomeToServer), connectedUser.UserClient, ServerTasksCancellationToken).ConfigureAwait(false);
+            CancellationToken token = connectedUser.ServerCombinedCTS.Token;
+            bool userRegistered = false;
+
             while (!connectedUser.ServerCombinedCTS.IsCancellationRequested)
             {
                 ServerCommand? clientResponse = await RecieveCommandFromStreamAsync(stream, token).ConfigureAwait(false);
 
                 if (clientResponse is not null)
                 {
-                    if (clientResponse.CMD == CommandType.RegisterUser && !userRegistered)
+                    if (clientResponse.CMD.Equals(CommandType.RegisterUser) && !userRegistered)
                     {
-                        try
-                        {
-                            userRegistered = true;
-                            connectedUser!.UserName = clientResponse.Name;
-                            Console.WriteLine($"[Server]: {connectedUser.UserName} has registered.");
-                        }
-                        catch (Exception)
-                        { // Thrown if Name already has a value.
-
-                        }
+                        userRegistered = true;
+                        connectedUser.UserName = clientResponse.Name;
+                        Console.WriteLine($"[Server]: {connectedUser.UserName} has registered.");
                     }
-                    else if (clientResponse.CMD == CommandType.LookingForGame && userRegistered && !_waitingForGameLobby.Contains(connectedUser))
-                    {   // Only add the user to the queue if they aren't already in it.
-                        _waitingForGameLobby.Enqueue(connectedUser);
-                    }
-                    else if (clientResponse.CMD == CommandType.NewMove && clientResponse.MoveDetails is not null && userRegistered)
-                    {   // Send user response to the opposing player.
-                        if (_startedGames.TryGetValue(clientResponse.GameIdentifier, out TrackedGame? currentGame) && currentGame.AssociatedPlayers.ContainsValue(connectedUser))
-                        {
-                            TrackedUser opposingUser = currentGame.AssociatedPlayers[GameEnvironment.ReturnOppositeTeam(clientResponse.MoveDetails.Value.SubmittingTeam)];
-                            try
-                            {
-                                await SendClientMessageAsync(clientResponse, opposingUser.UserClient, opposingUser.PersonalCTS.Token).ConfigureAwait(false);
-                            }
-                            catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is OperationCanceledException || e is InvalidOperationException)
-                            {
-                                GetPossibleSocketErrorCode(e, true);
-                                // Send user that submitted the move a message to end the game as a draw.
-                                if (!ServerTasksCancellationToken.IsCancellationRequested)
-                                {
-                                    try
-                                    {
-                                        opposingUser.PersonalCTS.Cancel();
-
-                                    }
-                                    catch (ObjectDisposedException)
-                                    {
-
-                                    }
-                                    // If the opposingUser isn't reachable send player notification that the opponent couldn't be reached.
-                                    // Errors thrown here will be caught in outermost catch statement.
-                                    var opponentDisconnectedCommand = new ServerCommand(CommandType.OpponentClientDisconnected, currentGame.GameID);
-                                    await SendClientMessageAsync(opponentDisconnectedCommand, connectedUser!.UserClient, connectedUser.PersonalCTS.Token).ConfigureAwait(false);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            // User is sending a command for a game that they are not linked to.
-                        }
-                    }
-                    else if (_endGameCommands.Contains(clientResponse.CMD) && _startedGames.TryGetValue(clientResponse.GameIdentifier, out TrackedGame? currentGame))
-                    {
-                        if (currentGame.AssociatedPlayers.ContainsValue(connectedUser))
-                        {
-                            _startedGames.TryRemove(new KeyValuePair<int, TrackedGame>(currentGame!.GameID, currentGame));
-                        }
-                        else
-                        {
-                            // User is sending a command for a game that they are not linked to.
-                        }
-                    }
-                    else if (clientResponse.CMD == CommandType.ClientDisconnecting)
+                    else if (clientResponse.CMD.Equals(CommandType.ClientDisconnecting))
                     {
                         connectedUser.PersonalCTS.Cancel();
-                        // Console.WriteLine($"[Server]: {user.UserName} has sent disconnect.");
+                    }
+                    else if (userRegistered)
+                    {
+                        if (clientResponse.CMD.Equals(CommandType.LookingForGame) && !_waitingForGameLobby.Contains(connectedUser))
+                        {   // Only add the user to the queue if they aren't already in it.
+                            _waitingForGameLobby.Enqueue(connectedUser);
+                        }
+                        else if (clientResponse.CMD.Equals(CommandType.NewMove) && clientResponse.MoveDetails is not null)
+                        {
+                            // Send user response to the opposing player.                        
+                            if (_startedGames.TryGetValue(clientResponse.GameIdentifier, out TrackedGame? currentGame) && currentGame.AssociatedPlayers.ContainsValue(connectedUser))
+                            {
+                                TrackedUser opposingUser = currentGame.AssociatedPlayers[GameEnvironment.ReturnOppositeTeam(clientResponse.MoveDetails.Value.SubmittingTeam)];
+                                try
+                                {
+                                    await SendClientMessageAsync(clientResponse, opposingUser.UserClient, opposingUser.PersonalCTS.Token).ConfigureAwait(false);
+                                }
+                                catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is OperationCanceledException || e is InvalidOperationException)
+                                {
+                                    GetPossibleSocketErrorCode(e, true);
+                                    // Send user that submitted the move a message to end the game as a draw.
+                                    if (!ServerTasksCancellationToken.IsCancellationRequested)
+                                    {
+                                        try
+                                        {
+                                            opposingUser.PersonalCTS.Cancel();
+                                        }
+                                        catch (ObjectDisposedException)
+                                        {
+
+                                        }
+                                        // If the opposingUser isn't reachable send player notification that the opponent couldn't be reached.
+                                        // Errors thrown here will be caught in outermost catch statement.
+                                        var opponentDisconnectedCommand = new ServerCommand(CommandType.OpponentClientDisconnected, currentGame.GameID);
+                                        await SendClientMessageAsync(opponentDisconnectedCommand, connectedUser.UserClient, connectedUser.PersonalCTS.Token).ConfigureAwait(false);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                var invalidMoveCommand = new ServerCommand(CommandType.InvalidMove, clientResponse.GameIdentifier, clientResponse.MoveDetails);
+                                await SendClientMessageAsync(invalidMoveCommand, connectedUser.UserClient, connectedUser.PersonalCTS.Token).ConfigureAwait(false);
+                            }
+                        }
+                        else if (_endGameCommands.Contains(clientResponse.CMD) && _startedGames.TryGetValue(clientResponse.GameIdentifier, out TrackedGame? currentGame))
+                        {
+                            if (currentGame.AssociatedPlayers.ContainsValue(connectedUser))
+                            {
+                                _startedGames.TryRemove(new KeyValuePair<int, TrackedGame>(currentGame.GameID, currentGame));
+                            }
+                            else
+                            {
+                                // User is sending a command for a game that they are not linked to.
+                                var invalidMoveCommand = new ServerCommand(CommandType.InvalidMove, currentGame.GameID);
+                                await SendClientMessageAsync(invalidMoveCommand, connectedUser.UserClient, connectedUser.PersonalCTS.Token).ConfigureAwait(false);
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("Unhandled Command Recieved");
+                        }
                     }
                 }
             }
@@ -694,6 +695,7 @@ public class Server
         /// Gets or sets a Task that will ping <see cref="UserClient"/> until it can't be reacehd or a token is cancelled.
         /// </summary>
         public Task? PingConnectedClientTask { get; set; }
+        
         /// <summary>
         /// Initializes a new instance of the <see cref="TrackedUser"/> class.
         /// </summary>
@@ -714,13 +716,9 @@ public class Server
     }
     private class TrackedGame
     {
-        /// <summary>
-        /// Gets the <see cref="TrackedUser"/> associated with <see cref="Team.White"/>.
-        /// </summary>
+        /// <summary>Gets the <see cref="TrackedUser"/> associated with <see cref="Team.White"/>.</summary>
         public TrackedUser WhitePlayer { get => AssociatedPlayers[Team.White]; }
-        /// <summary>
-        /// Gets the <see cref="TrackedUser"/> associated with <see cref="Team.Black"/>.
-        /// </summary>
+        /// <summary>Gets the <see cref="TrackedUser"/> associated with <see cref="Team.Black"/>.</summary>
         public TrackedUser BlackPlayer { get => AssociatedPlayers[Team.Black]; }
         /// <summary>Gets an identification code used to track relevant information for started <see cref="GameEnvironment"/> instances.</summary>
         public int GameID { get; }
@@ -730,6 +728,8 @@ public class Server
         private static int _gameID = 0;
         /// <summary>Random number generator used to assign teams to added <see cref="TrackedUser"/> instances.</summary>
         private static readonly Random _rand = new();
+
+        /// <summary>Initializes a new instance of the <see cref="TrackedGame"/> class.</summary>       
         public TrackedGame(TrackedUser playerOne, TrackedUser playerTwo)
         {
             GameID = ++_gameID;
