@@ -76,16 +76,16 @@ public class MovementInformation
     /// <param name="castlingWithSecondary"><see langword="true"/> if <paramref name="mainPieceCopy"/> should castle with <paramref name="secondaryPieceCopy"/>; otherwise, <see langword="false"/>   </param>
     /// <param name="newType">PieceType to convert <paramref name="mainPieceCopy"/> to.</param>
     /// <exception cref="ArgumentException"></exception>
-    public MovementInformation(ChessPiece mainPieceCopy, ChessPiece? secondaryPieceCopy, Coords newMainCoords, Coords? newSecondaryCoords, bool enPassantCapturePossible, bool capturingSecondary, bool castlingWithSecondary, PieceType? newType)
+    public MovementInformation(ChessPiece mainCopy, ChessPiece? secondaryCopy, Coords newMainCoords, Coords? newSecondaryCoords, bool enPassantCapturePossible, bool capturingSecondary, bool castlingWithSecondary, PieceType? newType)
     {
-        if (mainPieceCopy.IsCopy && (secondaryPieceCopy?.IsCopy ?? true))
+        if (mainCopy.IsCopy && (secondaryCopy?.IsCopy ?? true))
         {
-            SecondaryCopy = secondaryPieceCopy;
-            MainCopy = mainPieceCopy;
+            SecondaryCopy = secondaryCopy;
+            MainCopy = mainCopy;
         }
         else
         {
-            throw new ArgumentException($"Both {nameof(mainPieceCopy)} and {nameof(secondaryPieceCopy)} must have a {nameof(ChessPiece.IsCopy)} property of true");
+            throw new ArgumentException($"Both {nameof(mainCopy)} and {nameof(secondaryCopy)} must have a {nameof(ChessPiece.IsCopy)} property of true");
         }
         NewMainCoords = newMainCoords;
         NewSecondaryCoords = newSecondaryCoords;
