@@ -481,8 +481,9 @@ public class Server
                                 ServerCommand? newCommand = JsonSerializer.Deserialize<ServerCommand>(textSection);
                                 return newCommand!;
                             }
-                            catch (Exception)
+                            catch (Exception ex)
                             {
+                                Console.WriteLine(ex);
                                 // Start waiting for another response.
                                 if (builder.Length > 0) builder.Clear();
                                 break;
