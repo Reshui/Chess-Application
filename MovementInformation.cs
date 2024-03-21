@@ -4,7 +4,7 @@ namespace Pieces;
 /// <summary>
 /// Struct that contains information about a given chess movement.
 /// </summary>
-public struct MovementInformation
+public class MovementInformation
 {
     /// <summary>Class that contains the new coordinates to move <see cref="MainCopy"/> to.</summary>
     public Coords NewMainCoords { get; init; }
@@ -18,10 +18,10 @@ public struct MovementInformation
     public ChessPiece? SecondaryCopy { get; init; }
 
     /// <summary>New location to place <see cref="MainCopy"/></summary>
-    public readonly Vector2 MainNewLocation { get => new(NewMainCoords.ColumnIndex, NewMainCoords.RowIndex); }
+    public Vector2 MainNewLocation { get => new(NewMainCoords.ColumnIndex, NewMainCoords.RowIndex); }
 
     /// <summary>New location to place <see cref="SecondaryCopy"/>.</summary>
-    public readonly Vector2? SecondaryNewLocation
+    public Vector2? SecondaryNewLocation
     {
         get
         {
@@ -43,12 +43,12 @@ public struct MovementInformation
 
     /// <summary>Gets a value indicating which <see cref="Team"/> is submitting the <see cref="MovementInformation"/> instance.</summary>
     /// <value>The current value of <see cref="MainCopy"/>.<c>AssignedTeam</c>.</value>
-    public readonly Team SubmittingTeam => MainCopy.AssignedTeam;
+    public Team SubmittingTeam => MainCopy.AssignedTeam;
 
     /// <summary>Gets a value representing if the <see cref="MovementInformation"/> instance describes if <see cref="MainCopy"/> is capturing <see cref="SecondaryCopy"/>
     /// via En Passant.</summary>
     /// <value><see langword="true"/> if capturing via En Passant; otherwise, <see langword="false"/>.</value>
-    public readonly bool CapturingViaEnPassant
+    public bool CapturingViaEnPassant
     {
         get
         {
