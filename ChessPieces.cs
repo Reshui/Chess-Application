@@ -78,7 +78,7 @@ public class ChessPiece
         set { _assignedTeam ??= value; }
     }
     private Team? _assignedTeam = null;
-
+    private bool _enPassantCapturePossible = false;
     /// <summary>
     /// Gets or sets a value representing whether or not the current <see cref="ChessPiece"/> instance is vulnerable to En Passant.
     /// </summary>
@@ -92,7 +92,6 @@ public class ChessPiece
             else if (value == true) throw new InvalidOperationException("Attempting to make a non Pawn vulnerable to En Passant.");
         }
     }
-    private bool _enPassantCapturePossible = false;
 
     /// <summary>Gets a value that describes if the instance can move across the board.</summary>
     /// <value><see langword="true"/> if <see cref="AssignedType"/> is within <see cref="_multiSquareCapable"/>; otherwise, <see langword="false"/>.</value>
