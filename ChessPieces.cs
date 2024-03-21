@@ -27,100 +27,6 @@ public struct Coords
     public int RowIndex { get; set; }
     public int ColumnIndex { get; set; }
 }
-/// <summary>
-/// Struct that contains information about a given chess movement.
-/// </summary>
-public struct MovementInformation
-{
-    /// <summary>Class that contains the new coordinates to move <see cref="MainCopy"/> to.</summary>
-    public Coords NewMainCoords { get; init; }
-    /// <summary>Class that contains the new coordinates to move <see cref="SecondaryCopy"/> to if available.</summary>
-    public Coords? NewSecondaryCoords { get; init; }
-    /// <summary>Primary ChessPiece that is moved.</summary>
-    public ChessPiece MainCopy { get; init; }
-
-    /// <summary>Nullable property that refrences any secondary chess pieces involved in the given movement.
-    /// For example: <example>A rook being castled with or an opponent chess piece that's being captured</example>.</summary>
-    public ChessPiece? SecondaryCopy { get; init; }
-
-    /// <summary>New location to place <see cref="MainCopy"/></summary>
-    public readonly Vector2 MainNewLocation { get => new(NewMainCoords.ColumnIndex, NewMainCoords.RowIndex); }
-
-    /// <summary>New location to place <see cref="SecondaryCopy"/>.</summary>
-    public readonly Vector2? SecondaryNewLocation
-    {
-        get
-        {
-            return NewSecondaryCoords == null ? null : new Vector2((float)NewSecondaryCoords?.ColumnIndex!, (float)NewSecondaryCoords?.RowIndex!);
-        }
-    }
-
-    /// <summary> Gets a value indicating if <see cref="MainCopy"/> is vulnerable to En Passant.</summary>
-    /// <value><see langword="true"/> if <see cref="MainCopy"/> is vulnerable to En Passant; otherwise, <see langword="false"/></value>
-    public bool EnPassantCapturePossible { get; init; }
-
-    /// <summary> Gets a value indicating if <see cref="MainCopy"/> is capturing <see cref="SecondaryCopy"/>.</summary>
-    /// <value><see langword="true"/> if <see cref="MainCopy"/> is capturing <see cref="SecondaryCopy"/>; otherwise, <see langword="false"/></value>
-    public bool CapturingSecondary { get; init; }
-
-    /// <summary> Gets a value indicating if <see cref="MainCopy"/> is castling with <see cref="SecondaryCopy"/>.</summary>
-    /// <value><see langword="true"/> if <see cref="MainCopy"/> is castling with <see cref="SecondaryCopy"/>; otherwise, <see langword="false"/></value>
-    public bool CastlingWithSecondary { get; init; }
-
-    /// <summary>Gets a value indicating which <see cref="Team"/> is submitting the <see cref="MovementInformation"/> instance.</summary>
-    /// <value>The current value of <see cref="MovementInformation.MainCopy"/>.<c>AssignedTeam</c>.</value>
-    public readonly Team SubmittingTeam => MainCopy.AssignedTeam;
-
-    /// <summary>Gets a value representing if the <see cref="MovementInformation"/> instance describes if <see cref="MainCopy"/> is capturing <see cref="SecondaryCopy"/>
-    /// via En Passant.</summary>
-    /// <value><see langword="true"/> if capturing via En Passant; otherwise, <see langword="false"/>.</value>
-    public readonly bool CapturingViaEnPassant
-    {
-        get
-        {
-            if (CapturingSecondary && SecondaryCopy is not null && !new Coords(SecondaryCopy.CurrentLocation).Equals(NewMainCoords))
-            {
-                return true;
-            }
-            return false;
-        }
-    }
-    /// <value>
-    /// If not null then MainCopy will have its PieceType replaced with if it is a pawn.
-    /// </value>
-    public PieceType? NewType { get; set; } = null;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="MovementInformation"/> class.
-    /// </summary>
-    /// <param name="mainPieceCopy">Copy of piece doing the move.</param>
-    /// <param name="secondaryPieceCopy">Copy or null of secondary piece being acted upon.</param>
-    /// <param name="newMainCoords">Coordinates to move <paramref name="mainPieceCopy"/> to.</param>
-    /// <param name="newSecondaryCoords">Coordinates to move <paramref name="secondaryPieceCopy"/> to.</param>
-    /// <param name="enPassantCapturePossible"><see langword="true"/> if <paramref name="mainPieceCopy"/> is captureable via En Passant; otherwise, ><see langword="false"/>.</param>
-    /// <param name="capturingSecondary"></param>
-    /// <param name="castlingWithSecondary"><see langword="true"/> if <paramref name="mainPieceCopy"/> should castle with <paramref name="secondaryPieceCopy"/>; otherwise, <see langword="false"/>   </param>
-    /// <param name="newType">PieceType to convert <paramref name="mainPieceCopy"/> to.</param>
-    /// <exception cref="ArgumentException"></exception>
-    public MovementInformation(ChessPiece mainPieceCopy, ChessPiece? secondaryPieceCopy, Coords newMainCoords, Coords? newSecondaryCoords, bool enPassantCapturePossible, bool capturingSecondary, bool castlingWithSecondary, PieceType? newType)
-    {
-        if (mainPieceCopy.IsCopy && (secondaryPieceCopy?.IsCopy ?? true))
-        {
-            SecondaryCopy = secondaryPieceCopy;
-            MainCopy = mainPieceCopy;
-        }
-        else
-        {
-            throw new ArgumentException($"Both {nameof(mainPieceCopy)} and {nameof(secondaryPieceCopy)} must have a {nameof(ChessPiece.IsCopy)} property of true");
-        }
-        NewMainCoords = newMainCoords;
-        NewSecondaryCoords = newSecondaryCoords;
-        EnPassantCapturePossible = enPassantCapturePossible;
-        CapturingSecondary = capturingSecondary;
-        CastlingWithSecondary = castlingWithSecondary;
-        NewType = newType;
-    }
-}
 
 public class ChessPiece
 {
@@ -276,10 +182,10 @@ public class ChessPiece
                 // Ignore the combination that results in no movement.
                 if (horizontalScalar == 0 && verticalScalar == 0) continue;
                 // Being equal to 1 implies that one dimension has a value of 0 and is therefore a perpendicular or parallel vector.
-                bool vectorIsPerpendicularOrParallel = Math.Abs(verticalScalar) + Math.Abs(horizontalScalar) == 1;
+                bool rookVectorConditions = Math.Abs(verticalScalar) + Math.Abs(horizontalScalar) == 1;
 
-                bool rookVector = (AssignedType == PieceType.Rook) && vectorIsPerpendicularOrParallel;
-                bool bishopVector = (AssignedType == PieceType.Bishop) && vectorIsPerpendicularOrParallel == false;
+                bool rookVector = (AssignedType == PieceType.Rook) && rookVectorConditions;
+                bool bishopVector = (AssignedType == PieceType.Bishop) && rookVectorConditions == false;
                 bool pawnVector = (AssignedType == PieceType.Pawn) && verticalScalar == forwardDirection;
 
                 if (bishopVector || rookVector || pawnVector || canMoveInAnyDirection)

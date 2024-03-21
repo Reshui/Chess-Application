@@ -576,7 +576,10 @@ public class Server
                         {
                             if (currentGame.AssociatedPlayers.ContainsValue(connectedUser))
                             {
-                                _startedGames.TryRemove(new KeyValuePair<int, TrackedGame>(currentGame.GameID, currentGame));
+                                if (_startedGames.TryRemove(new KeyValuePair<int, TrackedGame>(currentGame.GameID, currentGame)))
+                                {
+                                    // COnsider replacing woth uploading result of game to database.                                    
+                                }
                             }
                             else
                             {
@@ -587,7 +590,7 @@ public class Server
                         }
                         else
                         {
-                            Console.WriteLine("Unhandled Command Recieved");
+                            Console.WriteLine("Unhandled Command Recieved : " + clientResponse.ToString());
                         }
                     }
                 }
@@ -695,7 +698,7 @@ public class Server
         /// Gets or sets a Task that will ping <see cref="UserClient"/> until it can't be reacehd or a token is cancelled.
         /// </summary>
         public Task? PingConnectedClientTask { get; set; }
-        
+
         /// <summary>
         /// Initializes a new instance of the <see cref="TrackedUser"/> class.
         /// </summary>
@@ -728,6 +731,12 @@ public class Server
         private static int _gameID = 0;
         /// <summary>Random number generator used to assign teams to added <see cref="TrackedUser"/> instances.</summary>
         private static readonly Random _rand = new();
+        /// <summary>Dictionary used to keep track of winners and losers.</summary>
+        public Dictionary<Team, GameState> GameState { get; } = new()
+        {
+            {Team.Black,Pieces.GameState.Playing },
+            {Team.White,Pieces.GameState.Playing }
+        };
 
         /// <summary>Initializes a new instance of the <see cref="TrackedGame"/> class.</summary>       
         public TrackedGame(TrackedUser playerOne, TrackedUser playerTwo)
