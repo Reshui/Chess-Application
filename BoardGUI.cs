@@ -313,6 +313,11 @@ namespace Chess_GUi
                 {
                     InteractionsDisabled = true;
                 }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex);
+                    throw;
+                }
             }
         }
 
