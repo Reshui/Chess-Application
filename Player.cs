@@ -151,9 +151,9 @@ public class Player
                         }
                         else if (response.CMD == CommandType.NewMove && _activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGame))
                         {
-                            if (!TryUpdateGameInstance(targetedGame, response.MoveDetails!.Value, guiAlreadyUpdated: false))
+                            if (!TryUpdateGameInstance(targetedGame, response.MoveDetails!, guiAlreadyUpdated: false))
                             {
-                                var invalidMoveFromOpponent = new ServerCommand(CommandType.InvalidMove, targetedGame.GameID, response.MoveDetails.Value);
+                                var invalidMoveFromOpponent = new ServerCommand(CommandType.InvalidMove, targetedGame.GameID, response.MoveDetails);
                                 await SendClientMessageAsync(invalidMoveFromOpponent, _connectedServer, PersonalSource.Token);//.ConfigureAwait(false);
                             }
                         }

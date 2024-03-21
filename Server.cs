@@ -540,7 +540,7 @@ public class Server
                             // Send user response to the opposing player.                        
                             if (_startedGames.TryGetValue(clientResponse.GameIdentifier, out TrackedGame? currentGame) && currentGame.AssociatedPlayers.ContainsValue(connectedUser))
                             {
-                                TrackedUser opposingUser = currentGame.AssociatedPlayers[GameEnvironment.ReturnOppositeTeam(clientResponse.MoveDetails.Value.SubmittingTeam)];
+                                TrackedUser opposingUser = currentGame.AssociatedPlayers[GameEnvironment.ReturnOppositeTeam(clientResponse.MoveDetails.SubmittingTeam)];
                                 try
                                 {
                                     await SendClientMessageAsync(clientResponse, opposingUser.UserClient, opposingUser.PersonalCTS.Token).ConfigureAwait(false);
