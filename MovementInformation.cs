@@ -69,12 +69,12 @@ public class MovementInformation
     /// </summary>
     /// <param name="mainCopy">Copy of piece doing the move.</param>
     /// <param name="secondaryCopy">Copy or null of secondary piece being acted upon.</param>
-    /// <param name="newMainCoords">Coordinates to move <paramref name="mainPieceCopy"/> to.</param>
-    /// <param name="newSecondaryCoords">Coordinates to move <paramref name="secondaryPieceCopy"/> to.</param>
-    /// <param name="enPassantCapturePossible"><see langword="true"/> if <paramref name="mainPieceCopy"/> is captureable via En Passant; otherwise, ><see langword="false"/>.</param>
+    /// <param name="newMainCoords">Coordinates to move <paramref name="mainCopy"/> to.</param>
+    /// <param name="newSecondaryCoords">Coordinates to move <paramref name="secondaryCopy"/> to.</param>
+    /// <param name="enPassantCapturePossible"><see langword="true"/> if <paramref name="mainCopy"/> is captureable via En Passant; otherwise, ><see langword="false"/>.</param>
     /// <param name="capturingSecondary"></param>
-    /// <param name="castlingWithSecondary"><see langword="true"/> if <paramref name="mainPieceCopy"/> should castle with <paramref name="secondaryPieceCopy"/>; otherwise, <see langword="false"/>   </param>
-    /// <param name="newType">PieceType to convert <paramref name="mainPieceCopy"/> to.</param>
+    /// <param name="castlingWithSecondary"><see langword="true"/> if <paramref name="mainCopy"/> should castle with <paramref name="secondaryCopy"/>; otherwise, <see langword="false"/>   </param>
+    /// <param name="newType">PieceType to convert <paramref name="mainCopy"/> to.</param>
     /// <exception cref="ArgumentException"></exception>
     public MovementInformation(ChessPiece mainCopy, Coords newMainCoords, ChessPiece? secondaryCopy = null, Coords? newSecondaryCoords = null, bool enPassantCapturePossible = false, bool capturingSecondary = false, bool castlingWithSecondary = false, PieceType? newType = null)
     {
