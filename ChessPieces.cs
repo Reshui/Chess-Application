@@ -39,7 +39,7 @@ public class ChessPiece
             if (_directionVectors.Count == 0) { _directionVectors = AvailableDirectionVectors(); }
             return _directionVectors;
         }
-        set => _directionVectors = value;
+        private set => _directionVectors = value;
     }
     private List<Vector2> _directionVectors = new();
 
