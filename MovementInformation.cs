@@ -67,8 +67,8 @@ public class MovementInformation
     /// <summary>
     /// Initializes a new instance of the <see cref="MovementInformation"/> class.
     /// </summary>
-    /// <param name="mainPieceCopy">Copy of piece doing the move.</param>
-    /// <param name="secondaryPieceCopy">Copy or null of secondary piece being acted upon.</param>
+    /// <param name="mainCopy">Copy of piece doing the move.</param>
+    /// <param name="secondaryCopy">Copy or null of secondary piece being acted upon.</param>
     /// <param name="newMainCoords">Coordinates to move <paramref name="mainPieceCopy"/> to.</param>
     /// <param name="newSecondaryCoords">Coordinates to move <paramref name="secondaryPieceCopy"/> to.</param>
     /// <param name="enPassantCapturePossible"><see langword="true"/> if <paramref name="mainPieceCopy"/> is captureable via En Passant; otherwise, ><see langword="false"/>.</param>
