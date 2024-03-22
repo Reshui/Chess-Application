@@ -23,9 +23,6 @@ public class GameEnvironment
     /// <remarks>Assigned a value when an instance of <see cref="Chess_GUi.BoardGUI"/> is generated.</remarks>
     public PictureBox[,]? Squares { get; set; }
 
-    /// <summary>Player dictionary keyed to the <see cref="Team"/> that they have been assigned to.</summary>
-    public Dictionary<Team, Player> AssociatedPlayers = new();
-
     /// <summary>Dictionary of <see cref="ChessPiece"/> objects keyed to a <see cref="Team"/> enum.</summary>
     private readonly Dictionary<Team, Dictionary<string, ChessPiece>> _chessPieceByIdByTeam;
 
@@ -44,7 +41,7 @@ public class GameEnvironment
     /// <summary>Gets or sets a value representing which <see cref="Team"/> is currently allowed to submit MovementInformation.</summary>
     /// <remarks>Alternated whenever <see cref="SubmitFinalizedChange(MovementInformation)"/> is called.</remarks>
     ///<value>The <see cref="Team"/> that is currently allowed to submit <see cref="MovementInformation"/> to the <see cref="GameEnvironment"/> instance.</value>
-    public Team ActiveTeam { get; set; } = Team.White;
+    public Team ActiveTeam { get; private set; } = Team.White;
 
     /// <summary>Gets or sets the current game state.</summary>
     /// <value>The current game state.</value>
