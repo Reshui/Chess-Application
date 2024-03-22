@@ -220,7 +220,7 @@ public class Server
                 { }
             }
             user.Dispose();
-            Console.WriteLine($"[Server]: {user.UserName} has disconnected from the server.");
+            Console.WriteLine($"[Server]: # {user.UserID} has disconnected from the server.");
         }
     }
 
@@ -345,7 +345,7 @@ public class Server
                                 bool success = false, objectDisposed = false;
                                 try
                                 {
-                                    await SendClientMessageAsync(notifyOpponentDisconnectCommand, playerWaitingForOpponent.UserClient!, playerWaitingForOpponent.ServerCombinedCTS!.Token).ConfigureAwait(false);
+                                    await SendClientMessageAsync(notifyOpponentDisconnectCommand, playerWaitingForOpponent.UserClient, playerWaitingForOpponent.ServerCombinedCTS.Token).ConfigureAwait(false);
                                     success = true;
                                 }
                                 catch (OperationCanceledException)
@@ -528,6 +528,7 @@ public class Server
                     }
                     else if (clientResponse.CMD.Equals(CommandType.ClientDisconnecting))
                     {
+                        Console.WriteLine($"#{connectedUser.UserID} sent disconnect command.");
                         connectedUser.PersonalCTS.Cancel();
                     }
                     else if (userRegistered)
@@ -651,6 +652,7 @@ public class Server
                 if (!await IsClientActiveAsync(clientToPing, pingCancellationToken).ConfigureAwait(false))
                 {
                     sourceToInvoke.Cancel();
+                    Console.WriteLine("Couldn't be reached.");
                     return;
                 }
                 await Task.Delay(1000 * SecondsBetweenPings, pingCancellationToken).ConfigureAwait(false);
