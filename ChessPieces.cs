@@ -216,7 +216,7 @@ public class ChessPiece
         return directions;
     }
 
-    /// <summary>Generates general direction vectors for Knights.</summary>
+    /// <summary>Generates general L shaped direction vectors for Knights.</summary>
     /// <returns>A <see cref="List{Vector2}"/> of direction vectors for Knights.</returns>
     public static List<Vector2> KnightDirectionVectors()
     {
