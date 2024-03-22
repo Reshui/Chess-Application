@@ -420,6 +420,7 @@ public class Server
     /// <summary>
     /// Asynchronously waits for messages from <paramref name="stream"/>.
     /// </summary>
+    /// <returns>An asynchronous <see cref="Task{ServerCommand}"/>.</returns>
     /// <param name="stream"><see cref="NetworkStream"/> that is awaited for its responses.</param>
     /// <param name="token"><see cref="CancellationToken"/> used to cancel asynchronous operations.</param>
     /// <exception cref="OperationCanceledException">Thrown if <paramref name="token"/> source is cancelled.</exception>
