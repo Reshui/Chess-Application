@@ -271,8 +271,11 @@ public class ChessPiece
     /// <param name="newType">A <see cref="PieceType"/> Enum that is used to designate what this chess piece should be promoted to.</param>
     public void ChangePieceType(PieceType newType)
     {
-        AssignedType = newType;
-        DirectionVectors = AvailableDirectionVectors();
+        if (AssignedType != newType)
+        {
+            AssignedType = newType;
+            DirectionVectors = AvailableDirectionVectors();
+        }
     }
 
     /// <summary>Increases the <see cref="TimesMoved"/> property by one.</summary>
