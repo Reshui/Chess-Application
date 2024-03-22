@@ -76,7 +76,7 @@ public class MovementInformation
     /// <param name="castlingWithSecondary"><see langword="true"/> if <paramref name="mainPieceCopy"/> should castle with <paramref name="secondaryPieceCopy"/>; otherwise, <see langword="false"/>   </param>
     /// <param name="newType">PieceType to convert <paramref name="mainPieceCopy"/> to.</param>
     /// <exception cref="ArgumentException"></exception>
-    public MovementInformation(ChessPiece mainCopy, ChessPiece? secondaryCopy, Coords newMainCoords, Coords? newSecondaryCoords, bool enPassantCapturePossible, bool capturingSecondary, bool castlingWithSecondary, PieceType? newType)
+    public MovementInformation(ChessPiece mainCopy, Coords newMainCoords, ChessPiece? secondaryCopy = null, Coords? newSecondaryCoords = null, bool enPassantCapturePossible = false, bool capturingSecondary = false, bool castlingWithSecondary = false, PieceType? newType = null)
     {
         if (mainCopy.IsCopy && (secondaryCopy?.IsCopy ?? true))
         {
