@@ -572,7 +572,7 @@ public class GameEnvironment
                                     && captureablePawn.CanBeCapturedViaEnPassant)
                                     {
                                         var enPassantCapture = new MovementInformation(copyOfPiece, new Coords(calculatedPosition), captureablePawn.Copy(),
-                                            new Coords(ChessPiece.s_capturedLocation), movementWillExposeToEnPassant, capturingSecondary: true);
+                                            new Coords(ChessPiece.s_capturedLocation), capturingSecondary: true);
 
                                         if (false == WillChangeResultInCheck(enPassantCapture, piece.AssignedTeam))
                                         {
