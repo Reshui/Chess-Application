@@ -122,16 +122,26 @@ public class ChessPiece
     /// <summary>Gets a value representing whether or not the current <see cref="ChessPiece"/> instance has been captured.</summary>
     /// <value><see langword="true"/> if the <see cref="CurrentLocation"/> Equals <see cref="s_capturedLocation"/> ; otherwise, <see langword="false"/>.</value>
     public bool Captured { get => CurrentLocation.Equals(s_capturedLocation); }
-
+    private string? _id = null;
     /// <summary>Gets a string to serve as a key for <see cref="GameEnvironment._teamPieces"/>.</summary>
     public string ID
     {
         get => _id ?? throw new NullReferenceException($"{nameof(_id)} is null.");
         set { _id ??= value; }
     }
-    private string? _id = null;
+    /// <summary>
+    /// Gets or initializes a value that describes if the instance is a copy.
+    /// </summary>
+    /// <value><see langword="true"/> if instance is a copy; otherwise, <see langword="false"/>.</value>
     public bool IsCopy { get; init; } = false;
-    //[JsonConstructor]
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ChessPiece"/> class.
+    /// </summary>
+    /// <param name="assignedType">Determines what type of chess piece should be created.</param>
+    /// <param name="currentLocation">Location of the ChessPiece on the board.</param>
+    /// <param name="assignedTeam">The team that the instance is aligned with.</param>
+    /// <param name="initialColumnNumber">Column number before game has started used to generate a unique name for the instance.</param>
     public ChessPiece(PieceType assignedType, Coords currentLocation, Team assignedTeam, int? initialColumnNumber = null)
     {
         AssignedType = assignedType;
@@ -142,6 +152,7 @@ public class ChessPiece
 
         DirectionVectors = AvailableDirectionVectors();
     }
+    [JsonConstructor]
     public ChessPiece()
     {
 

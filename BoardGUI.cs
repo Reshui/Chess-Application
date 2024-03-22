@@ -133,7 +133,7 @@ namespace Chess_GUi
             {
                 for (int column = 0; column < squaresToCreate; column++)
                 {
-                    ChessPiece? currentPiece = _currentGame[row, column];
+                    ChessPiece? currentPiece = _currentGame.GameBoard[row, column];
 
                     _pictureSquares[row, column] = new PictureBox()
                     {
@@ -183,7 +183,7 @@ namespace Chess_GUi
             int[] coords = (from cc in selectedSquare!.Name
                             select int.Parse(cc.ToString())).ToArray();
 
-            ChessPiece? selectedPiece = _currentGame[coords[0], coords[1]];
+            ChessPiece? selectedPiece = _currentGame.GameBoard[coords[0], coords[1]];
 
             if (selectedPiece?.AssignedTeam == _currentGame.PlayerTeam && !selectedSquare.Equals(_friendlySelectedSquare))
             {   // Display available movements for the ChessPiece

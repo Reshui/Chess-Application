@@ -51,17 +51,11 @@ public class GameEnvironment
     /// <value><see langword="true"/> if the <see cref="GameEnvironment"/> instance has ended; otherwise, <see langword="false"/>.</value>
     public bool GameEnded { get => MatchState != GameState.Playing; }
 
-    public ChessPiece this[int x, int y]
-    {
-        get => GameBoard[x, y]!;
-        set => GameBoard[x, y] = value;
-    }
-
     /// <summary>
     /// Initializes a new instance of the <see cref="GameEnvironment"/> instance.
     /// </summary>
     /// <param name="playerTeam"><see cref="Team"/> assigned to client-side <see cref="GameEnvironment"/> instances.</param>
-    /// <param name="serverSideID">Sever generated id  assigned by server to identify this instance.</param>
+    /// <param name="serverSideID">Sever generated id assigned by server to identify this instance.</param>
     public GameEnvironment(int serverSideID, Team playerTeam)
     {
         GameID = serverSideID;
