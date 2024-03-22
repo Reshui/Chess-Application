@@ -142,7 +142,7 @@ public class GameEnvironment
             {   // Exclude the current space.
                 if (verticalScalar == 0 && horizontalScalar == 0) continue;
 
-                bool vectorIsPerpendicularOrParallel = Math.Abs(verticalScalar) + Math.Abs(horizontalScalar) == 1;
+                bool rookVectorConditions = Math.Abs(verticalScalar) + Math.Abs(horizontalScalar) == 1;
                 var vectorDirection = new Vector2(horizontalScalar, verticalScalar);
                 // Propagate the vector at most 7 times to get from the current space to the opposite side of the board.
                 for (int propagationCount = 1; propagationCount < 8; ++propagationCount)
@@ -160,9 +160,9 @@ public class GameEnvironment
                             {
                                 PieceType pieceType = piece.AssignedType;
                                 // Certain captures are only available to specific combinations of vector scalars and piece types.
-                                bool enemyRookFound = pieceType == PieceType.Rook && vectorIsPerpendicularOrParallel;
-                                bool enemyBishopFound = pieceType == PieceType.Bishop && !vectorIsPerpendicularOrParallel;
-                                bool enemyPawnFound = pieceType == PieceType.Pawn && propagationCount == 1 && !vectorIsPerpendicularOrParallel
+                                bool enemyRookFound = pieceType == PieceType.Rook && rookVectorConditions;
+                                bool enemyBishopFound = pieceType == PieceType.Bishop && !rookVectorConditions;
+                                bool enemyPawnFound = pieceType == PieceType.Pawn && propagationCount == 1 && !rookVectorConditions
                                     && ((kingRow > row && piece.AssignedTeam == Team.White) || (kingRow < row && piece.AssignedTeam == Team.Black));
                                 bool enemyQueenOrKingFound = (pieceType == PieceType.Queen) || (pieceType == PieceType.King && propagationCount == 1);
 
