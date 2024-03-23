@@ -17,7 +17,7 @@ public class GameEnvironment
     private int _movesSinceLastCapture = 0;
 
     /// <summary>Array used to hold <see cref="ChessPiece"/> instances and their locations withn the current game.</summary>
-    public readonly ChessPiece?[,] GameBoard = new ChessPiece[8, 8];
+    public readonly ChessPiece?[,] GameBoard;
 
     /// <summary>Gets or sets an array used to store visual information about the current state of <see cref="GameBoard"/>.</summary>
     /// <remarks>Assigned a value when an instance of <see cref="Chess_GUi.BoardGUI"/> is generated.</remarks>
@@ -60,6 +60,7 @@ public class GameEnvironment
     {
         GameID = serverSideID;
         PlayerTeam = playerTeam;
+        GameBoard = new ChessPiece[8, 8];
 
         _chessPieceByIdByTeam = GenerateBoard();
         AssignKings(out _whiteKing, out _blackKing);
@@ -117,20 +118,21 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Determines if king associated with <paramref name="teamToCheck"/> is checked on <paramref name="GameBoard"/>.
+    /// Determines if king associated with <paramref name="teamToCheck"/> is in check.
     /// </summary>
-    /// <param name="teamToCheck">The team you want the checked status for.</param>
-    /// <returns><see langword="true"/> if the King associated with <paramref name="teamToCheck"/> is checked; else <see langword="false"/>.</returns>
-    private bool IsKingChecked(Team teamToCheck)
+    /// <param name="teamToCheck">The team for which the checked status is returned.</param>
+    /// <returns><see langword="true"/> if the King associated with <paramref name="teamToCheck"/> is checked; otherwise, <see langword="false"/>.</returns>
+    private bool IsTeamInCheck(Team teamToCheck)
     {
-        // This variable is needed to determine if a king can be attacked by an enemy pawn(pawns can only attack towards on side of the board.).
         ChessPiece queriedKing = ReturnKing(teamToCheck);
-        int kingRow = queriedKing.CurrentRow;
+        // This variable is needed to determine if a king can be attacked by an enemy pawn(pawns can only attack towards one side of the board).
+        int kingRowNumber = queriedKing.CurrentRow;
 
         for (int verticalScalar = -1; verticalScalar < 2; ++verticalScalar)
         {
             for (int horizontalScalar = -1; horizontalScalar < 2; ++horizontalScalar)
-            {   // Exclude the current space.
+            {
+                // Exclude the current space.
                 if (verticalScalar == 0 && horizontalScalar == 0) continue;
 
                 bool rookVectorConditions = Math.Abs(verticalScalar) + Math.Abs(horizontalScalar) == 1;
@@ -139,23 +141,23 @@ public class GameEnvironment
                 for (int propagationCount = 1; propagationCount < 8; ++propagationCount)
                 {
                     var locationToCheck = Vector2.Add(queriedKing.CurrentLocation, Vector2.Multiply(vectorDirection, propagationCount));
-                    (int row, int column) = ((int)locationToCheck.Y, (int)locationToCheck.X);
+                    (int queriedRow, int queriedColumn) = ((int)locationToCheck.Y, (int)locationToCheck.X);
 
-                    if ((row is >= 0 and <= 7) && (column is >= 0 and <= 7))
+                    if ((queriedRow is >= 0 and <= 7) && (queriedColumn is >= 0 and <= 7))
                     {
-                        ChessPiece? piece = GameBoard[row, column];
+                        ChessPiece? piece = GameBoard[queriedRow, queriedColumn];
 
                         if (piece is not null)
-                        {   // If a ChessPiece object is found determine its type and whether or not it is friendly.
+                        {
                             if (!queriedKing.OnSameTeam(piece))
                             {
                                 PieceType pieceType = piece.AssignedType;
                                 // Certain captures are only available to specific combinations of vector scalars and piece types.
                                 bool enemyRookFound = pieceType == PieceType.Rook && rookVectorConditions;
                                 bool enemyBishopFound = pieceType == PieceType.Bishop && !rookVectorConditions;
-                                bool enemyPawnFound = pieceType == PieceType.Pawn && propagationCount == 1 && !rookVectorConditions
-                                    && ((kingRow > row && piece.AssignedTeam == Team.White) || (kingRow < row && piece.AssignedTeam == Team.Black));
                                 bool enemyQueenOrKingFound = (pieceType == PieceType.Queen) || (pieceType == PieceType.King && propagationCount == 1);
+                                bool enemyPawnFound = propagationCount == 1 && !rookVectorConditions && pieceType == PieceType.Pawn
+                                    && ((kingRowNumber > queriedRow && piece.AssignedTeam == Team.White) || (kingRowNumber < queriedRow && piece.AssignedTeam == Team.Black));
 
                                 if (enemyBishopFound || enemyQueenOrKingFound || enemyPawnFound || enemyRookFound)
                                 {
@@ -177,11 +179,11 @@ public class GameEnvironment
         foreach (Vector2 knightVector in ChessPiece.KnightDirectionVectors())
         {
             var locationToCheck = Vector2.Add(queriedKing.CurrentLocation, knightVector);
-            (int row, int column) = ((int)locationToCheck.Y, (int)locationToCheck.X);
+            (int queriedRow, int queriedColumn) = ((int)locationToCheck.Y, (int)locationToCheck.X);
 
-            if ((row is >= 0 and <= 7) && (column is >= 0 and <= 7))
+            if ((queriedRow is >= 0 and <= 7) && (queriedColumn is >= 0 and <= 7))
             {
-                ChessPiece? piece = GameBoard[row, column];
+                ChessPiece? piece = GameBoard[queriedRow, queriedColumn];
 
                 if (piece is not null && piece.AssignedType == PieceType.Knight && !queriedKing.OnSameTeam(piece))
                 {
@@ -201,7 +203,7 @@ public class GameEnvironment
     private bool WillChangeResultInCheck(MovementInformation moveInfo, Team teamToCheck)
     {
         EditGameBoard(moveInfo);
-        bool returnValue = IsKingChecked(teamToCheck);
+        bool returnValue = IsTeamInCheck(teamToCheck);
         UndoGameBoardEdit(moveInfo);
 
         return returnValue;
@@ -210,10 +212,10 @@ public class GameEnvironment
     /// <summary>Determins if the king is checked and if so, determines if any move can undo the check.</summary>
     /// <returns><see langword="true"/> if the team associated with <paramref name="teamToCheck"/> is check-mated; otherwise, <see langword="false"/>.</returns>
     /// <param name ="teamToCheck">Used to determine which king should be queried for a check-mate state.</param>
-    private bool IsKingCheckMated(Team teamToCheck)
+    private bool IsTeamCheckmated(Team teamToCheck)
     {
         // It isn't possible to be checkmated without being in check first.
-        if (!IsKingChecked(teamToCheck)) return false;
+        if (!IsTeamInCheck(teamToCheck)) return false;
         // Determine if there are any moves that can be done to prevent the current check.
         var moveThatDeniesCheckUnavailable = !(from piece in _chessPieceByIdByTeam[teamToCheck].Values
                                                where !piece.Captured && AvailableMoves(piece).Count > 0
@@ -355,11 +357,11 @@ public class GameEnvironment
                 DisableTeamVulnerabilityToEnPassant(newActiveTeam);
                 // The local player isn't allowed to submit a move that will place themselves in check, So just determine if the opponent
                 // has placed the local player in check.
-                if (!localPlayerMove && IsKingCheckMated(PlayerTeam))
+                if (!localPlayerMove && IsTeamCheckmated(PlayerTeam))
                 {
                     ChangeGameState(GameState.LocalLoss);
                 }
-                else if (localPlayerMove && IsKingCheckMated(ReturnOppositeTeam(PlayerTeam)))
+                else if (localPlayerMove && IsTeamCheckmated(ReturnOppositeTeam(PlayerTeam)))
                 {
                     ChangeGameState(GameState.LocalWin);
                 }
@@ -452,7 +454,7 @@ public class GameEnvironment
             // If castling vector, determine if it is possible to castle.
             if (piece.IsKing() && Math.Abs(movementVector.X) == 2)
             {
-                if (piece.TimesMoved != 0 || IsKingChecked(piece.AssignedTeam)) continue;
+                if (piece.TimesMoved != 0 || IsTeamInCheck(piece.AssignedTeam)) continue;
                 // A castleDirection of -1 means it's towards the left.
                 int castleDirection = (int)movementVector.X / 2;
                 int friendlySpecialLine = piece.CurrentRow;
