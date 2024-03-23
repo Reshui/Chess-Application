@@ -12,6 +12,14 @@ public class GameEnvironment
     private readonly ChessPiece _whiteKing;
     private readonly ChessPiece _blackKing;
 
+    /// <summary>
+    /// Boolean used to signify if a temporary move has been pushed to <see cref="_gameMoves"/>.
+    /// </summary>
+    private bool _tempMoveSaved = false;
+
+    /// <summary>Tracks moves within the current <see cref="GameEnvironment"/> instance.</summary>
+    private readonly Stack<MovementInformation> _gameMoves = new();
+
     /// <summary>Stores how many moves have been submitted since the last capture was made.</summary>
     /// <remarks>If over 50 then a Draw is determined.</remarks>
     private int _movesSinceLastCapture = 0;
@@ -25,9 +33,6 @@ public class GameEnvironment
 
     /// <summary>Dictionary of <see cref="ChessPiece"/> objects keyed to a <see cref="Team"/> enum.</summary>
     private readonly Dictionary<Team, Dictionary<string, ChessPiece>> _chessPieceByIdByTeam;
-
-    /// <summary>List of submitted moves within the current <see cref="GameEnvironment"/> instance.</summary>
-    private readonly Stack<MovementInformation> _gameMoves = new();
 
     /// <summary>Gets or initializes an ID number used to track the current instance on the server.</summary>
     /// <value>The ID of the current <see cref="GameEnvironment"/> instance on the server.</value>
@@ -50,7 +55,6 @@ public class GameEnvironment
     /// <summary>Gets a boolean that denotes whether or not a given instance has ended.</summary>
     /// <value><see langword="true"/> if the <see cref="GameEnvironment"/> instance has ended; otherwise, <see langword="false"/>.</value>
     public bool GameEnded { get => MatchState != GameState.Playing; }
-    private bool _tempMoveSaved = false;
     /// <summary>
     /// Initializes a new instance of the <see cref="GameEnvironment"/> instance.
     /// </summary>
@@ -259,6 +263,7 @@ public class GameEnvironment
     /// Replaces or moves a <see cref="ChessPiece"/> object within the <paramref name ="GameBoard"/> array.
     /// </summary>
     /// <param name ="move">Contains details for a given move.</param>
+    /// <exception cref="InvalidOperationException">Thrown if <see cref="_tempMoveSaved"/> is <see langword="true"/>.</exception>
     private void EditGameBoard(MovementInformation move, bool moveIsFinal)
     {
         if (_tempMoveSaved) throw new InvalidOperationException("There is a temporary move reflected in the current state of the board. Undo it before preceding.");
@@ -301,7 +306,7 @@ public class GameEnvironment
             AdjustChessPieceLocationProperty(pieceTwo, movementToUndo.SecondaryCopy.CurrentLocation);
             if (movementToUndo.CastlingWithSecondary) pieceTwo.DecreaseMovementCount();
         }
-        if (_tempMoveSaved) _tempMoveSaved = false;
+        _tempMoveSaved = false;
     }
 
     /// <summary>
