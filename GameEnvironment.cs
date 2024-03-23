@@ -27,7 +27,7 @@ public class GameEnvironment
     private readonly Dictionary<Team, Dictionary<string, ChessPiece>> _chessPieceByIdByTeam;
 
     /// <summary>List of submitted moves within the current <see cref="GameEnvironment"/> instance.</summary>
-    private readonly List<MovementInformation> _gameMoves = new();
+    private readonly Stack<MovementInformation> _gameMoves = new();
 
     /// <summary>Gets or initializes an ID number used to track the current instance on the server.</summary>
     /// <value>The ID of the current <see cref="GameEnvironment"/> instance on the server.</value>
@@ -50,7 +50,7 @@ public class GameEnvironment
     /// <summary>Gets a boolean that denotes whether or not a given instance has ended.</summary>
     /// <value><see langword="true"/> if the <see cref="GameEnvironment"/> instance has ended; otherwise, <see langword="false"/>.</value>
     public bool GameEnded { get => MatchState != GameState.Playing; }
-
+    private bool _tempMoveSaved = false;
     /// <summary>
     /// Initializes a new instance of the <see cref="GameEnvironment"/> instance.
     /// </summary>
@@ -199,9 +199,9 @@ public class GameEnvironment
     /// <returns><see langword="true"/> if the king associated with <paramref name="teamToCheck"/> will be checked; otherwise, <see langword="false"/>.</returns>
     private bool WillChangeResultInCheck(MovementInformation moveInfo, Team teamToCheck)
     {
-        EditGameBoard(moveInfo);
+        EditGameBoard(moveInfo, false);
         bool returnValue = IsTeamInCheck(teamToCheck);
-        UndoGameBoardEdit(moveInfo);
+        UndoGameBoardEdit();
 
         return returnValue;
     }
@@ -258,9 +258,10 @@ public class GameEnvironment
     /// <summary>
     /// Replaces or moves a <see cref="ChessPiece"/> object within the <paramref name ="GameBoard"/> array.
     /// </summary>
-    /// <param name ="move">Struct that contains details for a given movement or capture.</param>
-    private void EditGameBoard(MovementInformation move)
+    /// <param name ="move">Contains details for a given move.</param>
+    private void EditGameBoard(MovementInformation move, bool moveIsFinal)
     {
+        if (_tempMoveSaved) throw new InvalidOperationException("There is a temporary move reflected in the current state of the board. Undo it before preceding.");
         // For simplicity the second piece is moved first.
         if (move.SecondaryCopy is not null && move.SecondaryNewLocation is not null)
         {
@@ -275,14 +276,18 @@ public class GameEnvironment
         if (move.EnPassantCapturePossible) pieceToChange.EnableEnPassantCaptures();
         else if (move.NewType is not null) pieceToChange.ChangePieceType((PieceType)move.NewType);
         pieceToChange.IncreaseMovementCount();
+
+        _gameMoves.Push(move);
+        _tempMoveSaved = !moveIsFinal;
     }
 
     /// <summary>
     /// Undoes a change to a <see cref="ChessPiece"/> array using information from <paramref name="movementToUndo"/>.
     /// </summary>
     /// <param name="movementToUndo">Struct that contains information on the change to undo.</param>
-    private void UndoGameBoardEdit(MovementInformation movementToUndo)
+    private void UndoGameBoardEdit()
     {
+        MovementInformation movementToUndo = _gameMoves.Pop();
         ChessPiece mainChessPiece = GetPieceFromMovement(movementToUndo, true);
         AdjustChessPieceLocationProperty(mainChessPiece, movementToUndo.MainCopy.CurrentLocation);
 
@@ -296,6 +301,7 @@ public class GameEnvironment
             AdjustChessPieceLocationProperty(pieceTwo, movementToUndo.SecondaryCopy.CurrentLocation);
             if (movementToUndo.CastlingWithSecondary) pieceTwo.DecreaseMovementCount();
         }
+        if (_tempMoveSaved) _tempMoveSaved = false;
     }
 
     /// <summary>
@@ -342,10 +348,9 @@ public class GameEnvironment
 
             if (localPlayerMove || hostileMoveCheck.Any())
             {
-                _gameMoves.Add(newMove);
                 if (!piecesAlreadyMovedOnGUI) UpdateSquaresOnGUI(newMove, piecesAlreadyMovedOnGUI);
 
-                EditGameBoard(newMove);
+                EditGameBoard(newMove, true);
 
                 if (newMove.CapturingSecondary) _movesSinceLastCapture = 0;
                 else ++_movesSinceLastCapture;
