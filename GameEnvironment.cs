@@ -88,6 +88,8 @@ public class GameEnvironment
             { Team.Black, new Dictionary<string, ChessPiece>() }
         };
 
+        int indexOfLastRow = GameBoard.GetUpperBound(0);
+
         for (int columnIndex = 0; columnIndex <= GameBoard.GetUpperBound(1); ++columnIndex)
         {
             PieceType specialPieceType = columnIndex switch
@@ -100,7 +102,6 @@ public class GameEnvironment
                 _ => throw new ArgumentOutOfRangeException($"{nameof(columnIndex)} is greater than 7 or less than 0.")
             };
 
-            int indexOfLastRow = GameBoard.GetUpperBound(0);
             foreach (var selectedTeam in new Team[] { Team.White, Team.Black })
             {
                 (int pawnRow, int specialRow) = (selectedTeam == Team.White) ? (1, 0) : (indexOfLastRow - 1, indexOfLastRow);
