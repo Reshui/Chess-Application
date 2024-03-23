@@ -84,9 +84,6 @@ public class GameEnvironment
             { Team.Black, new Dictionary<string, ChessPiece>() }
         };
 
-        // 2nd row from the top and bottom.
-        int[] pawnRows = { 1, GameBoard.GetUpperBound(0) - 1 };
-
         for (int columnIndex = 0; columnIndex <= GameBoard.GetUpperBound(1); ++columnIndex)
         {
             PieceType specialPieceType = columnIndex switch
@@ -99,19 +96,19 @@ public class GameEnvironment
                 _ => throw new ArgumentOutOfRangeException($"{nameof(columnIndex)} is greater than 7 or less than 0.")
             };
 
-            foreach (int pawnRow in pawnRows)
+            int indexOfLastRow = GameBoard.GetUpperBound(0);
+            foreach (var selectedTeam in new Team[] { Team.White, Team.Black })
             {
-                Team currentTeam = (pawnRow == 1) ? Team.White : Team.Black;
-                int specialRow = (currentTeam == Team.White) ? 0 : GameBoard.GetUpperBound(0);
+                (int pawnRow, int specialRow) = (selectedTeam == Team.White) ? (1, 0) : (indexOfLastRow - 1, indexOfLastRow);
 
-                var pawnPiece = new ChessPiece(PieceType.Pawn, new Coords(pawnRow, columnIndex), currentTeam, columnIndex);
-                var specialPiece = new ChessPiece(specialPieceType, new Coords(specialRow, columnIndex), currentTeam, columnIndex);
+                var pawnPiece = new ChessPiece(PieceType.Pawn, new Coords(pawnRow, columnIndex), selectedTeam, columnIndex);
+                var specialPiece = new ChessPiece(specialPieceType, new Coords(specialRow, columnIndex), selectedTeam, columnIndex);
 
                 GameBoard[pawnRow, columnIndex] = pawnPiece;
                 GameBoard[specialRow, columnIndex] = specialPiece;
 
-                piecesPerTeam[currentTeam].TryAdd(pawnPiece.ID, pawnPiece);
-                piecesPerTeam[currentTeam].TryAdd(specialPiece.ID, specialPiece);
+                piecesPerTeam[selectedTeam].TryAdd(pawnPiece.ID, pawnPiece);
+                piecesPerTeam[selectedTeam].TryAdd(specialPiece.ID, specialPiece);
             }
         }
         return piecesPerTeam;
@@ -217,9 +214,9 @@ public class GameEnvironment
         // It isn't possible to be checkmated without being in check first.
         if (!IsTeamInCheck(teamToCheck)) return false;
         // Determine if there are any moves that can be done to prevent the current check.
-        var moveThatDeniesCheckUnavailable = !(from piece in _chessPieceByIdByTeam[teamToCheck].Values
-                                               where !piece.Captured && AvailableMoves(piece).Count > 0
-                                               select true).Any();
+        bool moveThatDeniesCheckUnavailable = !(from piece in _chessPieceByIdByTeam[teamToCheck].Values
+                                                where !piece.Captured && AvailableMoves(piece).Count > 0
+                                                select true).Any();
         return moveThatDeniesCheckUnavailable;
     }
 
