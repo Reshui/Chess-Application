@@ -164,26 +164,24 @@ public class ChessPiece
     /// <returns>A <see cref="List{Vector2}"/> of available direction vectors for the current <see cref="AssignedType"/>.</returns>
     private List<Vector2> AvailableDirectionVectors()
     {
-        bool canMoveInAnyDirection = true;
+        bool canMoveInAnyDirection = false;
         int initialPawnJump = 0, forwardDirection = 0;
 
         switch (AssignedType)
         {
+            case PieceType.King:
+            case PieceType.Queen:
+                canMoveInAnyDirection = true;
+                break;
             case PieceType.Pawn:
-            case PieceType.Rook:
-            case PieceType.Bishop:
-                if (AssignedType.Equals(PieceType.Pawn))
-                {
-                    forwardDirection = AssignedTeam.Equals(Team.White) ? 1 : -1;
-                    initialPawnJump = 2 * forwardDirection;
-                }
-                canMoveInAnyDirection = false;
+                forwardDirection = AssignedTeam.Equals(Team.White) ? 1 : -1;
+                initialPawnJump = 2 * forwardDirection;
                 break;
             case PieceType.Knight:
                 return KnightDirectionVectors();
         }
 
-        var directions = new List<Vector2>();
+        var chessPieceMoveSet = new List<Vector2>();
 
         for (int horizontalScalar = -1; horizontalScalar < 2; ++horizontalScalar)
         {
@@ -191,36 +189,36 @@ public class ChessPiece
             {
                 // Ignore the combination that results in no movement.
                 if (horizontalScalar == 0 && verticalScalar == 0) continue;
-                // Being equal to 1 implies that one dimension has a value of 0 and is therefore a perpendicular or parallel vector.
-                bool rookVectorConditions = Math.Abs(verticalScalar) + Math.Abs(horizontalScalar) == 1;
 
-                bool rookVector = (AssignedType == PieceType.Rook) && rookVectorConditions;
-                bool bishopVector = (AssignedType == PieceType.Bishop) && rookVectorConditions == false;
+                bool vectorIsDiagonal = Math.Abs(verticalScalar) + Math.Abs(horizontalScalar) == 2;
+
+                bool rookVector = (AssignedType == PieceType.Rook) && !vectorIsDiagonal;
+                bool bishopVector = (AssignedType == PieceType.Bishop) && vectorIsDiagonal;
                 bool pawnVector = (AssignedType == PieceType.Pawn) && verticalScalar == forwardDirection;
 
                 if (bishopVector || rookVector || pawnVector || canMoveInAnyDirection)
                 {
-                    directions.Add(new Vector2(horizontalScalar, verticalScalar));
+                    chessPieceMoveSet.Add(new Vector2(horizontalScalar, verticalScalar));
 
                     if (AssignedType.Equals(PieceType.King) && verticalScalar == 0 && horizontalScalar != 0)
                     {   // This will allow the king to castle in either direction horizontally for castling purposes.
-                        directions.Add(new Vector2(2 * horizontalScalar, 0));
+                        chessPieceMoveSet.Add(new Vector2(2 * horizontalScalar, 0));
                     }
                     else if (AssignedType.Equals(PieceType.Pawn) && horizontalScalar == 0)
                     {   // This will allow pawns to move forward 2 spaces if they haven't been moved yet.
-                        directions.Add(new Vector2(horizontalScalar, initialPawnJump));
+                        chessPieceMoveSet.Add(new Vector2(horizontalScalar, initialPawnJump));
                     }
                 }
             }
         }
-        return directions;
+        return chessPieceMoveSet;
     }
 
     /// <summary>Generates general L shaped direction vectors for Knights.</summary>
     /// <returns>A <see cref="List{Vector2}"/> of direction vectors for Knights.</returns>
     public static List<Vector2> KnightDirectionVectors()
     {
-        var directions = new List<Vector2>();
+        var knightMoveSet = new List<Vector2>();
         int[] horizontalMovements = { 2, -2, 1, -1 };
 
         foreach (int horizontalScalar in horizontalMovements)
@@ -229,11 +227,11 @@ public class ChessPiece
 
             for (int i = 0; i < 2; ++i)
             {
-                directions.Add(new Vector2(horizontalScalar, verticalScalar));
+                knightMoveSet.Add(new Vector2(horizontalScalar, verticalScalar));
                 verticalScalar *= -1;
             }
         }
-        return directions;
+        return knightMoveSet;
     }
 
     /// <summary>
