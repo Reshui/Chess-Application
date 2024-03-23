@@ -162,7 +162,7 @@ public class Server
                 }
                 finally
                 {
-                    if (success) Console.WriteLine($"[Server]: Shutdown notification sent => {user.UserName}");
+                    if (success) Console.WriteLine($"[Server]: Shutdown notification sent => # {user.UserID}");
                 }
             }
 
