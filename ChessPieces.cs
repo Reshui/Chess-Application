@@ -185,9 +185,9 @@ public class ChessPiece
 
         var directions = new List<Vector2>();
 
-        for (int horizontalScalar = -1; horizontalScalar < 2; horizontalScalar++)
+        for (int horizontalScalar = -1; horizontalScalar < 2; ++horizontalScalar)
         {
-            for (int verticalScalar = -1; verticalScalar < 2; verticalScalar++)
+            for (int verticalScalar = -1; verticalScalar < 2; ++verticalScalar)
             {
                 // Ignore the combination that results in no movement.
                 if (horizontalScalar == 0 && verticalScalar == 0) continue;
