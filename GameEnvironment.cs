@@ -36,12 +36,12 @@ public class GameEnvironment
 
     /// <summary>Gets or initializes an ID number used to track the current instance on the server.</summary>
     /// <value>The ID of the current <see cref="GameEnvironment"/> instance on the server.</value>
-    public int GameID { get; init; }
+    public int GameID { get; }
 
     /// <summary>Gets or initializes a <see cref="Team"/> enum that represents the assigned Team of the client.</summary>
     /// <remarks>Variable used by the client-side <see cref="BoardGUI"/> instance to limit interaction with the board until it is that team's turn.</remarks>
     /// <value><see cref="Team"/> assigned to the local user.</value>
-    public Team PlayerTeam { get; init; }
+    public Team PlayerTeam { get; }
 
     /// <summary>Gets or sets a value representing which <see cref="Team"/> is currently allowed to submit MovementInformation.</summary>
     /// <remarks>Alternated whenever <see cref="SubmitFinalizedChange(MovementInformation)"/> is called.</remarks>
@@ -137,7 +137,7 @@ public class GameEnvironment
                 // Exclude the current space.
                 if (verticalScalar == 0 && horizontalScalar == 0) continue;
 
-                bool rookVectorConditions = Math.Abs(verticalScalar) + Math.Abs(horizontalScalar) == 1;
+                bool vectorIsDiagonal = Math.Abs(verticalScalar) + Math.Abs(horizontalScalar) == 2;
                 var vectorDirection = new Vector2(horizontalScalar, verticalScalar);
                 // Propagate the vector at most 7 times to get from the current space to the opposite side of the board.
                 for (int propagationCount = 1; propagationCount < 8; ++propagationCount)
@@ -155,10 +155,10 @@ public class GameEnvironment
                             {
                                 PieceType pieceType = piece.AssignedType;
                                 // Certain captures are only available to specific combinations of vector scalars and piece types.
-                                bool enemyRookFound = pieceType == PieceType.Rook && rookVectorConditions;
-                                bool enemyBishopFound = pieceType == PieceType.Bishop && !rookVectorConditions;
+                                bool enemyRookFound = pieceType == PieceType.Rook && !vectorIsDiagonal;
+                                bool enemyBishopFound = pieceType == PieceType.Bishop && vectorIsDiagonal;
                                 bool enemyQueenOrKingFound = (pieceType == PieceType.Queen) || (pieceType == PieceType.King && propagationCount == 1);
-                                bool enemyPawnFound = propagationCount == 1 && !rookVectorConditions && pieceType == PieceType.Pawn
+                                bool enemyPawnFound = propagationCount == 1 && vectorIsDiagonal && pieceType == PieceType.Pawn
                                     && ((kingRowNumber > queriedRow && piece.AssignedTeam == Team.White) || (kingRowNumber < queriedRow && piece.AssignedTeam == Team.Black));
 
                                 if (enemyBishopFound || enemyQueenOrKingFound || enemyPawnFound || enemyRookFound)
@@ -264,10 +264,11 @@ public class GameEnvironment
     /// Replaces or moves a <see cref="ChessPiece"/> object within the <paramref name ="GameBoard"/> array.
     /// </summary>
     /// <param name ="move">Contains details for a given move.</param>
+    /// <param name="moveIsFinal"><see cref="true"/> if <paramref name="move"/> being submitted as the final move for the current turn.</param>
     /// <exception cref="InvalidOperationException">Thrown if <see cref="_tempMoveSaved"/> is <see langword="true"/>.</exception>
     private void EditGameBoard(MovementInformation move, bool moveIsFinal)
     {
-        if (_tempMoveSaved) throw new InvalidOperationException("There is a temporary move reflected in the current state of the board. Undo it before preceding.");
+        if (_tempMoveSaved) throw new InvalidOperationException("There is a temporary move reflected in the current state of the board. Undo it before proceeding.");
         // For simplicity the second piece is moved first.
         if (move.SecondaryCopy is not null && move.SecondaryNewLocation is not null)
         {
@@ -288,9 +289,8 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Undoes a change to a <see cref="ChessPiece"/> array using information from <paramref name="movementToUndo"/>.
+    /// Undoes the most recent move in the game.
     /// </summary>
-    /// <param name="movementToUndo">Struct that contains information on the change to undo.</param>
     private void UndoGameBoardEdit()
     {
         MovementInformation movementToUndo = _gameMoves.Pop();
@@ -617,7 +617,7 @@ public class GameEnvironment
     /// <summary>Returns a chess piece within the current instance based on the ID property of a ChessPiece found in <paramref name="move"/> parameter.</summary>
     /// <param name="move">Data used to help retrieve a chess piece.</param>
     /// <param name="wantPrimary"><see langword="true"/> if you want the MainCopy; otherwise, the secondary piece will be retrieved.</param>
-    /// <returns>A chess piece instance.</returns>
+    /// <returns>A <see cref="ChessPiece"/> instance.</returns>
     /// <exception cref="KeyNotFoundException"></exception>
     private ChessPiece GetPieceFromMovement(MovementInformation move, bool wantPrimary)
     {
