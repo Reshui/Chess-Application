@@ -212,6 +212,7 @@ namespace Chess_GUi
 
             JoinServer.Enabled = true;
             StartServer.Enabled = true;
+            panel1.Controls["LFG"].Visible = false;
         }
         private void GameTracker_SelectedIndexChanged(object sender, EventArgs e)
         {
