@@ -95,8 +95,8 @@ namespace Chess_GUi
             var _promotionPanel = new Panel()
             {
                 BackColor = Color.White,
-                Location = new Point(_mainBoard.Right + 30, 300),
-                Size = new Size(150, 50),
+                Location = new Point(_mainBoard.Right + 50, 300),
+                Size = new Size(500, 75),
                 Visible = false,
                 Name = "PromotionPanel"
             };
