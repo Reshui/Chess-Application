@@ -530,7 +530,7 @@ public class GameEnvironment
                     {
                         bool targetSquareIsEmpty = GameBoard[row, column] is null;
                         bool canCaptureEnemy = piece.IsComparedPieceHostile(GameBoard[row, column], out ChessPiece? captureablePiece);
-                        bool pawnAttackVector, movementWillExposeToEnPassant = pawnAttackVector = false;
+                        bool pawnAttackVector, promptUserForPawnPromotion, movementWillExposeToEnPassant = promptUserForPawnPromotion = pawnAttackVector = false;
 
                         if (piece.AssignedType == PieceType.Pawn)
                         {
@@ -547,18 +547,7 @@ public class GameEnvironment
                                 }
                                 else if (row == (piece.AssignedTeam.Equals(Team.White) ? 7 : 0) && targetSquareIsEmpty)
                                 {
-                                    // Adding pawn promotion moves if conditions are met.
-                                    foreach (PieceType pieceType in Enum.GetValues(typeof(PieceType)))
-                                    {
-                                        var pawnPromotionMove = new MovementInformation(copyOfPiece, new Coords(calculatedPosition), newType: pieceType);
-
-                                        if (!pieceType.Equals(PieceType.King) && !pieceType.Equals(PieceType.Pawn) && !WillChangeResultInCheck(pawnPromotionMove, piece.AssignedTeam))
-                                        {
-                                            viableMoves.Add(pawnPromotionMove);
-                                        }
-                                    }
-                                    // Ignore just moving and remaining a pawn.
-                                    break;
+                                    promptUserForPawnPromotion = true;
                                 }
                             }
                             else
@@ -573,7 +562,7 @@ public class GameEnvironment
                                         var enPassantCapture = new MovementInformation(copyOfPiece, new Coords(calculatedPosition), captureablePawn.Copy(),
                                             new Coords(ChessPiece.s_capturedLocation), capturingSecondary: true);
 
-                                        if (false == WillChangeResultInCheck(enPassantCapture, piece.AssignedTeam))
+                                        if (!WillChangeResultInCheck(enPassantCapture, piece.AssignedTeam))
                                         {
                                             viableMoves.Add(enPassantCapture);
                                         }
@@ -587,14 +576,14 @@ public class GameEnvironment
                         {
                             var moveInfo = new MovementInformation(copyOfPiece, new Coords(calculatedPosition), captureablePiece?.Copy(),
                                 canCaptureEnemy ? new Coords(ChessPiece.s_capturedLocation) : null, movementWillExposeToEnPassant,
-                                capturingSecondary: canCaptureEnemy);
+                                capturingSecondary: canCaptureEnemy, promotingPawn: promptUserForPawnPromotion);
 
                             if (!WillChangeResultInCheck(moveInfo, piece.AssignedTeam))
                             {
                                 viableMoves.Add(moveInfo);
                             }
                         }
-                        if (!targetSquareIsEmpty || !piece.CanMoveAcrossBoard) break;
+                        if (!targetSquareIsEmpty || !piece.CanMoveAcrossBoard || promptUserForPawnPromotion) break;
                     }
                     else
                     {   // Further multiplication of the vector will result in out of bounds values.
