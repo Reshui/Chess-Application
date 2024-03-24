@@ -63,6 +63,7 @@ public class MovementInformation
     /// If not null then MainCopy will have its PieceType replaced with if it is a pawn.
     /// </value>
     public PieceType? NewType { get; set; } = null;
+    public bool PromotingPawn { get; set; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MovementInformation"/> class.
@@ -76,7 +77,7 @@ public class MovementInformation
     /// <param name="castlingWithSecondary"><see langword="true"/> if <paramref name="mainCopy"/> should castle with <paramref name="secondaryCopy"/>; otherwise, <see langword="false"/>   </param>
     /// <param name="newType">PieceType to convert <paramref name="mainCopy"/> to.</param>
     /// <exception cref="ArgumentException"></exception>
-    public MovementInformation(ChessPiece mainCopy, Coords newMainCoords, ChessPiece? secondaryCopy = null, Coords? newSecondaryCoords = null, bool enPassantCapturePossible = false, bool capturingSecondary = false, bool castlingWithSecondary = false, PieceType? newType = null)
+    public MovementInformation(ChessPiece mainCopy, Coords newMainCoords, ChessPiece? secondaryCopy = null, Coords? newSecondaryCoords = null, bool enPassantCapturePossible = false, bool capturingSecondary = false, bool castlingWithSecondary = false, bool promotingPawn = false, PieceType? newType = null)
     {
         if (mainCopy.IsCopy && (secondaryCopy?.IsCopy ?? true))
         {
@@ -93,5 +94,6 @@ public class MovementInformation
         CapturingSecondary = capturingSecondary;
         CastlingWithSecondary = castlingWithSecondary;
         NewType = newType;
+        PromotingPawn = promotingPawn;
     }
 }
