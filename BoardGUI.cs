@@ -1,6 +1,4 @@
-﻿
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using Pieces;
 
@@ -96,7 +94,7 @@ namespace Chess_GUi
             {
                 BackColor = Color.White,
                 Location = new Point(_mainBoard.Right + 50, 300),
-                Size = new Size(500, 75),
+                Size = new Size(300, 45),
                 Visible = false,
                 Name = "PromotionPanel"
             };
@@ -351,13 +349,7 @@ namespace Chess_GUi
 
             if (!InteractionsDisabled)
             {
-                // If a pawn reaches the opposite side of the board, prompt the user to select a different piece type.
-                if (_moveToSubmit.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(_moveToSubmit.NewMainCoords.RowIndex))
-                {
-                    throw new NotImplementedException("Exchanging a pawn for a special piece hasn't been implemented visually.");
-                }
                 // Send change to the server and update on local client.
-
                 try
                 {
                     await _player.SubmitMoveToServerAsync(_moveToSubmit, _currentGame.GameID);
