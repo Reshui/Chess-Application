@@ -69,7 +69,7 @@ public class MovementInformation
         get => _newType;
         set
         {
-            if (MainCopy.AssignedType == PieceType.Pawn) _newType = value;
+            if (MainCopy.AssignedType == PieceType.Pawn || value == null) _newType = value;
             else throw new InvalidOperationException($"{nameof(MainCopy.AssignedType)} must be {nameof(PieceType.Pawn)} to submit with a new type.");
         }
     }
