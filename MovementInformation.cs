@@ -60,9 +60,22 @@ public class MovementInformation
         }
     }
     /// <value>
-    /// If not null then MainCopy will have its PieceType replaced with if it is a pawn.
+    /// If not null then <see cref="MainCopy"/> will have its <see cref="ChessPiece.AssignedType"/> property replaced with if it is a pawn.
     /// </value>
-    public PieceType? NewType { get; set; } = null;
+
+    private PieceType? _newType;
+    public PieceType? NewType
+    {
+        get => _newType;
+        set
+        {
+            if (MainCopy.AssignedType == PieceType.Pawn) _newType = value;
+            else throw new InvalidOperationException($"{nameof(MainCopy.AssignedType)} must be {nameof(PieceType.Pawn)} to submit with a new type.");
+        }
+    }
+    /// <summary>
+    /// Gets a value that describes if the <see cref="MovementInformation"/> instance involves promoting a pawn.
+    /// </summary>
     public bool PromotingPawn { get; }
 
     /// <summary>
@@ -88,6 +101,9 @@ public class MovementInformation
         {
             throw new ArgumentException($"Both {nameof(mainCopy)} and {nameof(secondaryCopy)} must have a {nameof(ChessPiece.IsCopy)} property of true");
         }
+
+        if (promotingPawn && mainCopy.AssignedType != PieceType.Pawn) throw new ArgumentException("Cannot promote chess piece", nameof(mainCopy));
+
         NewMainCoords = newMainCoords;
         NewSecondaryCoords = newSecondaryCoords;
         EnPassantCapturePossible = enPassantCapturePossible;
