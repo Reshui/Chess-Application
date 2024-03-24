@@ -140,12 +140,11 @@ public class Server
             // If server is shutting down then send a shutdown message.
             if (ServerTasksCancellationToken.IsCancellationRequested && !user.PersonalCTS.IsCancellationRequested && user.UserClient.Connected)
             {
-                bool success = false;
-                var shutdownCommand = new ServerCommand(CommandType.ServerIsShuttingDown);
                 try
                 {
+                    var shutdownCommand = new ServerCommand(CommandType.ServerIsShuttingDown);
                     await SendClientMessageAsync(shutdownCommand, user.UserClient!, user.PersonalCTS.Token).ConfigureAwait(false);
-                    success = true;
+                    Console.WriteLine($"[Server]: Shutdown notification sent => # {user.UserID}");
                 }
                 catch (IOException e)
                 {
@@ -159,10 +158,6 @@ public class Server
                 catch (Exception e)
                 {
                     Console.WriteLine("[Server]: Server Failed to send shutdown message.\n\n" + e.Message);
-                }
-                finally
-                {
-                    if (success) Console.WriteLine($"[Server]: Shutdown notification sent => # {user.UserID}");
                 }
             }
 
