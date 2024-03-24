@@ -63,7 +63,7 @@ public class MovementInformation
     /// If not null then MainCopy will have its PieceType replaced with if it is a pawn.
     /// </value>
     public PieceType? NewType { get; set; } = null;
-    public bool PromotingPawn { get; set; }
+    public bool PromotingPawn { get; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MovementInformation"/> class.

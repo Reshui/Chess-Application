@@ -38,7 +38,7 @@ namespace Chess_GUi
         private PictureBox? _chessPieceDestinationSquare = null;
 
         /// <summary>A <see cref="PictureBox"/> that represents a square containing a piece friendly to <see cref="_player"/>.</summary>
-        private PictureBox? _friendlySelectedSquare = null;
+        private PictureBox? _previousFriendlySquare = null;
 
         /// <summary><see cref="Playerr"/> instance used to communicate with the server.</summary>
         private readonly Player _player;
@@ -55,7 +55,7 @@ namespace Chess_GUi
         /// <summary>Stores a temporary reference to the friendly piece selected by <see cref="_player"/></summary>
         private Image? _friendlyImage;
 
-        /// <summary>If <see langword="true"/> then <see cref="_friendlySelectedSquare"/> and <see cref="_chessPieceDestinationSquare"/> will be set to <see langword="null"/> when <see cref="BoardGUI.SquareClickedEvent(object, EventArgs)"/> is called.</summary>
+        /// <summary>If <see langword="true"/> then <see cref="_previousFriendlySquare"/> and <see cref="_chessPieceDestinationSquare"/> will be set to <see langword="null"/> when <see cref="BoardGUI.SquareClickedEvent(object, EventArgs)"/> is called.</summary>
         private bool _resetSquareAssignments;
         public bool InteractionsDisabled { get; set; } = false;
         public GameState StateOfGame { get => _currentGame.MatchState; }
@@ -92,10 +92,36 @@ namespace Chess_GUi
                 Visible = false
             };
 
+            var _promotionPanel = new Panel()
+            {
+                BackColor = Color.White,
+                Location = new Point(_mainBoard.Right + 30, 300),
+                Size = new Size(150, 50),
+                Visible = false,
+                Name = "PromotionPanel"
+            };
+
+            foreach (PieceType chessType in Enum.GetValues(typeof(PieceType)))
+            {
+                if (chessType != PieceType.King && chessType != PieceType.Pawn)
+                {
+                    var width = _promotionPanel.Width / 4;
+                    var btn = new Button()
+                    {
+                        Text = chessType.ToString(),
+                        Size = new Size(width, _promotionPanel.Height),
+                        Name = chessType.ToString(),
+                        Location = new Point(_promotionPanel.Controls.Count * width, 0)
+                    };
+                    btn.Click += new EventHandler(this.PromotePawnSelectionEvent!);
+                    _promotionPanel.Controls.Add(btn);
+                }
+            }
+
             CreateBoard();
 
             ConfirmMoveBTN.Click += new EventHandler(this.ConfirmMoveClickedEvent!);
-            Controls.AddRange(new Control[] { _mainBoard, ConfirmMoveBTN });
+            Controls.AddRange(new Control[] { _mainBoard, ConfirmMoveBTN, _promotionPanel });
         }
 
         /// <summary>
@@ -162,13 +188,12 @@ namespace Chess_GUi
         /// </summary>
         private void SquareClickedEvent(object sender, EventArgs e)
         {
+            Controls["PromotionPanel"].Visible = false;
             if (InteractionsDisabled) return;
-            // First determine if a piece friendly to the player has been selected.
-            // If not do nothing, Else display available moves.
             if (_resetSquareAssignments)
             {
                 _chessPieceDestinationSquare = null;
-                _friendlySelectedSquare = null;
+                _previousFriendlySquare = null;
                 _resetSquareAssignments = false;
             }
             // Check if the user is allowed to interact with the game board.
@@ -188,8 +213,11 @@ namespace Chess_GUi
 
             ChessPiece? selectedPiece = _currentGame.GameBoard[coords[0], coords[1]];
 
-            if (selectedPiece?.AssignedTeam == _currentGame.PlayerTeam && !selectedSquare.Equals(_friendlySelectedSquare))
-            {   // Display available movements for the ChessPiece
+            // First determine if a piece friendly to the player has been selected.
+            // If true then display available moves, else do nothing.
+            if (selectedPiece?.AssignedTeam == _currentGame.PlayerTeam && !selectedSquare.Equals(_previousFriendlySquare))
+            {
+                // Display available movements for the ChessPiece
                 if (_chessPieceDestinationSquare is not null)
                 {
                     // _chessPieceDestinationSquare not being null means that a different friendly piece has been selected
@@ -198,7 +226,6 @@ namespace Chess_GUi
                     _chessPieceDestinationSquare = null;
                 }
 
-                _friendlySelectedSquare = selectedSquare;
                 _movesAvailableToPiece = _currentGame.AvailableMoves(selectedPiece);
 
                 ResetSquareColors();
@@ -211,9 +238,9 @@ namespace Chess_GUi
                 _changedSquares = (from square in _validMovementSquares
                                    select new OriginalBackColor(square)).ToList();
 
-                _changedSquares.Add(new OriginalBackColor(_friendlySelectedSquare));
+                _changedSquares.Add(new OriginalBackColor(selectedSquare));
                 // Highlight the selected chess piece.
-                _friendlySelectedSquare.BackColor = moveablePieceColor;
+                selectedSquare.BackColor = moveablePieceColor;
 
                 // Highlight potential moves for the selected piece.
                 foreach (var square in _validMovementSquares)
@@ -226,8 +253,9 @@ namespace Chess_GUi
 
                 ConfirmMoveBTN.Visible = false;
                 // Store a reference to the current image so that it can be placed
-                // onto other squares or have any changes to _friendlySelectedSquare reversed.
-                _friendlyImage = _friendlySelectedSquare.Image;
+                // onto other squares or have any changes to _previousFriendlySquare reversed.
+                _friendlyImage = selectedSquare.Image;
+                _previousFriendlySquare = selectedSquare;
             }
             else if (_validMovementSquares.Contains(selectedSquare))
             {
@@ -240,7 +268,7 @@ namespace Chess_GUi
                     // Revert a previously selected squares backColor property.
                     _chessPieceDestinationSquare.BackColor = (coordSum % 2) == 0 ? availableMovesColorDark : availableMovesColorLight;
                     // Undo previoulsy made changes.
-                    if (_friendlySelectedSquare != null) _chessPieceDestinationSquare.Image = _targetImage;
+                    if (_previousFriendlySquare != null) _chessPieceDestinationSquare.Image = _targetImage;
                 }
 
                 _chessPieceDestinationSquare = selectedSquare;
@@ -248,7 +276,7 @@ namespace Chess_GUi
                 _targetImage = _chessPieceDestinationSquare.Image;
                 _chessPieceDestinationSquare.Image = _friendlyImage;
 
-                _friendlySelectedSquare!.Image = null;
+                _previousFriendlySquare!.Image = null;
 
                 var row = int.Parse(_chessPieceDestinationSquare!.Name[0].ToString());
                 var column = int.Parse(_chessPieceDestinationSquare.Name[1].ToString());
@@ -259,14 +287,14 @@ namespace Chess_GUi
                                  select cm).First();
                 if (_moveToSubmit.PromotingPawn)
                 {
-                    throw new NotImplementedException("Need to expose buttons that will edit selected move for pawn promotion.");
+                    Controls["PromotionPanel"].Visible = true;
                 }
                 else
                 {
                     ConfirmMoveBTN.Visible = true;
                 }
             }
-            else if (!selectedSquare.Equals(_friendlySelectedSquare))
+            else if (!selectedSquare.Equals(_previousFriendlySquare))
             {
                 // An invalid square has been selected.
                 RevertPictureDisplay();
@@ -279,15 +307,16 @@ namespace Chess_GUi
 
         private void PromotePawnSelectionEvent(object sender, EventArgs e)
         {
-            _moveToSubmit!.NewType = ((Button)sender).Name switch
+            if (Enum.TryParse(((Button)sender).Name, out PieceType selectedPromotion))
             {
-                nameof(PieceType.Queen) => PieceType.Queen,
-                nameof(PieceType.Rook) => PieceType.Rook,
-                nameof(PieceType.Bishop) => PieceType.Bishop,
-                nameof(PieceType.Knight) => PieceType.Knight,
-                _ => throw new ArgumentException("Sender is unknown.")
-            };
-            ConfirmMoveBTN.Visible = true;
+                if (new PieceType[] { PieceType.Rook, PieceType.Bishop, PieceType.Knight, PieceType.Queen }.Contains(selectedPromotion))
+                {
+                    _moveToSubmit!.NewType = selectedPromotion;
+                    ConfirmMoveBTN.Visible = true;
+                    return;
+                }
+            }
+            throw new ArgumentException("Sender is unknown.");
         }
 
         /// <summary>
@@ -298,6 +327,7 @@ namespace Chess_GUi
         {
             // Ensure the user can no longer submit a move.
             ConfirmMoveBTN.Visible = false;
+            Controls["PromotionPanel"].Visible = false;
 
             _resetSquareAssignments = true;
             _validMovementSquares.Clear();
@@ -357,11 +387,11 @@ namespace Chess_GUi
             }
         }
         /// <summary>
-        /// Reverts <see cref="_friendlySelectedSquare"/> and <see cref="_chessPieceDestinationSquare"/> to their pre-click <see cref="PictureBox.Image"/> values.
+        /// Reverts <see cref="_previousFriendlySquare"/> and <see cref="_chessPieceDestinationSquare"/> to their pre-click <see cref="PictureBox.Image"/> values.
         /// </summary>
         private void RevertPictureDisplay()
         {
-            if (_friendlySelectedSquare != null) _friendlySelectedSquare.Image = _friendlyImage;
+            if (_previousFriendlySquare != null) _previousFriendlySquare.Image = _friendlyImage;
             if (_chessPieceDestinationSquare != null) _chessPieceDestinationSquare.Image = _targetImage;
         }
 
