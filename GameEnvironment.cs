@@ -583,7 +583,7 @@ public class GameEnvironment
                                 viableMoves.Add(moveInfo);
                             }
                         }
-                        if (!targetSquareIsEmpty || !piece.CanMoveAcrossBoard || promptUserForPawnPromotion) break;
+                        if (!targetSquareIsEmpty || !piece.CanMoveAcrossBoard) break;
                     }
                     else
                     {   // Further multiplication of the vector will result in out of bounds values.
