@@ -606,20 +606,14 @@ public class GameEnvironment
     /// <param name="wantPrimary"><see langword="true"/> if you want the MainCopy; otherwise, the secondary piece will be retrieved.</param>
     /// <returns>A <see cref="ChessPiece"/> instance.</returns>
     /// <exception cref="KeyNotFoundException"></exception>
+    /// <exception cref="NullReferenceException"></exception>
     private ChessPiece GetPieceFromMovement(MovementInformation move, bool wantPrimary)
     {
         ChessPiece pieceFromMove;
-        try
-        {
-            Team wantedTeam = (wantPrimary || move.CastlingWithSecondary) ? move.SubmittingTeam : ReturnOppositeTeam(move.SubmittingTeam);
-            string pieceID = wantPrimary ? move.MainCopy.ID : move.SecondaryCopy!.ID;
-            pieceFromMove = _chessPieceByIdByTeam[wantedTeam][pieceID];
-        }
-        catch (KeyNotFoundException e)
-        {
-            Console.WriteLine(e);
-            throw;
-        }
+        Team wantedTeam = (wantPrimary || move.CastlingWithSecondary) ? move.SubmittingTeam : ReturnOppositeTeam(move.SubmittingTeam);
+        string pieceID = wantPrimary ? move.MainCopy.ID : move.SecondaryCopy!.ID;
+        pieceFromMove = _chessPieceByIdByTeam[wantedTeam][pieceID];
+
         return pieceFromMove;
     }
 
