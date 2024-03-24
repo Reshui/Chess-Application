@@ -454,7 +454,6 @@ public class GameEnvironment
         {
             return viableMoves;
         }
-        bool targetSquareIsEmpty;
         ChessPiece copyOfPiece = piece.Copy();
 
         foreach (Vector2 movementVector in piece.DirectionVectors)
@@ -529,26 +528,26 @@ public class GameEnvironment
                     // If coordinate isn't out of bounds on the chess board then propagate the vector.
                     if (row is >= 0 and <= 7 && column is >= 0 and <= 7)
                     {
-                        targetSquareIsEmpty = GameBoard[row, column] is null;
+                        bool targetSquareIsEmpty = GameBoard[row, column] is null;
                         bool canCaptureEnemy = piece.IsComparedPieceHostile(GameBoard[row, column], out ChessPiece? captureablePiece);
                         bool pawnAttackVector, movementWillExposeToEnPassant = pawnAttackVector = false;
 
                         if (piece.AssignedType == PieceType.Pawn)
                         {
-                            // Disable the starting move of moving 2 spaces forward if the pawn has already been moved.
-                            if (Math.Abs(movementVector.Y) == 2)
-                            {
-                                int initialRowJumped = piece.AssignedTeam == Team.White ? 2 : 5;
-                                if (piece.TimesMoved != 0 || GameBoard[initialRowJumped, piece.CurrentColumn] is not null) break;
-                                movementWillExposeToEnPassant = true;
-                            }
-
                             if (movementVector.X == 0)
-                            {   // If there is no horizontal movement, disable attacking;
+                            {
+                                // If there is no horizontal movement, disable attacking;
                                 canCaptureEnemy = false;
-                                #region  Adding pawn promotion moves if conditions are met.
-                                if (row == (piece.AssignedTeam.Equals(Team.White) ? 7 : 0) && targetSquareIsEmpty)
+                                // Disable the starting move of moving 2 spaces forward if the pawn has already been moved.
+                                if (Math.Abs(movementVector.Y) == 2)
                                 {
+                                    int initialRowJumped = piece.AssignedTeam == Team.White ? 2 : 5;
+                                    if (piece.TimesMoved != 0 || GameBoard[initialRowJumped, piece.CurrentColumn] is not null) break;
+                                    movementWillExposeToEnPassant = true;
+                                }
+                                else if (row == (piece.AssignedTeam.Equals(Team.White) ? 7 : 0) && targetSquareIsEmpty)
+                                {
+                                    // Adding pawn promotion moves if conditions are met.
                                     foreach (PieceType pieceType in Enum.GetValues(typeof(PieceType)))
                                     {
                                         var pawnPromotionMove = new MovementInformation(copyOfPiece, new Coords(calculatedPosition), newType: pieceType);
@@ -559,15 +558,14 @@ public class GameEnvironment
                                         }
                                     }
                                     // Ignore just moving and remaining a pawn.
-                                    continue;
+                                    break;
                                 }
-                                #endregion
                             }
                             else
                             {
                                 pawnAttackVector = true;
                                 #region Check for possible En Passant captures.
-                                if (piece.IsComparedPieceHostile(GameBoard[piece.CurrentRow, column], out ChessPiece? captureablePawn))
+                                if (piece.TimesMoved >= 2 && piece.IsComparedPieceHostile(GameBoard[piece.CurrentRow, column], out ChessPiece? captureablePawn))
                                 {
                                     if (captureablePawn is not null && captureablePawn.AssignedType.Equals(PieceType.Pawn)
                                     && captureablePawn.CanBeCapturedViaEnPassant)
