@@ -1,4 +1,5 @@
 ﻿
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using Pieces;
@@ -58,6 +59,8 @@ namespace Chess_GUi
         private bool _resetSquareAssignments;
         public bool InteractionsDisabled { get; set; } = false;
         public GameState StateOfGame { get => _currentGame.MatchState; }
+
+        private MovementInformation? _moveToSubmit = null;
         public BoardGUI(Player user, GameEnvironment newGame, string nameOfGui)
         {
             Name = nameOfGui;
@@ -246,7 +249,22 @@ namespace Chess_GUi
                 _chessPieceDestinationSquare.Image = _friendlyImage;
 
                 _friendlySelectedSquare!.Image = null;
-                ConfirmMoveBTN.Visible = true;
+
+                var row = int.Parse(_chessPieceDestinationSquare!.Name[0].ToString());
+                var column = int.Parse(_chessPieceDestinationSquare.Name[1].ToString());
+
+                _moveToSubmit = (from cm in _movesAvailableToPiece
+                                 let newSquareVector = new Vector2(column, row)
+                                 where Equals(cm.MainNewLocation, newSquareVector)
+                                 select cm).First();
+                if (_moveToSubmit.PromotingPawn)
+                {
+                    throw new NotImplementedException("Need to expose buttons that will edit selected move for pawn promotion.");
+                }
+                else
+                {
+                    ConfirmMoveBTN.Visible = true;
+                }
             }
             else if (!selectedSquare.Equals(_friendlySelectedSquare))
             {
@@ -257,6 +275,19 @@ namespace Chess_GUi
                 _validMovementSquares.Clear();
                 ConfirmMoveBTN.Visible = false;
             }
+        }
+
+        private void PromotePawnSelectionEvent(object sender, EventArgs e)
+        {
+            _moveToSubmit!.NewType = ((Button)sender).Name switch
+            {
+                nameof(PieceType.Queen) => PieceType.Queen,
+                nameof(PieceType.Rook) => PieceType.Rook,
+                nameof(PieceType.Bishop) => PieceType.Bishop,
+                nameof(PieceType.Knight) => PieceType.Knight,
+                _ => throw new ArgumentException("Sender is unknown.")
+            };
+            ConfirmMoveBTN.Visible = true;
         }
 
         /// <summary>
@@ -272,25 +303,17 @@ namespace Chess_GUi
             _validMovementSquares.Clear();
             ResetSquareColors();
 
-            // Get coordinates from selected square. Move has been validated if this event is available.
-            var row = int.Parse(_chessPieceDestinationSquare!.Name[0].ToString());
-            var column = int.Parse(_chessPieceDestinationSquare.Name[1].ToString());
-
-            MovementInformation submittedMovement = (from cm in _movesAvailableToPiece
-                                                     let newSquareVector = new Vector2(column, row)
-                                                     where Equals(cm.MainNewLocation, newSquareVector)
-                                                     select cm).First();
             // The main friendly piece has already been moved so move secondary pieces that haven't been replaced.
-            if (submittedMovement.SecondaryCopy is not null)
+            if (_moveToSubmit!.SecondaryCopy is not null)
             {
-                ChessPiece piece = submittedMovement.SecondaryCopy;
+                ChessPiece piece = _moveToSubmit.SecondaryCopy;
 
-                if (submittedMovement.CastlingWithSecondary)
+                if (_moveToSubmit.CastlingWithSecondary)
                 {
-                    _pictureSquares[(int)submittedMovement.NewSecondaryCoords?.RowIndex!, (int)submittedMovement.NewSecondaryCoords?.ColumnIndex!].Image = _pictureSquares[piece.CurrentRow, piece.CurrentColumn].Image;
+                    _pictureSquares[(int)_moveToSubmit.NewSecondaryCoords?.RowIndex!, (int)_moveToSubmit.NewSecondaryCoords?.ColumnIndex!].Image = _pictureSquares[piece.CurrentRow, piece.CurrentColumn].Image;
                     _pictureSquares[piece.CurrentRow, piece.CurrentColumn].Image = null;
                 }
-                else if (submittedMovement.CapturingViaEnPassant)
+                else if (_moveToSubmit.CapturingViaEnPassant)
                 {   // If the current location is not the same as the final location of MainPiece then the movemtn is an En Passant capture.
                     _pictureSquares[piece.CurrentRow, piece.CurrentColumn].Image = null;
                 }
@@ -299,7 +322,7 @@ namespace Chess_GUi
             if (!InteractionsDisabled)
             {
                 // If a pawn reaches the opposite side of the board, prompt the user to select a different piece type.
-                if (submittedMovement.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(submittedMovement.NewMainCoords.RowIndex))
+                if (_moveToSubmit.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(_moveToSubmit.NewMainCoords.RowIndex))
                 {
                     throw new NotImplementedException("Exchanging a pawn for a special piece hasn't been implemented visually.");
                 }
@@ -307,7 +330,7 @@ namespace Chess_GUi
 
                 try
                 {
-                    await _player.SubmitMoveToServerAsync(submittedMovement, _currentGame.GameID);
+                    await _player.SubmitMoveToServerAsync(_moveToSubmit, _currentGame.GameID);
                 }
                 catch (IOException)
                 {
@@ -318,6 +341,7 @@ namespace Chess_GUi
                     Console.WriteLine(ex);
                     throw;
                 }
+                _moveToSubmit = null;
             }
         }
 
