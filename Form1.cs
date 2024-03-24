@@ -174,6 +174,7 @@ namespace Chess_GUi
                 };
 
                 wantedDisplay.Controls.Add(labelToShowUser);
+                labelToShowUser.BringToFront();
             }
         }
         /// <summary>
