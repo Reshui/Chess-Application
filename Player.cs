@@ -287,6 +287,7 @@ public class Player
         UserWantsToQuit = userIsQuitting;
         if (_connectedServer is not null)
         {
+            if (!UserWantsToQuit && !serverDeniedConnection) _gui?.ServerIsUnreachable();
             try
             {   // Command is sent first rather than at the end of client listening because, 
                 // when the token is invoked the stream cannot be sent any more messages.                
@@ -322,7 +323,6 @@ public class Player
                 PersonalSource.Dispose();
                 _connectedServer.Close();
                 _connectedServer = null;
-                if (!UserWantsToQuit && !serverDeniedConnection) _gui?.ServerIsUnreachable();
             }
         }
     }
