@@ -287,14 +287,13 @@ public class Player
         UserWantsToQuit = userIsQuitting;
         if (_connectedServer is not null)
         {
-            if (!UserWantsToQuit && !serverDeniedConnection) _gui?.ServerIsUnreachable();
             try
             {   // Command is sent first rather than at the end of client listening because, 
                 // when the token is invoked the stream cannot be sent any more messages.                
                 if (AllowedToMessageServer)
                 {
                     var notifyServerCommand = new ServerCommand(CommandType.ClientDisconnecting);
-                    await SendClientMessageAsync(notifyServerCommand, _connectedServer, CancellationToken.None).ConfigureAwait(false);
+                    await SendClientMessageAsync(notifyServerCommand, _connectedServer, CancellationToken.None);
                 }
             }
             catch (IOException e)
@@ -312,17 +311,18 @@ public class Player
                 // If this method wasn't called from ListenForServerResponseAsync() then wait for that Task to finish.
                 if (!calledFromListeningTask && _listenForServerTask is not null)
                 {
-                    await _listenForServerTask.ConfigureAwait(false);
+                    await _listenForServerTask;
                 }
 
                 if (PingConnectedClientTask is not null)
                 {
-                    await PingConnectedClientTask.ConfigureAwait(false);
+                    await PingConnectedClientTask;
                 }
 
                 PersonalSource.Dispose();
                 _connectedServer.Close();
                 _connectedServer = null;
+                if (!UserWantsToQuit && !serverDeniedConnection) _gui?.ServerIsUnreachable();
             }
         }
     }
