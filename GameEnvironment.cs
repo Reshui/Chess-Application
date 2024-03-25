@@ -342,7 +342,7 @@ public class GameEnvironment
     /// </summary>
     /// <param name="newMove"><see cref="MovementInformation"/> to submit to <see cref="GameBoard"/>.</param>
     /// <param name="piecesAlreadyMovedOnGUI">true if chesspieces on the GUI have already been updated; otherwise, false.</param>
-    public bool SubmitFinalizedChange(MovementInformation newMove, bool piecesAlreadyMovedOnGUI)
+    public bool SubmitFinalizedChange(MovementInformation newMove)
     {
         bool success = false;
         if (newMove.SubmittingTeam == ActiveTeam && !GameEnded)
@@ -354,8 +354,6 @@ public class GameEnvironment
 
             if (localPlayerMove || hostileMoveCheck.Any())
             {
-                if (!piecesAlreadyMovedOnGUI) UpdateSquaresOnGUI(newMove, piecesAlreadyMovedOnGUI);
-
                 EditGameBoard(newMove, true);
 
                 if (newMove.CapturingSecondary) _movesSinceLastCapture = 0;
@@ -398,55 +396,6 @@ public class GameEnvironment
         foreach (ChessPiece chessPiece in _chessPieceByIdByTeam[activeTeam].Values.Where(x => x.CanBeCapturedViaEnPassant))
         {
             chessPiece.DisableEnPassantCaptures();
-        }
-    }
-
-    /// <summary>
-    /// Updates a client-side <see cref="GameEnvironment"/> instance and corresponding visuals using <paramref name="newMove"/>.
-    /// </summary>
-    /// <param name="newMove">Board movement used to update a <see cref="GameEnvironment"/> instance.</param>
-    /// <param name="piecesAlreadyMovedOnGUI">If <see langword="true"/>, then the GUI has already been updated with <paramref name="newMove"/>.</param>
-    private void UpdateSquaresOnGUI(MovementInformation newMove, bool piecesAlreadyMovedOnGUI)
-    {
-        if (GameBoard is not null && Squares is not null && ActiveTeam == newMove.SubmittingTeam && !piecesAlreadyMovedOnGUI)
-        {
-            // Updates Graphics
-            // It is important to move the secondary piece first if available.
-            if (newMove.SecondaryCopy is not null)
-            {
-                ChessPiece secPiece = newMove.SecondaryCopy;
-                // Interface with the board using coordinates rather than the object.
-                PictureBox? secBox = Squares[secPiece.CurrentRow, secPiece.CurrentColumn];
-
-                if (secBox is not null)
-                {
-                    if (newMove.CapturingSecondary)
-                    {   // Setting equal to null allows the image to be replaced even if this is an en passant capture.
-                        secBox.Image = null;
-                    }
-                    else if (newMove.CastlingWithSecondary && newMove.NewSecondaryCoords is not null)
-                    {
-                        Squares[(int)newMove.NewSecondaryCoords?.RowIndex!, (int)newMove.NewSecondaryCoords?.ColumnIndex!]!.Image = secBox.Image;
-                        secBox.Image = null;
-                    }
-                }
-            }
-
-            ChessPiece mainPiece = newMove.MainCopy;
-            PictureBox? mainBox = Squares[mainPiece.CurrentRow, mainPiece.CurrentColumn];
-
-            if (mainBox is not null)
-            {
-                if (newMove.PromotingPawn && newMove.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(newMove.NewMainCoords.RowIndex))
-                {
-                    Squares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = Image.FromFile(Environment.CurrentDirectory + $"\\Resources\\{newMove.MainCopy.AssignedTeam}_{newMove.NewType}.jpg");
-                }
-                else
-                {
-                    Squares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = mainBox.Image;
-                }
-                mainBox.Image = null;
-            }
         }
     }
     /// <summary>

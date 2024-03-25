@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
+using System.Reflection;
 using Pieces;
 
 namespace Chess_GUi
@@ -57,6 +58,8 @@ namespace Chess_GUi
         private bool _resetSquareAssignments;
         public bool InteractionsDisabled { get; set; } = false;
         public GameState StateOfGame { get => _currentGame.MatchState; }
+
+        public static string PathToResources { get; } = Path.Combine(Assembly.GetExecutingAssembly().Location, "..\\..\\..\\Resources\\");
 
         private MovementInformation? _moveToSubmit = null;
         public BoardGUI(Player user, GameEnvironment newGame, string nameOfGui)
@@ -150,11 +153,13 @@ namespace Chess_GUi
                 xIncrementer *= -1;
             }
 
-            string imageFolder = Path.GetFullPath(@"..\..\..\Resources\");
-            if (!Directory.Exists(imageFolder))
+            //string imageFolder = Path.Combine(Assembly.GetExecutingAssembly().Location, "..\\..\\..\\Resources\\");
+
+            /*if (!Directory.Exists(imageFolder))
             {
+                // USed if dotnet run is used or ran from Visual Studio.
                 imageFolder = Path.GetFullPath(@"Resources\");
-            }
+            }*/
 
             for (int row = 0; row < squaresToCreate; row++)
             {
@@ -168,7 +173,7 @@ namespace Chess_GUi
                         BackColor = (row + column) % 2 == 0 ? blackColor : whiteColor,
                         Size = new Size(squareLength, squareLength),
                         Location = new Point(left, top),
-                        Image = currentPiece == null ? null : Image.FromFile(imageFolder + $"{currentPiece.ReturnPieceTypeName()}.jpg"),
+                        Image = currentPiece == null ? null : Image.FromFile(PathToResources + $"{currentPiece.ReturnPieceTypeName()}.jpg"),
                         SizeMode = PictureBoxSizeMode.CenterImage
                     };
 
@@ -352,7 +357,7 @@ namespace Chess_GUi
                 // If a pawn reaches the opposite side of the board, prompt the user to select a different piece type.
                 if (_moveToSubmit.PromotingPawn && _moveToSubmit.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(_moveToSubmit.NewMainCoords.RowIndex))
                 {
-                    _pictureSquares[_moveToSubmit.NewMainCoords.RowIndex, _moveToSubmit.NewMainCoords.ColumnIndex].Image = Image.FromFile(Environment.CurrentDirectory + $"\\Resources\\{_moveToSubmit.MainCopy.AssignedTeam}_{_moveToSubmit.NewType}.jpg");
+                    _pictureSquares[_moveToSubmit.NewMainCoords.RowIndex, _moveToSubmit.NewMainCoords.ColumnIndex].Image = Image.FromFile(PathToResources + $"\\{_moveToSubmit.MainCopy.AssignedTeam}_{_moveToSubmit.NewType}.jpg");
                 }
 
                 try
@@ -392,6 +397,49 @@ namespace Chess_GUi
             if (_chessPieceDestinationSquare != null) _chessPieceDestinationSquare.Image = _targetImage;
         }
 
+        public void UpdateBoardBasedOnMove(MovementInformation newMove)
+        {
+            if (_currentGame.GameBoard is not null && _pictureSquares is not null && _currentGame.ActiveTeam == newMove.SubmittingTeam)
+            {
+                // Updates Graphics
+                // It is important to move the secondary piece first if available.
+                if (newMove.SecondaryCopy is not null)
+                {
+                    ChessPiece secPiece = newMove.SecondaryCopy;
+                    // Interface with the board using coordinates rather than the object.
+                    PictureBox? secBox = _pictureSquares[secPiece.CurrentRow, secPiece.CurrentColumn];
+
+                    if (secBox is not null)
+                    {
+                        if (newMove.CapturingSecondary)
+                        {   // Setting equal to null allows the image to be replaced even if this is an en passant capture.
+                            secBox.Image = null;
+                        }
+                        else if (newMove.CastlingWithSecondary && newMove.NewSecondaryCoords is not null)
+                        {
+                            _pictureSquares[(int)newMove.NewSecondaryCoords?.RowIndex!, (int)newMove.NewSecondaryCoords?.ColumnIndex!]!.Image = secBox.Image;
+                            secBox.Image = null;
+                        }
+                    }
+                }
+
+                ChessPiece mainPiece = newMove.MainCopy;
+                PictureBox? mainBox = _pictureSquares[mainPiece.CurrentRow, mainPiece.CurrentColumn];
+
+                if (mainBox is not null)
+                {
+                    if (newMove.PromotingPawn && newMove.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(newMove.NewMainCoords.RowIndex))
+                    {
+                        _pictureSquares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = Image.FromFile(PathToResources + $"{newMove.MainCopy.AssignedTeam}_{newMove.NewType}.jpg");
+                    }
+                    else
+                    {
+                        _pictureSquares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = mainBox.Image;
+                    }
+                    mainBox.Image = null;
+                }
+            }
+        }
         private void InitializeComponent()
         {
             this.SuspendLayout();

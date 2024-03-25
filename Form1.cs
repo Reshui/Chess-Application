@@ -138,6 +138,11 @@ namespace Chess_GUi
             }
         }
 
+        public void UpdateGameInterface(MovementInformation newMove, int gameID)
+        {
+            _boardGuiByName[gameID.ToString()].UpdateBoardBasedOnMove(newMove);
+        }
+
         /// <summary>
         /// Disables any GUI that uses <paramref name="gameID"/> as a name.
         /// </summary>
