@@ -43,7 +43,7 @@ public class GameEnvironment
     /// <value><see cref="Team"/> assigned to the local user.</value>
     public Team PlayerTeam { get; }
 
-    /// <summary>Gets or sets a value representing which <see cref="Team"/> is currently allowed to submit MovementInformation.</summary>
+    /// <summary>Gets or sets a value representing which <see cref="Team"/> is currently allowed to submit a <see cref="MovementInformation"/> instance.</summary>
     /// <remarks>Alternated whenever <see cref="SubmitFinalizedChange(MovementInformation)"/> is called.</remarks>
     ///<value>The <see cref="Team"/> that is currently allowed to submit <see cref="MovementInformation"/> to the <see cref="GameEnvironment"/> instance.</value>
     public Team ActiveTeam { get; private set; } = Team.White;
