@@ -34,17 +34,13 @@ public class Player
     public int ServerAssignedID { get; private set; }
 
     /// <summary>Gets the player name assigned to this instance</summary>
-    /// <value>The current value of <see cref="_name"/>.</value>
-    public string? Name { get => _name; }
-
-    /// <summary>The name assigned to this <see cref="Player"/> instance.</summary>
-    private string? _name = null;
+    public string? Name { get; }
 
     /// <summary>TokenSource used to stop server listening tasks.</summary>
     public readonly CancellationTokenSource PersonalSource;
 
     /// <summary>Form object used to visually represent games.</summary>
-    private readonly Form1? _gui;
+    private readonly Form1 _gui;
 
     /// <summary>List used to track long-running asynchronous tasks started by the Player instance.</summary>
     private Task? _listenForServerTask;
@@ -58,10 +54,11 @@ public class Player
     /// <summary>
     /// Client-side constructor.
     /// </summary>
-    public Player(Form1 gui, CancellationTokenSource cancelSource, int portToConnectTo, string serverAddress)
+    public Player(Form1 gui, string userName, CancellationTokenSource cancelSource, int portToConnectTo, string serverAddress)
     {
         _hostPort = portToConnectTo;
         _hostAddress = serverAddress;
+        Name = userName;
         _gui = gui;
         PersonalSource = cancelSource;
     }
@@ -201,14 +198,14 @@ public class Player
         bool success = false;
         if (targetGame.SubmitFinalizedChange(newMove))
         {
-            if (!guiAlreadyUpdated) _gui?.UpdateGameInterface(newMove, targetGame.GameID);
+            if (!guiAlreadyUpdated) _gui.UpdateGameInterface(newMove, targetGame.GameID);
             success = true;
         }
         else
         {
             targetGame.ChangeGameState(GameState.GameDraw);
         }
-        if (targetGame.GameEnded) _gui?.DisableGame(targetGame.GameID);
+        if (targetGame.GameEnded) _gui.DisableGame(targetGame.GameID);
         return success;
     }
     /// <summary>
@@ -274,17 +271,6 @@ public class Player
                 throw new InvalidOperationException("Movement submitted on the wrong turn.");
             }
         }
-    }
-
-    /// <summary>
-    /// Assigns a name to the player instance.
-    /// </summary>
-    /// <param name="newName">This string will be used to assign a value to the <see cref="Name"/> property.</param>
-    /// <exception cref="InvalidOperationException">Thrown if <see cref="Name"/> returns a value that isn't null.</exception>
-    public void AssignName(string newName)
-    {
-        if (_name is null) _name = newName;
-        else throw new InvalidOperationException($"{nameof(_name)} has already been assigned a value.");
     }
 
     /// <summary>
