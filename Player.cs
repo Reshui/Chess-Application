@@ -115,7 +115,7 @@ public class Player
                 {
                     response = await RecieveCommandFromStreamAsync(stream, token);//.ConfigureAwait(false);
 
-                    if (response is not null && !response.CMD.Equals(CommandType.HeartBeatTest))
+                    if (response is not null)
                     {
                         int serverSideGameID = response.GameIdentifier;
 

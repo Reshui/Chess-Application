@@ -70,7 +70,6 @@ public class Server
                 if (_connectedPlayers.Count < MaxConnectionCount)
                 {
                     var newUser = new TrackedUser(newClient, ServerTasksCancellationToken);
-                    newUser.PingConnectedClientTask = PingClientAsync(newClient, newUser.PersonalCTS, newUser.ServerCombinedCTS.Token);
                     _connectedPlayers.TryAdd(newUser.UserID, newUser);
                     _clientListeningTasks.TryAdd(newUser.UserID, HandlePlayerResponsesAsync(newUser));
 
@@ -383,13 +382,9 @@ public class Server
     {
         try
         {
-            await SendClientMessageAsync(new ServerCommand(CommandType.HeartBeatTest), client, token);
-
-            /*
-            // Send 0 bytes to test the connection.
-            byte[] data = Array.Empty<byte>();
-            await client.GetStream().WriteAsync(data.AsMemory(0, 0), token).ConfigureAwait(false);
-            */
+            byte[] data = BitConverter.GetBytes(0);
+            // Sending 0 will tell the reciever that the message is empty.
+            await client.GetStream().WriteAsync(data.AsMemory(0, data.Length), token).ConfigureAwait(false);
         }
         catch (Exception)
         {
@@ -513,6 +508,8 @@ public class Server
         {
             NetworkStream stream = connectedUser.UserClient.GetStream();
             await SendClientMessageAsync(new ServerCommand(CommandType.WelcomeToServer), connectedUser.UserClient, ServerTasksCancellationToken).ConfigureAwait(false);
+            connectedUser.PingConnectedClientTask = PingClientAsync(connectedUser.UserClient, connectedUser.PersonalCTS, connectedUser.ServerCombinedCTS.Token);
+
             CancellationToken token = connectedUser.ServerCombinedCTS.Token;
             bool userRegistered = false;
 
@@ -520,7 +517,7 @@ public class Server
             {
                 ServerCommand? clientResponse = await RecieveCommandFromStreamAsync(stream, token).ConfigureAwait(false);
 
-                if (clientResponse is not null && !clientResponse.CMD.Equals(CommandType.HeartBeatTest))
+                if (clientResponse is not null)
                 {
                     if (clientResponse.CMD.Equals(CommandType.RegisterUser) && !userRegistered)
                     {
