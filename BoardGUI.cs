@@ -349,7 +349,12 @@ namespace Chess_GUi
 
             if (!InteractionsDisabled)
             {
-                // Send change to the server and update on local client.
+                // If a pawn reaches the opposite side of the board, prompt the user to select a different piece type.
+                if (_moveToSubmit.PromotingPawn && _moveToSubmit.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(_moveToSubmit.NewMainCoords.RowIndex))
+                {
+                    _pictureSquares[_moveToSubmit.NewMainCoords.RowIndex, _moveToSubmit.NewMainCoords.ColumnIndex].Image = Image.FromFile(Environment.CurrentDirectory + $"\\Resources\\{_moveToSubmit.MainCopy.AssignedTeam}_{_moveToSubmit.NewType}.jpg");
+                }
+
                 try
                 {
                     await _player.SubmitMoveToServerAsync(_moveToSubmit, _currentGame.GameID);

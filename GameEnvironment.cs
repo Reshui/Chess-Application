@@ -437,7 +437,14 @@ public class GameEnvironment
 
             if (mainBox is not null)
             {
-                Squares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex]!.Image = mainBox.Image;
+                if (newMove.PromotingPawn && newMove.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(newMove.NewMainCoords.RowIndex))
+                {
+                    Squares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = Image.FromFile(Environment.CurrentDirectory + $"\\Resources\\{newMove.MainCopy.AssignedTeam}_{newMove.NewType}.jpg");
+                }
+                else
+                {
+                    Squares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = mainBox.Image;
+                }
                 mainBox.Image = null;
             }
         }
