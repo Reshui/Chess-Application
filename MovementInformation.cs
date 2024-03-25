@@ -69,8 +69,13 @@ public class MovementInformation
         get => _newType;
         set
         {
-            if (MainCopy.AssignedType == PieceType.Pawn || value == null) _newType = value;
-            else throw new InvalidOperationException($"{nameof(MainCopy.AssignedType)} must be {nameof(PieceType.Pawn)} to submit with a new type.");
+            var legalTypes = new PieceType[] { PieceType.Rook, PieceType.Bishop, PieceType.Knight, PieceType.Queen };
+
+            if (PromotingPawn && MainCopy.AssignedType == PieceType.Pawn && legalTypes.Contains((PieceType)value!))
+            {
+                _newType = value;
+            }
+            else throw new InvalidOperationException($"{nameof(MainCopy.AssignedType)} must be {nameof(PieceType.Pawn)} to promote.");
         }
     }
     /// <summary>
@@ -109,7 +114,7 @@ public class MovementInformation
         EnPassantCapturePossible = enPassantCapturePossible;
         CapturingSecondary = capturingSecondary;
         CastlingWithSecondary = castlingWithSecondary;
-        NewType = newType;
+        _newType = newType;
         PromotingPawn = promotingPawn;
     }
 }
