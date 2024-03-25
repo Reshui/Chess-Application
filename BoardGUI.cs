@@ -59,7 +59,7 @@ namespace Chess_GUi
         public bool InteractionsDisabled { get; set; } = false;
         public GameState StateOfGame { get => _currentGame.MatchState; }
 
-        public static string PathToResources { get; } = Path.Combine(Assembly.GetExecutingAssembly().Location, "..\\..\\..\\Resources\\");
+        public static string PathToResources { get; } = Path.Combine(Assembly.GetExecutingAssembly().Location, "..\\..\\..\\..\\Resources\\");
 
         private MovementInformation? _moveToSubmit = null;
         public BoardGUI(Player user, GameEnvironment newGame, string nameOfGui)
@@ -399,40 +399,37 @@ namespace Chess_GUi
 
         public void UpdateBoardBasedOnMove(MovementInformation newMove)
         {
-            if (_currentGame.ActiveTeam == newMove.SubmittingTeam)
+            // Updates Graphics
+            // It is important to move the secondary piece first if available.
+            if (newMove.SecondaryCopy is not null)
             {
-                // Updates Graphics
-                // It is important to move the secondary piece first if available.
-                if (newMove.SecondaryCopy is not null)
-                {
-                    ChessPiece secPiece = newMove.SecondaryCopy;
-                    // Interface with the board using coordinates rather than the object.
-                    PictureBox secBox = _pictureSquares[secPiece.CurrentRow, secPiece.CurrentColumn];
+                ChessPiece secPiece = newMove.SecondaryCopy;
+                // Interface with the board using coordinates rather than the object.
+                PictureBox secBox = _pictureSquares[secPiece.CurrentRow, secPiece.CurrentColumn];
 
-                    if (newMove.CapturingSecondary)
-                    {   // Setting equal to null allows the image to be replaced even if this is an en passant capture.
-                        secBox.Image = null;
-                    }
-                    else if (newMove.CastlingWithSecondary && newMove.NewSecondaryCoords is not null)
-                    {
-                        _pictureSquares[(int)newMove.NewSecondaryCoords?.RowIndex!, (int)newMove.NewSecondaryCoords?.ColumnIndex!]!.Image = secBox.Image;
-                        secBox.Image = null;
-                    }
+                if (newMove.CapturingSecondary)
+                {   // Setting equal to null allows the image to be replaced even if this is an en passant capture.
+                    secBox.Image = null;
                 }
-
-                ChessPiece mainPiece = newMove.MainCopy;
-                PictureBox mainBox = _pictureSquares[mainPiece.CurrentRow, mainPiece.CurrentColumn];
-
-                if (newMove.PromotingPawn && newMove.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(newMove.NewMainCoords.RowIndex))
+                else if (newMove.CastlingWithSecondary && newMove.NewSecondaryCoords is not null)
                 {
-                    _pictureSquares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = Image.FromFile(PathToResources + $"{newMove.MainCopy.AssignedTeam}_{newMove.NewType}.jpg");
+                    _pictureSquares[(int)newMove.NewSecondaryCoords?.RowIndex!, (int)newMove.NewSecondaryCoords?.ColumnIndex!]!.Image = secBox.Image;
+                    secBox.Image = null;
                 }
-                else
-                {
-                    _pictureSquares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = mainBox.Image;
-                }
-                mainBox.Image = null;
             }
+
+            ChessPiece mainPiece = newMove.MainCopy;
+            PictureBox mainBox = _pictureSquares[mainPiece.CurrentRow, mainPiece.CurrentColumn];
+
+            if (newMove.PromotingPawn && newMove.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(newMove.NewMainCoords.RowIndex))
+            {
+                _pictureSquares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = Image.FromFile(PathToResources + $"{newMove.MainCopy.AssignedTeam}_{newMove.NewType}.jpg");
+            }
+            else
+            {
+                _pictureSquares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = mainBox.Image;
+            }
+            mainBox.Image = null;
         }
         private void InitializeComponent()
         {
