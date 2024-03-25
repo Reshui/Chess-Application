@@ -643,7 +643,7 @@ public class Server
     /// <returns>An asynchronous Task.</returns>
     public static async Task PingClientAsync(TcpClient clientToPing, CancellationTokenSource sourceToInvoke, CancellationToken pingCancellationToken)
     {
-        const byte SecondsBetweenPings = 10;
+        const byte SecondsBetweenPings = 30;
         try
         {
             while (!pingCancellationToken.IsCancellationRequested)
