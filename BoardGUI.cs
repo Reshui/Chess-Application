@@ -399,7 +399,7 @@ namespace Chess_GUi
 
         public void UpdateBoardBasedOnMove(MovementInformation newMove)
         {
-            if (_currentGame.GameBoard is not null && _pictureSquares is not null && _currentGame.ActiveTeam == newMove.SubmittingTeam)
+            if (_currentGame.ActiveTeam == newMove.SubmittingTeam)
             {
                 // Updates Graphics
                 // It is important to move the secondary piece first if available.
@@ -407,37 +407,31 @@ namespace Chess_GUi
                 {
                     ChessPiece secPiece = newMove.SecondaryCopy;
                     // Interface with the board using coordinates rather than the object.
-                    PictureBox? secBox = _pictureSquares[secPiece.CurrentRow, secPiece.CurrentColumn];
+                    PictureBox secBox = _pictureSquares[secPiece.CurrentRow, secPiece.CurrentColumn];
 
-                    if (secBox is not null)
+                    if (newMove.CapturingSecondary)
+                    {   // Setting equal to null allows the image to be replaced even if this is an en passant capture.
+                        secBox.Image = null;
+                    }
+                    else if (newMove.CastlingWithSecondary && newMove.NewSecondaryCoords is not null)
                     {
-                        if (newMove.CapturingSecondary)
-                        {   // Setting equal to null allows the image to be replaced even if this is an en passant capture.
-                            secBox.Image = null;
-                        }
-                        else if (newMove.CastlingWithSecondary && newMove.NewSecondaryCoords is not null)
-                        {
-                            _pictureSquares[(int)newMove.NewSecondaryCoords?.RowIndex!, (int)newMove.NewSecondaryCoords?.ColumnIndex!]!.Image = secBox.Image;
-                            secBox.Image = null;
-                        }
+                        _pictureSquares[(int)newMove.NewSecondaryCoords?.RowIndex!, (int)newMove.NewSecondaryCoords?.ColumnIndex!]!.Image = secBox.Image;
+                        secBox.Image = null;
                     }
                 }
 
                 ChessPiece mainPiece = newMove.MainCopy;
-                PictureBox? mainBox = _pictureSquares[mainPiece.CurrentRow, mainPiece.CurrentColumn];
+                PictureBox mainBox = _pictureSquares[mainPiece.CurrentRow, mainPiece.CurrentColumn];
 
-                if (mainBox is not null)
+                if (newMove.PromotingPawn && newMove.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(newMove.NewMainCoords.RowIndex))
                 {
-                    if (newMove.PromotingPawn && newMove.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(newMove.NewMainCoords.RowIndex))
-                    {
-                        _pictureSquares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = Image.FromFile(PathToResources + $"{newMove.MainCopy.AssignedTeam}_{newMove.NewType}.jpg");
-                    }
-                    else
-                    {
-                        _pictureSquares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = mainBox.Image;
-                    }
-                    mainBox.Image = null;
+                    _pictureSquares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = Image.FromFile(PathToResources + $"{newMove.MainCopy.AssignedTeam}_{newMove.NewType}.jpg");
                 }
+                else
+                {
+                    _pictureSquares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = mainBox.Image;
+                }
+                mainBox.Image = null;
             }
         }
         private void InitializeComponent()
@@ -450,7 +444,6 @@ namespace Chess_GUi
             this.Name = "BoardGUI";
             this.Size = new Size(1040, 685);
             this.ResumeLayout(false);
-
         }
     }
 }
