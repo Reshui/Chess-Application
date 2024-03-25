@@ -651,7 +651,6 @@ public class Server
                 if (!await IsClientActiveAsync(clientToPing, pingCancellationToken).ConfigureAwait(false))
                 {
                     sourceToInvoke.Cancel();
-                    Console.WriteLine("Couldn't be reached.");
                     return;
                 }
                 await Task.Delay(1000 * SecondsBetweenPings, pingCancellationToken).ConfigureAwait(false);
