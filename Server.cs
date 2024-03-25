@@ -73,6 +73,8 @@ public class Server
                     newUser.PingConnectedClientTask = PingClientAsync(newClient, newUser.PersonalCTS, newUser.ServerCombinedCTS.Token);
                     _connectedPlayers.TryAdd(newUser.UserID, newUser);
                     _clientListeningTasks.TryAdd(newUser.UserID, HandlePlayerResponsesAsync(newUser));
+
+                    //newClient.Kee
                 }
                 else
                 {
@@ -379,11 +381,15 @@ public class Server
     /// <param name="client"><see cref="TcpClient"/> that is tested.</param>
     public static async Task<bool> IsClientActiveAsync(TcpClient client, CancellationToken token)
     {
-        byte[] data = Array.Empty<byte>();
-
         try
-        {   // Send 0 bytes to test the connection.
+        {
+            await SendClientMessageAsync(new ServerCommand(CommandType.HeartBeatTest), client, token);
+
+            /*
+            // Send 0 bytes to test the connection.
+            byte[] data = Array.Empty<byte>();
             await client.GetStream().WriteAsync(data.AsMemory(0, 0), token).ConfigureAwait(false);
+            */
         }
         catch (Exception)
         {
@@ -514,7 +520,7 @@ public class Server
             {
                 ServerCommand? clientResponse = await RecieveCommandFromStreamAsync(stream, token).ConfigureAwait(false);
 
-                if (clientResponse is not null)
+                if (clientResponse is not null && !clientResponse.CMD.Equals(CommandType.HeartBeatTest))
                 {
                     if (clientResponse.CMD.Equals(CommandType.RegisterUser) && !userRegistered)
                     {
