@@ -397,8 +397,9 @@ public class Server
     /// <param name="client"><see cref="TcpClient"/> that is sent a message.</param>
     /// <param name="commandToSend">Command to send to <paramref name="client"/>.</param>
     /// <exception cref="IOException">Raised when an error occurs while attempting to use .WriteAsync.</exception>
-    /// <exception cref="ObjectDisposedException"></exception>
-    /// <exception cref="InvalidOperationException"></exception>
+    /// <exception cref="ObjectDisposedException">Thrown if <paramref name="client"/> is disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if an error occurs while attempting to send a message to <paramref name="client"/>.</exception>
+    /// <exception cref="OperationCanceledException">Thrown if <paramref name="token"/> is cancelled.</exception>
     public static async Task SendClientMessageAsync(ServerCommand commandToSend, TcpClient client, CancellationToken token)
     {
         string message = JsonSerializer.Serialize(commandToSend);
