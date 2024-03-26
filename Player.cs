@@ -120,10 +120,9 @@ public class Player
                         {
                             if (!gamesToIgnore.Contains(serverSideGameID))
                             {
-                                // Create a GameEnvironmentInstance, track it and send to the main GUi as well.
                                 var newGame = new GameEnvironment(serverSideGameID, (Team)response.AssignedTeam!);
                                 _activeGames.Add(serverSideGameID, newGame);
-                                _gui?.AddGame(newGame);
+                                _gui.AddGame(newGame);
                             }
                             else
                             {
@@ -139,7 +138,7 @@ public class Player
                         else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames.ContainsKey(serverSideGameID))
                         {
                             _activeGames[serverSideGameID].ChangeGameState(GameState.OpponentDisconnected);
-                            _gui?.DisableGame(serverSideGameID);
+                            _gui.DisableGame(serverSideGameID);
                             _activeGames.Remove(serverSideGameID);
                         }
                         else if (response.CMD == CommandType.OpponentClientDisconnected && !_activeGames.ContainsKey(serverSideGameID))
@@ -157,7 +156,7 @@ public class Player
                         else if (response.CMD == CommandType.InvalidMove && _activeGames.Remove(serverSideGameID, out targetedGame))
                         {
                             targetedGame.ChangeGameState(GameState.GameDraw);
-                            _gui?.DisableGame(targetedGame.GameID);
+                            _gui.DisableGame(targetedGame.GameID);
                         }
                     }
                 }
@@ -221,44 +220,25 @@ public class Player
         {
             if (TryUpdateGameInstance(targetedGameInstance, move, guiAlreadyUpdated: true))
             {
-                if (_connectedServer is not null && AllowedToMessageServer)
+                if (_connectedServer is not null && _connectedServer.Connected && AllowedToMessageServer)
                 {
                     var submissionCommand = new ServerCommand(CommandType.NewMove, serverSideGameID, move);
                     try
                     {
                         await SendClientMessageAsync(submissionCommand, _connectedServer, PersonalSource.Token).ConfigureAwait(false);
                     }
-                    catch (ObjectDisposedException)
+                    catch (Exception e) when (e is ObjectDisposedException or OperationCanceledException or NullReferenceException)
                     {
-                        // Token was disposed of in CloseConnectionToServerAsync() and server will be shutdown and user notified.
+                        // ObjectDisposedException or NullReferenceException => CloseConnectionToServerAsync() was called.
+                        // OperationCancelledException No longer want/aable to message server.
                     }
-                    catch (Exception e) when (e is IOException || e is OperationCanceledException || e is NullReferenceException || e is InvalidOperationException)
+                    catch (Exception e) when (e is IOException || e is InvalidOperationException)
                     {
                         targetedGameInstance.ChangeGameState(GameState.ServerUnavailable);
-                        IOException? newIOException = null;
-                        if (e is IOException || e is NullReferenceException || e is InvalidOperationException)
-                        {
-                            // Server can't be reached.
-                            AllowedToMessageServer = false;
-                            newIOException = new IOException("Unable to contact server.", e);
-                        }
-                        else if (!UserWantsToQuit && e is OperationCanceledException)
-                        {
-                            // Token was cancelled in either CloseConnectionToServerAsync().
-                            newIOException = new IOException("The server is shutting down.", e);
-                        }
-
-                        if (newIOException is not null)
-                        {
-                            await CloseConnectionToServerAsync(false, false, false).ConfigureAwait(false);
-                            throw newIOException;
-                        }
+                        AllowedToMessageServer = false;
+                        await CloseConnectionToServerAsync(false, false, false).ConfigureAwait(false);
+                        throw new IOException("Unable to contact server.", e);
                     }
-                    /*catch (InvalidOperationException e)
-                    {
-                        // Stream connection is probably closed due to token invoke.
-                        Console.WriteLine(e.Message);
-                    }*/
                 }
                 else if ((_connectedServer?.Connected ?? false) == false || AllowedToMessageServer == false)
                 {
