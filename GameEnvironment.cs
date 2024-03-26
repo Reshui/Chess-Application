@@ -340,6 +340,7 @@ public class GameEnvironment
     /// This method is used to submit finalized changes to <see cref="GameBoard"/> and exchanges <see cref="ActiveTeam"/>
     /// with the opposite <see cref="Team"/>.
     /// </summary>
+    /// <returns><see langword="true"/> if <paramref name="newMove"/> was successfully submitted; otherwise, <see langword="false"/>.</returns>
     /// <param name="newMove"><see cref="MovementInformation"/> to submit to <see cref="GameBoard"/>.</param>
     /// <param name="piecesAlreadyMovedOnGUI">true if chesspieces on the GUI have already been updated; otherwise, false.</param>
     public bool SubmitFinalizedChange(MovementInformation newMove)
@@ -390,7 +391,7 @@ public class GameEnvironment
     }
 
     /// <summary>Disables vulnerability to En Passant for the current <paramref name="activeTeam"/>.</summary>
-    /// <param name="activeTeam">The Team that will have its Pawns be no longer captureable via En Passant.</param>
+    /// <param name="activeTeam">Team that will have its Pawns be no longer captureable via En Passant.</param>
     private void DisableTeamVulnerabilityToEnPassant(Team activeTeam)
     {
         foreach (ChessPiece chessPiece in _chessPieceByIdByTeam[activeTeam].Values.Where(x => x.CanBeCapturedViaEnPassant))
