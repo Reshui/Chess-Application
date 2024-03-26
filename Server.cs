@@ -72,8 +72,6 @@ public class Server
                     var newUser = new TrackedUser(newClient, ServerTasksCancellationToken);
                     _connectedPlayers.TryAdd(newUser.UserID, newUser);
                     _clientListeningTasks.TryAdd(newUser.UserID, HandlePlayerResponsesAsync(newUser));
-
-                    //newClient.Kee
                 }
                 else
                 {
@@ -380,10 +378,10 @@ public class Server
     /// <param name="client"><see cref="TcpClient"/> that is tested.</param>
     public static async Task<bool> IsClientActiveAsync(TcpClient client, CancellationToken token)
     {
+        // Sending only the prefix with a value of 0 will tell the reciever that the message is empty and should be ignored.
+        byte[] data = BitConverter.GetBytes(0);
         try
         {
-            byte[] data = BitConverter.GetBytes(0);
-            // Sending 0 will tell the reciever that the message is empty.
             await client.GetStream().WriteAsync(data.AsMemory(0, data.Length), token).ConfigureAwait(false);
         }
         catch (Exception)
