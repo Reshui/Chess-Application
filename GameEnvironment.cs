@@ -566,10 +566,9 @@ public class GameEnvironment
     /// <exception cref="NullReferenceException"></exception>
     private ChessPiece GetPieceFromMovement(MovementInformation move, bool wantPrimary)
     {
-        ChessPiece pieceFromMove;
         Team wantedTeam = (wantPrimary || move.CastlingWithSecondary) ? move.SubmittingTeam : ReturnOppositeTeam(move.SubmittingTeam);
         string pieceID = wantPrimary ? move.MainCopy.ID : move.SecondaryCopy!.ID;
-        pieceFromMove = _chessPieceByIdByTeam[wantedTeam][pieceID];
+        ChessPiece pieceFromMove = _chessPieceByIdByTeam[wantedTeam][pieceID];
 
         return pieceFromMove;
     }
