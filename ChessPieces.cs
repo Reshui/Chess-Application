@@ -120,8 +120,8 @@ public class ChessPiece
     public static readonly Vector2 s_capturedLocation = new(-1);
 
     /// <summary>Gets a value representing whether or not the current <see cref="ChessPiece"/> instance has been captured.</summary>
-    /// <value><see langword="true"/> if the <see cref="CurrentLocation"/> Equals <see cref="s_capturedLocation"/> ; otherwise, <see langword="false"/>.</value>
-    public bool Captured { get => CurrentLocation.Equals(s_capturedLocation); }
+    /// <value><see langword="true"/> if the piece has been captured; otherwise, <see langword="false"/>.</value>
+    public bool Captured { get; set; }
     private string? _id = null;
     /// <summary>Gets a string to serve as a key for <see cref="GameEnvironment._teamPieces"/>.</summary>
     public string ID
