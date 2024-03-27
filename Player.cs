@@ -296,10 +296,15 @@ public class Player
                 PersonalSource.Dispose();
                 _connectedServer.Close();
                 _connectedServer = null;
-                if (!UserWantsToQuit && !serverDeniedConnection) _gui?.ServerIsUnreachable();
+                if (!UserWantsToQuit && !serverDeniedConnection) _gui.ServerIsUnreachable();
             }
         }
     }
+
+    /// <summary>
+    /// Tells <see cref="_connectedServer"/> to add user to the Looking For Game Lobby.
+    /// </summary>
+    /// <returns>An asynchronous task.</returns>
     public async Task JoinWaitingLobby()
     {
         if (_connectedServer?.Connected ?? false && !PersonalSource.IsCancellationRequested && AllowedToMessageServer)
