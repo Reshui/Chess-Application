@@ -39,6 +39,9 @@ public class Server
     /// <summary>A series of commands that signal the server that a given game has ended.</summary>
     private static readonly CommandType[] _endGameCommands = { CommandType.DeclareLoss, CommandType.DeclareWin, CommandType.DeclareStaleMate };
 
+    /// <summary>Initializes a new instance of the <see cref="Server"/> class.</summary>
+    /// <param name="port">Port to create the server on.</param>
+    /// <param name="ipAddress">ip address of server to create.</param>
     public Server(int port, string ipAddress)
     {   // Set the TcpListener on port 13000.
         IPAddress localAddr = IPAddress.Parse(ipAddress);
@@ -242,15 +245,15 @@ public class Server
                     bool bothPlayersAvailable = true;
 
                     List<Task<bool>> clientPingingTasks = new(2);
+                    // Send a ping to ensure both players are still connected.
                     foreach (TrackedUser user in matchedPlayers)
                     {
                         try
                         {
-                            clientPingingTasks.Add(IsClientActiveAsync(user.UserClient, user.ServerCombinedCTS!.Token));
+                            clientPingingTasks.Add(IsClientActiveAsync(user.UserClient, user.PersonalCTS.Token));
                         }
                         catch (ObjectDisposedException)
                         {
-                            // TaskCancelledExceptions will just return a false rather than throw themselves.
                             // Either server is shutting down or user no longer wants to play.
                             matchedPlayers.Remove(user);
                             bothPlayersAvailable = false;
@@ -419,7 +422,7 @@ public class Server
     /// <param name="stream"><see cref="NetworkStream"/> that is awaited for its responses.</param>
     /// <param name="token"><see cref="CancellationToken"/> used to cancel asynchronous operations.</param>
     /// <exception cref="OperationCanceledException">Thrown if <paramref name="token"/> source is cancelled.</exception>
-    /// <exception cref="IOException">Thrown if something goes wrong with <paramref name="stream.ReadAsync()"/>.</exception>
+    /// <exception cref="IOException">Thrown if something goes wrong when reading data from <paramref name="stream"/>.</exception>
     /// <exception cref="InvalidOperationException">Thrown if <paramref name="stream"/> is closed.</exception>
     public static async Task<ServerCommand?> RecieveCommandFromStreamAsync(NetworkStream stream, CancellationToken token)
     {
@@ -600,7 +603,7 @@ public class Server
         {
             GetPossibleSocketErrorCode(e, true);
         }
-        catch (Exception e) when (e is OperationCanceledException || e is ObjectDisposedException)
+        catch (Exception e) when (e is OperationCanceledException or ObjectDisposedException)
         {   // Client has likely disconnected.            
         }
         catch (InvalidOperationException e)
