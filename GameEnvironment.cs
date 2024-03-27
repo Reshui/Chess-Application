@@ -261,7 +261,7 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Replaces or moves a <see cref="ChessPiece"/> object within the <paramref name ="GameBoard"/> array.
+    /// Replaces or moves a <see cref="ChessPiece"/> object within the <see cref="GameBoard"/> array.
     /// </summary>
     /// <param name ="move">Contains details for a given move.</param>
     /// <param name="moveIsFinal"><see cref="true"/> if <paramref name="move"/> being submitted as the final move for the current turn.</param>
@@ -273,16 +273,16 @@ public class GameEnvironment
         if (move.SecondaryCopy is not null && move.SecondaryNewLocation is not null)
         {
             ChessPiece secondaryOnBoard = GetPieceFromMovement(move, false);
-            AdjustChessPieceLocationProperty(secondaryOnBoard, (Vector2)move.SecondaryNewLocation);
             if (move.CastlingWithSecondary) secondaryOnBoard.IncreaseMovementCount();
+            if (move.CapturingSecondary) secondaryOnBoard.Captured = true;
+            AdjustChessPieceLocationProperty(secondaryOnBoard, (Vector2)move.SecondaryNewLocation);
         }
 
         ChessPiece pieceToChange = GetPieceFromMovement(move, true);
-        AdjustChessPieceLocationProperty(pieceToChange, move.MainNewLocation);
-
         if (move.EnPassantCapturePossible) pieceToChange.EnableEnPassantCaptures();
         else if (move.NewType is not null) pieceToChange.ChangePieceType((PieceType)move.NewType);
         pieceToChange.IncreaseMovementCount();
+        AdjustChessPieceLocationProperty(pieceToChange, move.MainNewLocation);
 
         _gameMoves.Push(move);
         _tempMoveSaved = !moveIsFinal;
@@ -295,17 +295,18 @@ public class GameEnvironment
     {
         MovementInformation movementToUndo = _gameMoves.Pop();
         ChessPiece mainChessPiece = GetPieceFromMovement(movementToUndo, true);
-        AdjustChessPieceLocationProperty(mainChessPiece, movementToUndo.MainCopy.CurrentLocation);
 
         if (movementToUndo.EnPassantCapturePossible) mainChessPiece.DisableEnPassantCaptures();
         if (movementToUndo.NewType is not null) mainChessPiece.ChangePieceType(movementToUndo.MainCopy.AssignedType);
         mainChessPiece.DecreaseMovementCount();
+        AdjustChessPieceLocationProperty(mainChessPiece, movementToUndo.MainCopy.CurrentLocation);
 
         if (movementToUndo.SecondaryCopy is not null)
         {
             ChessPiece pieceTwo = GetPieceFromMovement(movementToUndo, false);
-            AdjustChessPieceLocationProperty(pieceTwo, movementToUndo.SecondaryCopy.CurrentLocation);
             if (movementToUndo.CastlingWithSecondary) pieceTwo.DecreaseMovementCount();
+            if (movementToUndo.CapturingSecondary) pieceTwo.Captured = false;
+            AdjustChessPieceLocationProperty(pieceTwo, movementToUndo.SecondaryCopy.CurrentLocation);
         }
         _tempMoveSaved = false;
     }
@@ -319,9 +320,9 @@ public class GameEnvironment
     /// <param name="newLocation">Vector2 instance of where <paramref name="pieceToMove"/> will be placed.</param>
     private void AdjustChessPieceLocationProperty(ChessPiece pieceToMove, Vector2 newLocation)
     {
-        if (!pieceToMove.Captured) GameBoard[pieceToMove.CurrentRow, pieceToMove.CurrentColumn] = null;
+        GameBoard[pieceToMove.CurrentRow, pieceToMove.CurrentColumn] = null;
         // If pieceToMove isn't being captured, move its current location within GameBoard.
-        if (!newLocation.Equals(ChessPiece.s_capturedLocation))
+        if (!pieceToMove.Captured)
         {
             (int row, int column) = ((int)newLocation.Y, (int)newLocation.X);
 
@@ -333,8 +334,8 @@ public class GameEnvironment
             {
                 throw new InvalidOperationException($"GameBoard[{row},{column}] must be null before replacing its value.");
             }
+            pieceToMove.CurrentLocation = newLocation;
         }
-        pieceToMove.CurrentLocation = newLocation;
     }
     /// <summary>
     /// This method is used to submit finalized changes to <see cref="GameBoard"/> and exchanges <see cref="ActiveTeam"/>
