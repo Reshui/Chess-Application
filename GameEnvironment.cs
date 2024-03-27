@@ -487,7 +487,7 @@ public class GameEnvironment
                     if (row is >= 0 and <= 7 && column is >= 0 and <= 7)
                     {
                         bool targetSquareIsEmpty = GameBoard[row, column] is null;
-                        bool canCaptureEnemy = piece.IsComparedPieceHostile(GameBoard[row, column], out ChessPiece? captureablePiece);
+                        bool canCaptureEnemy = piece.TryGetHostileChessPiece(GameBoard[row, column], out ChessPiece? captureablePiece);
                         bool pawnAttackVector, promptUserForPawnPromotion, movementWillExposeToEnPassant = promptUserForPawnPromotion = pawnAttackVector = false;
 
                         if (piece.AssignedType == PieceType.Pawn)
@@ -512,7 +512,7 @@ public class GameEnvironment
                             {
                                 pawnAttackVector = true;
                                 #region Check for possible En Passant captures.
-                                if (piece.TimesMoved >= 2 && piece.IsComparedPieceHostile(GameBoard[piece.CurrentRow, column], out ChessPiece? captureablePawn))
+                                if (piece.TimesMoved >= 2 && piece.TryGetHostileChessPiece(GameBoard[piece.CurrentRow, column], out ChessPiece? captureablePawn))
                                 {
                                     if (captureablePawn is not null && captureablePawn.AssignedType.Equals(PieceType.Pawn)
                                     && captureablePawn.CanBeCapturedViaEnPassant)

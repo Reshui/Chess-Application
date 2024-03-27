@@ -254,7 +254,7 @@ public class ChessPiece
     /// <param name="enemyPiece">This parameter is assigned a value if the piece being compared is hostile to the current instance of the <see cref="ChessPiece"/> class.</param>
     /// <param name="pieceToCompare"><see cref="ChessPiece"/> object that will have its allegiance tested.</param>
     /// <returns><see langword="true"/> if <paramref name="enemyPiece"/> and <paramref name="pieceToCompare"/> are both not null and are on different teams; otherwise, <see langword="false"/>.</returns>
-    public bool IsComparedPieceHostile(ChessPiece? pieceToCompare, out ChessPiece? enemyPiece)
+    public bool TryGetHostileChessPiece(ChessPiece? pieceToCompare, out ChessPiece? enemyPiece)
     {
         if (pieceToCompare is not null && !OnSameTeam(pieceToCompare))
         {
