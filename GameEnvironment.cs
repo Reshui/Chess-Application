@@ -316,7 +316,6 @@ public class GameEnvironment
     /// Moves <paramref name="pieceToMove"/> on <see cref="GameBoard"/> and changes its 
     /// <see cref="ChessPiece.CurrentLocation"/> property to <paramref name="newLocation"/>. 
     /// </summary>
-    /// <remarks>Method can handle undoing a movement as well.</remarks>
     /// <param name="pieceToMove">ChessPiece instance that will have its location changed.</param>
     /// <param name="newLocation">Vector2 instance of where <paramref name="pieceToMove"/> will be placed.</param>
     private void AdjustChessPieceLocation(ChessPiece pieceToMove, Vector2 newLocation)
