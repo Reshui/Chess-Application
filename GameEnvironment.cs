@@ -328,8 +328,7 @@ public class GameEnvironment
                 GameBoard[pieceToMove.CurrentRow, pieceToMove.CurrentColumn] = null;
             }
 
-            (int row, int column) = ((int)newLocation.Y, (int)newLocation.X);
-            GameBoard[row, column] = pieceToMove;
+            GameBoard[(int)newLocation.Y, (int)newLocation.X] = pieceToMove;
             pieceToMove.CurrentLocation = newLocation;
         }
     }
