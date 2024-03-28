@@ -275,14 +275,14 @@ public class GameEnvironment
             ChessPiece secondaryOnBoard = GetPieceFromMovement(move, false);
             if (move.CastlingWithSecondary) secondaryOnBoard.IncreaseMovementCount();
             else if (move.CapturingSecondary) secondaryOnBoard.Captured = true;
-            else AdjustChessPieceLocationProperty(secondaryOnBoard, (Vector2)move.SecondaryNewLocation);
+            else AdjustChessPieceLocation(secondaryOnBoard, (Vector2)move.SecondaryNewLocation);
         }
 
         ChessPiece pieceToChange = GetPieceFromMovement(move, true);
         if (move.EnPassantCapturePossible) pieceToChange.EnableEnPassantCaptures();
         else if (move.NewType is not null) pieceToChange.ChangePieceType((PieceType)move.NewType);
         pieceToChange.IncreaseMovementCount();
-        AdjustChessPieceLocationProperty(pieceToChange, move.MainNewLocation);
+        AdjustChessPieceLocation(pieceToChange, move.MainNewLocation);
 
         _gameMoves.Push(move);
         _tempMoveSaved = !moveIsFinal;
@@ -300,14 +300,14 @@ public class GameEnvironment
         if (movementToUndo.EnPassantCapturePossible) mainChessPiece.DisableEnPassantCaptures();
         else if (movementToUndo.NewType is not null) mainChessPiece.ChangePieceType(movementToUndo.MainCopy.AssignedType);
         mainChessPiece.DecreaseMovementCount();
-        AdjustChessPieceLocationProperty(mainChessPiece, movementToUndo.MainCopy.CurrentLocation);
+        AdjustChessPieceLocation(mainChessPiece, movementToUndo.MainCopy.CurrentLocation);
 
         if (movementToUndo.SecondaryCopy is not null)
         {
             ChessPiece pieceTwo = GetPieceFromMovement(movementToUndo, false);
             if (movementToUndo.CastlingWithSecondary) pieceTwo.DecreaseMovementCount();
             else if (movementToUndo.CapturingSecondary) pieceTwo.Captured = false;
-            AdjustChessPieceLocationProperty(pieceTwo, movementToUndo.SecondaryCopy.CurrentLocation);
+            AdjustChessPieceLocation(pieceTwo, movementToUndo.SecondaryCopy.CurrentLocation);
         }
         _tempMoveSaved = false;
     }
@@ -319,7 +319,7 @@ public class GameEnvironment
     /// <remarks>Method can handle undoing a movement as well.</remarks>
     /// <param name="pieceToMove">ChessPiece instance that will have its location changed.</param>
     /// <param name="newLocation">Vector2 instance of where <paramref name="pieceToMove"/> will be placed.</param>
-    private void AdjustChessPieceLocationProperty(ChessPiece pieceToMove, Vector2 newLocation)
+    private void AdjustChessPieceLocation(ChessPiece pieceToMove, Vector2 newLocation)
     {
         // If pieceToMove isn't being captured, move its current location within GameBoard.
         if (!newLocation.Equals(ChessPiece.s_capturedLocation))
