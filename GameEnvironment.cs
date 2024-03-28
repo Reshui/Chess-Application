@@ -147,19 +147,19 @@ public class GameEnvironment
 
                     if ((queriedRow is >= 0 and <= 7) && (queriedColumn is >= 0 and <= 7))
                     {
-                        ChessPiece? piece = GameBoard[queriedRow, queriedColumn];
+                        ChessPiece? hostilePiece = GameBoard[queriedRow, queriedColumn];
 
-                        if (piece is not null)
+                        if (hostilePiece is not null)
                         {
-                            if (!queriedKing.OnSameTeam(piece))
+                            if (!queriedKing.OnSameTeam(hostilePiece))
                             {
-                                PieceType pieceType = piece.AssignedType;
-                                // Certain captures are only available to specific combinations of vector scalars and piece types.
-                                bool enemyRookFound = pieceType == PieceType.Rook && !vectorIsDiagonal;
-                                bool enemyBishopFound = pieceType == PieceType.Bishop && vectorIsDiagonal;
-                                bool enemyQueenOrKingFound = (pieceType == PieceType.Queen) || (pieceType == PieceType.King && propagationCount == 1);
-                                bool enemyPawnFound = propagationCount == 1 && vectorIsDiagonal && pieceType == PieceType.Pawn
-                                    && ((kingRowNumber > queriedRow && piece.AssignedTeam == Team.White) || (kingRowNumber < queriedRow && piece.AssignedTeam == Team.Black));
+                                PieceType hostilePieceType = hostilePiece.AssignedType;
+                                // Certain captures are only available to specific combinations of vector scalars and hostilePiece types.
+                                bool enemyRookFound = hostilePieceType == PieceType.Rook && !vectorIsDiagonal;
+                                bool enemyBishopFound = hostilePieceType == PieceType.Bishop && vectorIsDiagonal;
+                                bool enemyQueenOrKingFound = (hostilePieceType == PieceType.Queen) || (hostilePieceType == PieceType.King && propagationCount == 1);
+                                bool enemyPawnFound = propagationCount == 1 && vectorIsDiagonal && hostilePieceType == PieceType.Pawn
+                                    && ((kingRowNumber > queriedRow && hostilePiece.AssignedTeam == Team.White) || (kingRowNumber < queriedRow && hostilePiece.AssignedTeam == Team.Black));
 
                                 if (enemyBishopFound || enemyQueenOrKingFound || enemyPawnFound || enemyRookFound)
                                 {
@@ -185,9 +185,9 @@ public class GameEnvironment
 
             if ((queriedRow is >= 0 and <= 7) && (queriedColumn is >= 0 and <= 7))
             {
-                ChessPiece? piece = GameBoard[queriedRow, queriedColumn];
+                ChessPiece? hostilePiece = GameBoard[queriedRow, queriedColumn];
 
-                if (piece is not null && piece.AssignedType == PieceType.Knight && !queriedKing.OnSameTeam(piece))
+                if (hostilePiece is not null && hostilePiece.AssignedType == PieceType.Knight && !queriedKing.OnSameTeam(hostilePiece))
                 {
                     return true;
                 }
