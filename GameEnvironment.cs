@@ -261,7 +261,7 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Replaces or moves a <see cref="ChessPiece"/> object within the <see cref="GameBoard"/> array.
+    /// Executes the instructions provided by <paramref name="move"/> and stores a record of them within <see cref="_gameMoves"/>.
     /// </summary>
     /// <param name ="move">Contains details for a given move.</param>
     /// <param name="moveIsFinal"><see cref="true"/> if <paramref name="move"/> being submitted as the final move for the current turn.</param>
@@ -289,8 +289,9 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Undoes the most recent move in the game.
+    /// Undoes the instructions provided by the most recent <see cref="MovementInformation"/> instance stored in <see cref="_gameMoves"/>.
     /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown if <see cref="_gameMoves"/> is empty.</exception>
     private void UndoGameBoardEdit()
     {
         MovementInformation movementToUndo = _gameMoves.Pop();
