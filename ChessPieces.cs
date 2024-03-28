@@ -55,7 +55,7 @@ public class ChessPiece
                 CurrentRow = (int)value.Y;
                 CurrentColumn = (int)value.X;
             }
-            else throw new ArgumentOutOfRangeException(nameof(value), value, "Inputted value is out of bounds.");
+            else throw new ArgumentOutOfRangeException(nameof(value), value, "Both .X and .Y values must be 0=< i <=7.");
         }
     }
 
