@@ -274,8 +274,8 @@ public class GameEnvironment
         {
             ChessPiece secondaryOnBoard = GetPieceFromMovement(move, false);
             if (move.CastlingWithSecondary) secondaryOnBoard.IncreaseMovementCount();
-            if (move.CapturingSecondary) secondaryOnBoard.Captured = true;
-            AdjustChessPieceLocationProperty(secondaryOnBoard, (Vector2)move.SecondaryNewLocation);
+            else if (move.CapturingSecondary) secondaryOnBoard.Captured = true;
+            else AdjustChessPieceLocationProperty(secondaryOnBoard, (Vector2)move.SecondaryNewLocation);
         }
 
         ChessPiece pieceToChange = GetPieceFromMovement(move, true);
@@ -306,7 +306,7 @@ public class GameEnvironment
         {
             ChessPiece pieceTwo = GetPieceFromMovement(movementToUndo, false);
             if (movementToUndo.CastlingWithSecondary) pieceTwo.DecreaseMovementCount();
-            if (movementToUndo.CapturingSecondary) pieceTwo.Captured = false;
+            else if (movementToUndo.CapturingSecondary) pieceTwo.Captured = false;
             AdjustChessPieceLocationProperty(pieceTwo, movementToUndo.SecondaryCopy.CurrentLocation);
         }
         _tempMoveSaved = false;
