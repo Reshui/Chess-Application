@@ -321,20 +321,11 @@ public class GameEnvironment
     /// <param name="newLocation">Vector2 instance of where <paramref name="pieceToMove"/> will be placed.</param>
     private void AdjustChessPieceLocationProperty(ChessPiece pieceToMove, Vector2 newLocation)
     {
-        GameBoard[pieceToMove.CurrentRow, pieceToMove.CurrentColumn] = null;
         // If pieceToMove isn't being captured, move its current location within GameBoard.
-        if (!pieceToMove.Captured)
+        if (!newLocation.Equals(ChessPiece.s_capturedLocation))
         {
             (int row, int column) = ((int)newLocation.Y, (int)newLocation.X);
-
-            if (GameBoard[row, column] is null)
-            {
-                GameBoard[row, column] = pieceToMove;
-            }
-            else
-            {
-                throw new InvalidOperationException($"GameBoard[{row},{column}] must be null before replacing its value.");
-            }
+            GameBoard[row, column] = pieceToMove;
             pieceToMove.CurrentLocation = newLocation;
         }
     }
