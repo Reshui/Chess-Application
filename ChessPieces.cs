@@ -50,8 +50,12 @@ public class ChessPiece
         get => new(CurrentColumn, CurrentRow);
         set
         {
-            CurrentRow = (int)value.Y;
-            CurrentColumn = (int)value.X;
+            if ((value.Y is >= 0 and <= 7) && (value.X is >= 0 and <= 7))
+            {
+                CurrentRow = (int)value.Y;
+                CurrentColumn = (int)value.X;
+            }
+            else throw new ArgumentOutOfRangeException(nameof(value), value, "Inputted value is out of bounds.");
         }
     }
 
