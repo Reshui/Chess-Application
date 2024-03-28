@@ -324,6 +324,11 @@ public class GameEnvironment
         // If pieceToMove isn't being captured, move its current location within GameBoard.
         if (!newLocation.Equals(ChessPiece.s_capturedLocation))
         {
+            if (pieceToMove == GameBoard[pieceToMove.CurrentRow, pieceToMove.CurrentColumn])
+            {
+                GameBoard[pieceToMove.CurrentRow, pieceToMove.CurrentColumn] = null;
+            }
+
             (int row, int column) = ((int)newLocation.Y, (int)newLocation.X);
             GameBoard[row, column] = pieceToMove;
             pieceToMove.CurrentLocation = newLocation;
