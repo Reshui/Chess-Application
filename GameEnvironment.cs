@@ -269,7 +269,7 @@ public class GameEnvironment
     private void EditGameBoard(MovementInformation move, bool moveIsFinal)
     {
         if (_tempMoveSaved) throw new InvalidOperationException("There is a temporary move reflected in the current state of the board. Undo it before proceeding.");
-        // For simplicity the second piece is moved first.
+
         if (move.SecondaryCopy is not null && move.SecondaryNewLocation is not null)
         {
             ChessPiece secondaryOnBoard = GetPieceFromMovement(move, false);
@@ -298,7 +298,7 @@ public class GameEnvironment
         ChessPiece mainChessPiece = GetPieceFromMovement(movementToUndo, true);
 
         if (movementToUndo.EnPassantCapturePossible) mainChessPiece.DisableEnPassantCaptures();
-        if (movementToUndo.NewType is not null) mainChessPiece.ChangePieceType(movementToUndo.MainCopy.AssignedType);
+        else if (movementToUndo.NewType is not null) mainChessPiece.ChangePieceType(movementToUndo.MainCopy.AssignedType);
         mainChessPiece.DecreaseMovementCount();
         AdjustChessPieceLocationProperty(mainChessPiece, movementToUndo.MainCopy.CurrentLocation);
 
