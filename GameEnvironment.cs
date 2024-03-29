@@ -273,9 +273,12 @@ public class GameEnvironment
         if (move.SecondaryCopy is not null && move.SecondaryNewLocation is not null)
         {
             ChessPiece secondaryOnBoard = GetPieceFromMovement(move, false);
-            if (move.CastlingWithSecondary) secondaryOnBoard.IncreaseMovementCount();
+            if (move.CastlingWithSecondary)
+            {
+                secondaryOnBoard.IncreaseMovementCount();
+                AdjustChessPieceLocation(secondaryOnBoard, (Vector2)move.SecondaryNewLocation);
+            }
             else if (move.CapturingSecondary) secondaryOnBoard.Captured = true;
-            else AdjustChessPieceLocation(secondaryOnBoard, (Vector2)move.SecondaryNewLocation);
         }
 
         ChessPiece pieceToChange = GetPieceFromMovement(move, true);
