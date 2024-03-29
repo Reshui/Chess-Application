@@ -106,7 +106,6 @@ public class ChessPiece
     /// </summary>
     private readonly static PieceType[] _multiSquareCapable = { PieceType.Queen, PieceType.Rook, PieceType.Bishop };
 
-    private int _timesMoved;
     /// <summary>Gets or sets the number of times the current <see cref="ChessPiece"/> instance has been moved.</summary>
     /// <value>Integer reprensentation of how many times the current <see cref="ChessPiece"/> instance has been moved.</value>
     /// <remarks>Incremented by 1 whenever moved.</remarks>
@@ -119,6 +118,7 @@ public class ChessPiece
             _timesMoved = value;
         }
     }
+    private int _timesMoved;
 
     /// <summary>Location assigned to all captured pieces.</summary>
     public static readonly Vector2 s_capturedLocation = new(-1);
@@ -126,13 +126,15 @@ public class ChessPiece
     /// <summary>Gets a value representing whether or not the current <see cref="ChessPiece"/> instance has been captured.</summary>
     /// <value><see langword="true"/> if the piece has been captured; otherwise, <see langword="false"/>.</value>
     public bool Captured { get; set; }
-    private string? _id = null;
+
     /// <summary>Gets a string to serve as a key for <see cref="GameEnvironment._teamPieces"/>.</summary>
     public string ID
     {
         get => _id ?? throw new NullReferenceException($"{nameof(_id)} is null.");
         set { _id ??= value; }
     }
+    private string? _id = null;
+
     /// <summary>
     /// Gets or initializes a value that describes if the instance is a copy.
     /// </summary>
