@@ -328,7 +328,7 @@ public class GameEnvironment
 
             if (GameBoard[row, column] is null)
             {
-                GameBoard[(int)newLocation.Y, (int)newLocation.X] = pieceToMove;
+                GameBoard[row, column] = pieceToMove;
                 updateCurrentLocation = true;
             }
             else throw new InvalidOperationException("Space to move to must be null.");
