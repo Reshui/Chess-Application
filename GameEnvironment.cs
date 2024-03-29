@@ -316,15 +316,12 @@ public class GameEnvironment
     /// Moves <paramref name="pieceToMove"/> on <see cref="GameBoard"/> and changes its 
     /// <see cref="ChessPiece.CurrentLocation"/> property to <paramref name="newLocation"/>. 
     /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown if attempting to move <paramref name="pieceToMove"/> to an occupied location within <see cref="GameBoard"/>.</exception>
     /// <param name="pieceToMove">ChessPiece instance that will have its location changed.</param>
     /// <param name="newLocation">Vector2 instance of where <paramref name="pieceToMove"/> will be placed.</param>
     private void AdjustChessPieceLocation(ChessPiece pieceToMove, Vector2 newLocation)
     {
-        if (pieceToMove == GameBoard[pieceToMove.CurrentRow, pieceToMove.CurrentColumn])
-        {
-            GameBoard[pieceToMove.CurrentRow, pieceToMove.CurrentColumn] = null;
-        }
-
+        bool updateCurrentLocation = false;
         if (!newLocation.Equals(ChessPiece.s_capturedLocation))
         {
             (int row, int column) = ((int)newLocation.Y, (int)newLocation.X);
@@ -332,10 +329,17 @@ public class GameEnvironment
             if (GameBoard[row, column] is null)
             {
                 GameBoard[(int)newLocation.Y, (int)newLocation.X] = pieceToMove;
-                pieceToMove.CurrentLocation = newLocation;
+                updateCurrentLocation = true;
             }
             else throw new InvalidOperationException("Space to move to must be null.");
         }
+
+        if (pieceToMove == GameBoard[pieceToMove.CurrentRow, pieceToMove.CurrentColumn])
+        {
+            GameBoard[pieceToMove.CurrentRow, pieceToMove.CurrentColumn] = null;
+        }
+
+        if (updateCurrentLocation) pieceToMove.CurrentLocation = newLocation;
     }
     /// <summary>
     /// This method is used to submit finalized changes to <see cref="GameBoard"/> and exchanges <see cref="ActiveTeam"/>
