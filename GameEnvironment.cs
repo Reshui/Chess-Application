@@ -273,12 +273,9 @@ public class GameEnvironment
         if (move.SecondaryCopy is not null && move.SecondaryNewLocation is not null)
         {
             ChessPiece secondaryOnBoard = GetPieceFromMovement(move, false);
-            if (move.CastlingWithSecondary)
-            {
-                secondaryOnBoard.IncreaseMovementCount();
-                AdjustChessPieceLocation(secondaryOnBoard, (Vector2)move.SecondaryNewLocation);
-            }
+            if (move.CastlingWithSecondary) secondaryOnBoard.IncreaseMovementCount();
             else if (move.CapturingSecondary) secondaryOnBoard.Captured = true;
+            AdjustChessPieceLocation(secondaryOnBoard, (Vector2)move.SecondaryNewLocation);
         }
 
         ChessPiece pieceToChange = GetPieceFromMovement(move, true);
@@ -323,16 +320,21 @@ public class GameEnvironment
     /// <param name="newLocation">Vector2 instance of where <paramref name="pieceToMove"/> will be placed.</param>
     private void AdjustChessPieceLocation(ChessPiece pieceToMove, Vector2 newLocation)
     {
-        // If pieceToMove isn't being captured, move its current location within GameBoard.
+        if (pieceToMove == GameBoard[pieceToMove.CurrentRow, pieceToMove.CurrentColumn])
+        {
+            GameBoard[pieceToMove.CurrentRow, pieceToMove.CurrentColumn] = null;
+        }
+
         if (!newLocation.Equals(ChessPiece.s_capturedLocation))
         {
-            if (pieceToMove == GameBoard[pieceToMove.CurrentRow, pieceToMove.CurrentColumn])
-            {
-                GameBoard[pieceToMove.CurrentRow, pieceToMove.CurrentColumn] = null;
-            }
+            (int row, int column) = ((int)newLocation.Y, (int)newLocation.X);
 
-            GameBoard[(int)newLocation.Y, (int)newLocation.X] = pieceToMove;
-            pieceToMove.CurrentLocation = newLocation;
+            if (GameBoard[row, column] is null)
+            {
+                GameBoard[(int)newLocation.Y, (int)newLocation.X] = pieceToMove;
+                pieceToMove.CurrentLocation = newLocation;
+            }
+            else throw new InvalidOperationException("Space to move to must be null.");
         }
     }
     /// <summary>
