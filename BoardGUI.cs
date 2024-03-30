@@ -362,7 +362,10 @@ namespace Chess_GUi
 
                 try
                 {
-                    await _player.SubmitMoveToServerAsync(_moveToSubmit, _currentGame.GameID);
+                    if (_currentGame.SubmitFinalizedChange(_moveToSubmit))
+                    {
+                        await _player.SubmitMoveToServerAsync(_moveToSubmit, _currentGame.GameID);
+                    }
                 }
                 catch (IOException)
                 {
