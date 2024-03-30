@@ -199,7 +199,7 @@ public class GameEnvironment
     /// <summary>
     /// Determines if movement details provided by <paramref name="moveInfo"/> will expose the king associated with <paramref name ="teamToCheck"/> to check.
     /// </summary>
-    /// <param name="moveInfo">Readonly struct with details on the movement to test.</param>
+    /// <param name="moveInfo">Move that will be tested.</param>
     /// <param name="teamToCheck">Used to determines which Team should be queried for a checked state.</param>
     /// <returns><see langword="true"/> if the king associated with <paramref name="teamToCheck"/> will be checked; otherwise, <see langword="false"/>.</returns>
     private bool WillChangeResultInCheck(MovementInformation moveInfo, Team teamToCheck)
