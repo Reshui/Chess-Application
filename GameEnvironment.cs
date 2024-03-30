@@ -450,7 +450,7 @@ public class GameEnvironment
 
                     if (castlePathIsClear)
                     {
-                        bool cannotCastleInThisDirection = false;
+                        bool canCastle = true;
                         var singleSquareMovement = new Vector2(castleDirection, 0);
                         // Initialize movement at the current location for addition purposes in the following loop.
                         Vector2 movement = piece.CurrentLocation;
@@ -462,12 +462,12 @@ public class GameEnvironment
 
                             if (WillChangeResultInCheck(singleSquareMovementInfo, piece.AssignedTeam))
                             {
-                                cannotCastleInThisDirection = true;
+                                canCastle = false;
                                 break;
                             }
                         }
 
-                        if (!cannotCastleInThisDirection)
+                        if (canCastle)
                         {
                             var newKingLocation = Vector2.Add(piece.CurrentLocation, movementVector);
                             var newRookLocation = Vector2.Add(piece.CurrentLocation, new Vector2(castleDirection, 0));
