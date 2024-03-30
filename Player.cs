@@ -218,38 +218,35 @@ public class Player
     {
         if (_activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGameInstance))
         {
-            if (TryUpdateGameInstance(targetedGameInstance, move, guiAlreadyUpdated: true))
+            if (_connectedServer is not null && _connectedServer.Connected && AllowedToMessageServer)
             {
-                if (_connectedServer is not null && _connectedServer.Connected && AllowedToMessageServer)
+                var submissionCommand = new ServerCommand(CommandType.NewMove, serverSideGameID, move);
+                try
                 {
-                    var submissionCommand = new ServerCommand(CommandType.NewMove, serverSideGameID, move);
-                    try
-                    {
-                        await SendClientMessageAsync(submissionCommand, _connectedServer, PersonalSource.Token).ConfigureAwait(false);
-                    }
-                    catch (Exception e) when (e is ObjectDisposedException or OperationCanceledException or NullReferenceException)
-                    {
-                        // ObjectDisposedException or NullReferenceException => CloseConnectionToServerAsync() was called.
-                        // OperationCancelledException No longer want/aable to message server.
-                    }
-                    catch (Exception e) when (e is IOException || e is InvalidOperationException)
-                    {
-                        targetedGameInstance.ChangeGameState(GameState.ServerUnavailable);
-                        AllowedToMessageServer = false;
-                        await CloseConnectionToServerAsync(false, false, false).ConfigureAwait(false);
-                        throw new IOException("Unable to contact server.", e);
-                    }
+                    await SendClientMessageAsync(submissionCommand, _connectedServer, PersonalSource.Token).ConfigureAwait(false);
                 }
-                else if ((_connectedServer?.Connected ?? false) == false || AllowedToMessageServer == false)
+                catch (Exception e) when (e is ObjectDisposedException or OperationCanceledException or NullReferenceException)
                 {
+                    // ObjectDisposedException or NullReferenceException => CloseConnectionToServerAsync() was called.
+                    // OperationCancelledException No longer want/aable to message server.
+                }
+                catch (Exception e) when (e is IOException || e is InvalidOperationException)
+                {
+                    targetedGameInstance.ChangeGameState(GameState.ServerUnavailable);
                     AllowedToMessageServer = false;
-                    throw new IOException("Server is no longer connected.");
+                    await CloseConnectionToServerAsync(false, false, false).ConfigureAwait(false);
+                    throw new IOException("Unable to contact server.", e);
                 }
             }
-            else
+            else if ((_connectedServer?.Connected ?? false) == false || AllowedToMessageServer == false)
             {
-                throw new InvalidOperationException("Movement submitted on the wrong turn.");
+                AllowedToMessageServer = false;
+                throw new IOException("Server is no longer connected.");
             }
+        }
+        else
+        {
+            throw new InvalidOperationException("Movement submitted on the wrong turn.");
         }
     }
 
