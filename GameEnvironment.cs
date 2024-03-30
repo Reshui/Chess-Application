@@ -516,7 +516,7 @@ public class GameEnvironment
                             {
                                 pawnAttackVector = true;
                                 #region Check for possible En Passant captures.
-                                if (piece.TimesMoved >= 2 && piece.TryGetHostileChessPiece(GameBoard[piece.CurrentRow, column], out ChessPiece? captureablePawn))
+                                if (piece.TimesMoved is 2 or 3 && piece.TryGetHostileChessPiece(GameBoard[piece.CurrentRow, column], out ChessPiece? captureablePawn))
                                 {
                                     if (captureablePawn is not null && captureablePawn.AssignedType.Equals(PieceType.Pawn)
                                     && captureablePawn.CanBeCapturedViaEnPassant)
@@ -565,7 +565,7 @@ public class GameEnvironment
     }
     /// <summary>Returns a chess piece within the current instance based on the ID property of a ChessPiece found in <paramref name="move"/> parameter.</summary>
     /// <param name="move">Data used to help retrieve a chess piece.</param>
-    /// <param name="wantPrimary"><see langword="true"/> if you want the MainCopy; otherwise, the secondary piece will be retrieved.</param>
+    /// <param name="wantPrimary"><see langword="true"/> if you want the <see cref="ChessPiece"/> that shares the same ID  with <paramref name="move"/>..MainCopy; otherwise, the secondary piece will be retrieved.</param>
     /// <returns>A <see cref="ChessPiece"/> instance.</returns>
     /// <exception cref="KeyNotFoundException"></exception>
     /// <exception cref="NullReferenceException"></exception>
