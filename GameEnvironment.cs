@@ -439,7 +439,7 @@ public class GameEnvironment
                     int greaterColumnIndex = Math.Max(rookColumn, piece.CurrentColumn);
                     bool castlePathIsClear = true;
                     // Ensure that squares between the King and Rook are empty.
-                    for (int columnIndex = lesserColumnIndex + 1; columnIndex < greaterColumnIndex; columnIndex++)
+                    for (int columnIndex = lesserColumnIndex + 1; columnIndex < greaterColumnIndex; ++columnIndex)
                     {
                         if (GameBoard[friendlySpecialLine, columnIndex] is not null)
                         {
