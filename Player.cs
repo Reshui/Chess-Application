@@ -147,7 +147,7 @@ public class Player
                         }
                         else if (response.CMD == CommandType.NewMove && _activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGame))
                         {
-                            if (!TryUpdateGameInstance(targetedGame, response.MoveDetails!, guiAlreadyUpdated: false))
+                            if (!await TryUpdateGameInstanceAsync(targetedGame, response.MoveDetails!, guiAlreadyUpdated: false, submitToServer: false))
                             {
                                 var invalidMoveFromOpponent = new ServerCommand(CommandType.InvalidMove, targetedGame.GameID, response.MoveDetails);
                                 await SendClientMessageAsync(invalidMoveFromOpponent, _connectedServer, PersonalSource.Token);//.ConfigureAwait(false);
@@ -192,12 +192,15 @@ public class Player
     /// <param name="targetGame">Game that chanes will target.</param>
     /// <param name="newMove">MovementInformation used to update <paramref name="targetGame"/>.</param>
     /// <param name="guiAlreadyUpdated"><see langword="true"/> if the GameBoard doesn't need to visually updated to reflect <paramref name="newMove"/>; otherwise, <see langword="false"/>.</param>
-    private bool TryUpdateGameInstance(GameEnvironment targetGame, MovementInformation newMove, bool guiAlreadyUpdated)
+    /// <exception cref="IOException"></exception>
+    /// <exception cref="InvalidOperationException"></exception>
+    public async Task<bool> TryUpdateGameInstanceAsync(GameEnvironment targetGame, MovementInformation newMove, bool guiAlreadyUpdated, bool submitToServer)
     {
         bool success = false;
         if (targetGame.SubmitFinalizedChange(newMove))
         {
-            if (!guiAlreadyUpdated) _gui.UpdateGameInterface(newMove, targetGame.GameID);
+            if (submitToServer) await SubmitMoveToServerAsync(newMove, targetGame.GameID);
+            else if (!guiAlreadyUpdated) _gui.UpdateGameInterface(newMove, targetGame.GameID);
             success = true;
         }
         else
@@ -235,7 +238,6 @@ public class Player
                     targetedGameInstance.ChangeGameState(GameState.ServerUnavailable);
                     AllowedToMessageServer = false;
                     await CloseConnectionToServerAsync(false, false, false).ConfigureAwait(false);
-                    throw new IOException("Unable to contact server.", e);
                 }
             }
             else if ((_connectedServer?.Connected ?? false) == false || AllowedToMessageServer == false)
