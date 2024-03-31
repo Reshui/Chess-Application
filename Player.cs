@@ -187,13 +187,14 @@ public class Player
     }
 
     /// <summary>
-    /// Submits move to Local game instance.
+    /// Submits move to Local game instance, updates graphics if needed and optionally submits <paramref name="newMove"/> to the server.
     /// </summary>
     /// <param name="targetGame">Game that chanes will target.</param>
     /// <param name="newMove">MovementInformation used to update <paramref name="targetGame"/>.</param>
     /// <param name="guiAlreadyUpdated"><see langword="true"/> if the GameBoard doesn't need to visually updated to reflect <paramref name="newMove"/>; otherwise, <see langword="false"/>.</param>
+    /// <param name="submitToServer"><see langword="true"/> if <paramref name="newMove"/> should be sent to <see cref="_connectedServer"/>; otherwise, <see langword="false"/>.</param>
     /// <exception cref="IOException"></exception>
-    /// <exception cref="InvalidOperationException"></exception>
+    /// <exception cref="InvalidOperationException">Game is no longer being tracked by this <see cref="Player"/> instance.</exception>
     public async Task<bool> TryUpdateGameInstanceAsync(GameEnvironment targetGame, MovementInformation newMove, bool guiAlreadyUpdated, bool submitToServer)
     {
         bool success = false;
@@ -216,7 +217,7 @@ public class Player
     /// <param name="move">Chess movement to submit to the server.</param>
     /// <param name="serverSideGameID">ID used to target a specific <see cref="GameEnvironment"/> instance.</param>
     /// <exception cref="IOException">The server can no longer be reached.</exception>
-    /// <exception cref="InvalidOperationException">Attempted to submit move when it isn't this player's turn.</exception> 
+    /// <exception cref="InvalidOperationException">Game is no longer being tracked by this <see cref="Player"/> instance.</exception> 
     public async Task SubmitMoveToServerAsync(MovementInformation move, int serverSideGameID)
     {
         if (_activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGameInstance))
