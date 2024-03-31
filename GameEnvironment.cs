@@ -347,7 +347,7 @@ public class GameEnvironment
     /// </summary>
     /// <returns><see langword="true"/> if <paramref name="newMove"/> was successfully submitted; otherwise, <see langword="false"/>.</returns>
     /// <param name="newMove"><see cref="MovementInformation"/> to submit to <see cref="GameBoard"/>.</param>
-    /// <param name="piecesAlreadyMovedOnGUI">true if chesspieces on the GUI have already been updated; otherwise, false.</param>
+    /// <param name="piecesAlreadyMovedOnGUI"><see langword="true"/> if chesspieces on the GUI have already been updated; otherwise, <see langword="false"/>.</param>
     public bool SubmitFinalizedChange(MovementInformation newMove)
     {
         bool success = false;
