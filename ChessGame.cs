@@ -521,7 +521,6 @@ public class ChessGame
     /// </summary>
     /// <param name="queriedTeam">Used to retrieve the king that will be checked for castling moves.</param>
     /// <param name="rookToCastleWith">Rook that will be used to castle with.</param>
-    /// <param name="castleDirection">Direction to castle in.</param>
     /// <returns><see langword="true"/>if a king can castle with <paramref name="rookToCastleWith"/>; otherwise, <see langword="false"/>.</returns>
     private bool CanKingCastleWithRook(Team queriedTeam, ChessPiece? rookToCastleWith)
     {
