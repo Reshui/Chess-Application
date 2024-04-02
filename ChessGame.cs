@@ -7,7 +7,7 @@ public enum GameState
     LocalWin, LocalLoss, GameDraw, Playing, OpponentDisconnected, ServerUnavailable
 }
 
-public class GameEnvironment
+public class ChessGame
 {
     private readonly ChessPiece _whiteKing;
     private readonly ChessPiece _blackKing;
@@ -17,8 +17,8 @@ public class GameEnvironment
     /// </summary>
     private bool _tempMoveSaved = false;
 
-    /// <summary>Tracks moves within the current <see cref="GameEnvironment"/> instance.</summary>
-    private readonly Stack<MovementInformation> _gameMoves = new();
+    /// <summary>Tracks moves within the current <see cref="ChessGame"/> instance.</summary>
+    private readonly Stack<ChessMove> _gameMoves = new();
 
     /// <summary>Stores how many moves have been submitted since the last capture was made.</summary>
     /// <remarks>If over 50 then a Draw is determined.</remarks>
@@ -35,7 +35,7 @@ public class GameEnvironment
     private readonly Dictionary<Team, Dictionary<string, ChessPiece>> _chessPieceByIdByTeam;
 
     /// <summary>Gets or initializes an ID number used to track the current instance on the server.</summary>
-    /// <value>The ID of the current <see cref="GameEnvironment"/> instance on the server.</value>
+    /// <value>The ID of the current <see cref="ChessGame"/> instance on the server.</value>
     public int GameID { get; }
 
     /// <summary>Gets or initializes a <see cref="Team"/> enum that represents the assigned Team of the client.</summary>
@@ -43,9 +43,9 @@ public class GameEnvironment
     /// <value><see cref="Team"/> assigned to the local user.</value>
     public Team PlayerTeam { get; }
 
-    /// <summary>Gets or sets a value representing which <see cref="Team"/> is currently allowed to submit a <see cref="MovementInformation"/> instance.</summary>
-    /// <remarks>Alternated whenever <see cref="SubmitFinalizedChange(MovementInformation)"/> is called.</remarks>
-    ///<value>The <see cref="Team"/> that is currently allowed to submit <see cref="MovementInformation"/> to the <see cref="GameEnvironment"/> instance.</value>
+    /// <summary>Gets or sets a value representing which <see cref="Team"/> is currently allowed to submit a <see cref="ChessMove"/> instance.</summary>
+    /// <remarks>Alternated whenever <see cref="SubmitFinalizedChange(ChessMove)"/> is called.</remarks>
+    ///<value>The <see cref="Team"/> that is currently allowed to submit <see cref="ChessMove"/> to the <see cref="ChessGame"/> instance.</value>
     public Team ActiveTeam { get; private set; } = Team.White;
 
     /// <summary>Gets or sets the current game state.</summary>
@@ -53,14 +53,14 @@ public class GameEnvironment
     public GameState MatchState { get; private set; } = GameState.Playing;
 
     /// <summary>Gets a boolean that denotes whether or not a given instance has ended.</summary>
-    /// <value><see langword="true"/> if the <see cref="GameEnvironment"/> instance has ended; otherwise, <see langword="false"/>.</value>
+    /// <value><see langword="true"/> if the <see cref="ChessGame"/> instance has ended; otherwise, <see langword="false"/>.</value>
     public bool GameEnded { get => MatchState != GameState.Playing; }
     /// <summary>
-    /// Initializes a new instance of the <see cref="GameEnvironment"/> instance.
+    /// Initializes a new instance of the <see cref="ChessGame"/> instance.
     /// </summary>
-    /// <param name="playerTeam"><see cref="Team"/> assigned to client-side <see cref="GameEnvironment"/> instances.</param>
+    /// <param name="playerTeam"><see cref="Team"/> assigned to client-side <see cref="ChessGame"/> instances.</param>
     /// <param name="serverSideID">Sever generated id assigned by server to identify this instance.</param>
-    public GameEnvironment(int serverSideID, Team playerTeam)
+    public ChessGame(int serverSideID, Team playerTeam)
     {
         GameID = serverSideID;
         PlayerTeam = playerTeam;
@@ -202,7 +202,7 @@ public class GameEnvironment
     /// <param name="moveInfo">Move that will be tested.</param>
     /// <param name="teamToCheck">Used to determines which Team should be queried for a checked state.</param>
     /// <returns><see langword="true"/> if the king associated with <paramref name="teamToCheck"/> will be checked; otherwise, <see langword="false"/>.</returns>
-    private bool WillChangeResultInCheck(MovementInformation moveInfo, Team teamToCheck)
+    private bool WillChangeResultInCheck(ChessMove moveInfo, Team teamToCheck)
     {
         EditGameBoard(moveInfo, false);
         bool returnValue = IsTeamInCheck(teamToCheck);
@@ -249,9 +249,9 @@ public class GameEnvironment
     /// </summary>
     /// <param name="queriedTeam"><see cref="Team"/> that has their available moves queried.</param>
     /// <returns>A dictionary of possible moves for chess pieces that are on <paramref name="queriedTeam"/>.</returns>
-    public Dictionary<string, List<MovementInformation>> AllPossibleMovesPerTeam(Team queriedTeam)
+    public Dictionary<string, List<ChessMove>> AllPossibleMovesPerTeam(Team queriedTeam)
     {
-        var teamMoves = new Dictionary<string, List<MovementInformation>>();
+        var teamMoves = new Dictionary<string, List<ChessMove>>();
 
         foreach (ChessPiece chessPiece in _chessPieceByIdByTeam[queriedTeam].Values.Where(x => !x.Captured))
         {
@@ -266,7 +266,7 @@ public class GameEnvironment
     /// <param name ="move">Contains details for a given move.</param>
     /// <param name="moveIsFinal"><see cref="true"/> if <paramref name="move"/> being submitted as the final move for the current turn.</param>
     /// <exception cref="InvalidOperationException">Thrown if <see cref="_tempMoveSaved"/> is <see langword="true"/>.</exception>
-    private void EditGameBoard(MovementInformation move, bool moveIsFinal)
+    private void EditGameBoard(ChessMove move, bool moveIsFinal)
     {
         if (_tempMoveSaved) throw new InvalidOperationException("There is a temporary move reflected in the current state of the board. Undo it before proceeding.");
 
@@ -289,12 +289,12 @@ public class GameEnvironment
     }
 
     /// <summary>
-    /// Undoes the instructions provided by the most recent <see cref="MovementInformation"/> instance stored in <see cref="_gameMoves"/>.
+    /// Undoes the instructions provided by the most recent <see cref="ChessMove"/> instance stored in <see cref="_gameMoves"/>.
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown if <see cref="_gameMoves"/> is empty.</exception>
     private void UndoGameBoardEdit()
     {
-        MovementInformation movementToUndo = _gameMoves.Pop();
+        ChessMove movementToUndo = _gameMoves.Pop();
         ChessPiece mainChessPiece = GetPieceFromMovement(movementToUndo, true);
 
         if (movementToUndo.EnPassantCapturePossible) mainChessPiece.DisableEnPassantCaptures();
@@ -346,9 +346,9 @@ public class GameEnvironment
     /// with the opposite <see cref="Team"/>.
     /// </summary>
     /// <returns><see langword="true"/> if <paramref name="newMove"/> was successfully submitted; otherwise, <see langword="false"/>.</returns>
-    /// <param name="newMove"><see cref="MovementInformation"/> to submit to <see cref="GameBoard"/>.</param>
+    /// <param name="newMove"><see cref="ChessMove"/> to submit to <see cref="GameBoard"/>.</param>
     /// <param name="piecesAlreadyMovedOnGUI"><see langword="true"/> if chesspieces on the GUI have already been updated; otherwise, <see langword="false"/>.</param>
-    public bool SubmitFinalizedChange(MovementInformation newMove)
+    public bool SubmitFinalizedChange(ChessMove newMove)
     {
         bool success = false;
         if (newMove.SubmittingTeam == ActiveTeam && !GameEnded)
@@ -407,11 +407,11 @@ public class GameEnvironment
     /// <summary>
     /// Determines the available moves for <paramref name="piece"/> and returns the result.
     /// </summary>
-    /// <returns>A <see cref="List{MovementInformation}"/> of available movements/attacks for <paramref name="piece"/>.</returns>
+    /// <returns>A <see cref="List{ChessMove}"/> of available movements/attacks for <paramref name="piece"/>.</returns>
     /// <param name="piece"><see cref="ChessPiece"/> instance to determine possible moves for.</param>
-    public List<MovementInformation> AvailableMoves(ChessPiece piece)
+    public List<ChessMove> AvailableMoves(ChessPiece piece)
     {
-        var viableMoves = new List<MovementInformation>();
+        var viableMoves = new List<ChessMove>();
         if (piece.Captured)
         {
             return viableMoves;
@@ -458,7 +458,7 @@ public class GameEnvironment
                         for (int i = 0; i < 2; ++i)
                         {
                             movement = Vector2.Add(movement, singleSquareMovement);
-                            var singleSquareMovementInfo = new MovementInformation(copyOfPiece, new Coords(movement));
+                            var singleSquareMovementInfo = new ChessMove(copyOfPiece, new Coords(movement));
 
                             if (WillChangeResultInCheck(singleSquareMovementInfo, piece.AssignedTeam))
                             {
@@ -472,7 +472,7 @@ public class GameEnvironment
                             var newKingLocation = Vector2.Add(piece.CurrentLocation, movementVector);
                             var newRookLocation = Vector2.Add(piece.CurrentLocation, new Vector2(castleDirection, 0));
 
-                            var moveInfo = new MovementInformation(copyOfPiece, new Coords(newKingLocation), pairedRook.Copy(), new Coords(newRookLocation), castlingWithSecondary: true);
+                            var moveInfo = new ChessMove(copyOfPiece, new Coords(newKingLocation), pairedRook.Copy(), new Coords(newRookLocation), castlingWithSecondary: true);
                             viableMoves.Add(moveInfo);
                         }
                     }
@@ -521,7 +521,7 @@ public class GameEnvironment
                                     if (captureablePawn is not null && captureablePawn.AssignedType.Equals(PieceType.Pawn)
                                     && captureablePawn.CanBeCapturedViaEnPassant)
                                     {
-                                        var enPassantCapture = new MovementInformation(copyOfPiece, new Coords(calculatedPosition), captureablePawn.Copy(),
+                                        var enPassantCapture = new ChessMove(copyOfPiece, new Coords(calculatedPosition), captureablePawn.Copy(),
                                             new Coords(ChessPiece.s_capturedLocation), capturingSecondary: true);
 
                                         if (!WillChangeResultInCheck(enPassantCapture, piece.AssignedTeam))
@@ -536,7 +536,7 @@ public class GameEnvironment
                         // Special notes for pawns: if pawnAttackVector = true, then the only way to move to that space is if canCaptureEnemy == true.
                         if ((targetSquareIsEmpty && !pawnAttackVector) || canCaptureEnemy)
                         {
-                            var moveInfo = new MovementInformation(copyOfPiece, new Coords(calculatedPosition), captureablePiece?.Copy(),
+                            var moveInfo = new ChessMove(copyOfPiece, new Coords(calculatedPosition), captureablePiece?.Copy(),
                                 canCaptureEnemy ? new Coords(ChessPiece.s_capturedLocation) : null, movementWillExposeToEnPassant,
                                 capturingSecondary: canCaptureEnemy, promotingPawn: promptUserForPawnPromotion);
 
@@ -569,7 +569,7 @@ public class GameEnvironment
     /// <returns>A <see cref="ChessPiece"/> instance.</returns>
     /// <exception cref="KeyNotFoundException"></exception>
     /// <exception cref="NullReferenceException"></exception>
-    private ChessPiece GetPieceFromMovement(MovementInformation move, bool wantPrimary)
+    private ChessPiece GetPieceFromMovement(ChessMove move, bool wantPrimary)
     {
         Team wantedTeam = (wantPrimary || move.CastlingWithSecondary) ? move.SubmittingTeam : ReturnOppositeTeam(move.SubmittingTeam);
         string pieceID = wantPrimary ? move.MainCopy.ID : move.SecondaryCopy!.ID;

@@ -1,4 +1,3 @@
-using Microsoft.VisualBasic.Logging;
 using Pieces;
 
 namespace Chess_GUi
@@ -13,7 +12,7 @@ namespace Chess_GUi
     */
     public partial class Form1 : Form
     {
-        private Server? _hostedServer;
+        private ChessServer? _hostedServer;
         private Player? _localPlayer;
 
         private bool _allowClose = false;
@@ -83,7 +82,7 @@ namespace Chess_GUi
         {
             if (_hostedServer is null)
             {
-                _hostedServer = new Server(13_000, "127.0.0.1");
+                _hostedServer = new ChessServer(13_000, "127.0.0.1");
                 _hostedServer.StartServer();
                 StartServer.BackColor = Color.Wheat;
                 StartServer.ForeColor = Color.Black;
@@ -122,7 +121,7 @@ namespace Chess_GUi
             _localPlayer?.JoinWaitingLobby();
         }
 
-        public void AddGame(GameEnvironment newGame)
+        public void AddGame(ChessGame newGame)
         {
             if (_localPlayer is not null)
             {
@@ -137,7 +136,7 @@ namespace Chess_GUi
             }
         }
 
-        public void UpdateGameInterface(MovementInformation newMove, int gameID)
+        public void UpdateGameInterface(ChessMove newMove, int gameID)
         {
             _boardGuiByName[gameID.ToString()].UpdateBoardBasedOnMove(newMove);
         }
@@ -145,7 +144,7 @@ namespace Chess_GUi
         /// <summary>
         /// Disables any GUI that uses <paramref name="gameID"/> as a name.
         /// </summary>
-        /// <param name="gameID"><see cref="GameEnvironment.GameID"/> of game to target.</param>
+        /// <param name="gameID"><see cref="ChessGame.GameID"/> of game to target.</param>
         public void DisableGame(int gameID)
         {
             if (_localPlayer is not null && !_localPlayer.UserWantsToQuit)

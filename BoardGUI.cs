@@ -27,8 +27,8 @@ namespace Chess_GUi
         /// <summary>2D array of <see cref="PictureBox"/> objects that represent the visible board.</summary>
         private PictureBox[,] _pictureSquares;
 
-        /// <summary>A <see cref="GameEnvironment"/> instance that is mapped to the GUI.</summary>
-        private readonly GameEnvironment _currentGame;
+        /// <summary>A <see cref="ChessGame"/> instance that is mapped to the GUI.</summary>
+        private readonly ChessGame _currentGame;
 
         /// <summary>List of squares that a piece friendly to <see cref="_player"/> can move to.</summary>
         private List<PictureBox> _validMovementSquares = new();
@@ -46,7 +46,7 @@ namespace Chess_GUi
         private List<OriginalBackColor> _changedSquares = new();
 
         /// <summary>List of available moves to the currently selected piece friendly to the <see cref="_player"/>.</summary>
-        private List<MovementInformation>? _movesAvailableToPiece;
+        private List<ChessMove>? _movesAvailableToPiece;
 
         /// <summary>Stores a temporary reference to an image when selecting an available movement.</summary>
         private Image? _targetImage;
@@ -61,8 +61,8 @@ namespace Chess_GUi
 
         public static string PathToResources { get; } = Path.Combine(Assembly.GetExecutingAssembly().Location, "..\\..\\..\\..\\Resources\\");
 
-        private MovementInformation? _moveToSubmit = null;
-        public BoardGUI(Player user, GameEnvironment newGame, string nameOfGui)
+        private ChessMove? _moveToSubmit = null;
+        public BoardGUI(Player user, ChessGame newGame, string nameOfGui)
         {
             Name = nameOfGui;
             _currentGame = newGame;
@@ -323,7 +323,7 @@ namespace Chess_GUi
         }
 
         /// <summary>
-        /// This event submits a movement to the <see cref="GameEnvironment"/> instance.
+        /// This event submits a movement to the <see cref="ChessGame"/> instance.
         /// </summary>
         /// <param name="sender"><see cref="PictureBox"/> object that has been clicked.</param>
         public async void ConfirmMoveClickedEvent(object sender, EventArgs e)
@@ -400,7 +400,7 @@ namespace Chess_GUi
             if (_chessPieceDestinationSquare != null) _chessPieceDestinationSquare.Image = _targetImage;
         }
 
-        public void UpdateBoardBasedOnMove(MovementInformation newMove)
+        public void UpdateBoardBasedOnMove(ChessMove newMove)
         {
             // Updates Graphics
             // It is important to move the secondary piece first if available.

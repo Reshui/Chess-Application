@@ -14,7 +14,7 @@ public class ServerCommand
     /// <summary><see cref="CommandType"/> enum that specifies what this ServerCommand is intended to do.</summary>
     public CommandType CMD { get; set; }
     /// <summary>Optional class field used when <see cref="CMD"/> equals <see cref="CommandType.NewMove"/>.</summary>
-    public MovementInformation? MoveDetails { get; set; } = null;
+    public ChessMove? MoveDetails { get; set; } = null;
     /// <summary>Optional field used to assign a client-side <see cref="Player"/> to a given team.</summary>
     public Team? AssignedTeam { get; set; } = null;
     /// <summary>Specifies which instance of a <see cref="GameEnvironment"/> is being communicated with.</summary>
@@ -24,14 +24,14 @@ public class ServerCommand
     public string? Message { get; set; }
     public string? OpponentName { get; set; }
 
-    public ServerCommand(CommandType cmd, int gameIdentifier = 0, MovementInformation? moveDetails = null, Team? assignedTeam = null, string? name = null, string? message = null, string? opponentName = null)
+    public ServerCommand(CommandType cmd, int gameIdentifier = 0, ChessMove? moveDetails = null, Team? assignedTeam = null, string? name = null, string? message = null, string? opponentName = null)
     {
         CMD = cmd;
         GameIdentifier = gameIdentifier;
         Message = message;
         if (cmd == CommandType.NewMove)
         {
-            MoveDetails = moveDetails ?? throw new ArgumentNullException(nameof(moveDetails), "A new move command has been submitted without a non-null MovementInformation struct.");
+            MoveDetails = moveDetails ?? throw new ArgumentNullException(nameof(moveDetails), "A new move command has been submitted without a non-null ChessMove struct.");
         }
         else if (cmd == CommandType.StartGameInstance)
         {

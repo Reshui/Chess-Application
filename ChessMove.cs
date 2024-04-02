@@ -4,7 +4,7 @@ namespace Pieces;
 /// <summary>
 /// Struct that contains information about a given chess movement.
 /// </summary>
-public class MovementInformation
+public class ChessMove
 {
     /// <summary>Class that contains the new coordinates to move <see cref="MainCopy"/> to.</summary>
     public Coords NewMainCoords { get; init; }
@@ -41,11 +41,11 @@ public class MovementInformation
     /// <value><see langword="true"/> if <see cref="MainCopy"/> is castling with <see cref="SecondaryCopy"/>; otherwise, <see langword="false"/></value>
     public bool CastlingWithSecondary { get; init; }
 
-    /// <summary>Gets a value indicating which <see cref="Team"/> is submitting the <see cref="MovementInformation"/> instance.</summary>
+    /// <summary>Gets a value indicating which <see cref="Team"/> is submitting the <see cref="ChessMove"/> instance.</summary>
     /// <value>The current value of <see cref="MainCopy"/>.<c>AssignedTeam</c>.</value>
     public Team SubmittingTeam => MainCopy.AssignedTeam;
 
-    /// <summary>Gets a value representing if the <see cref="MovementInformation"/> instance describes if <see cref="MainCopy"/> is capturing <see cref="SecondaryCopy"/>
+    /// <summary>Gets a value representing if the <see cref="ChessMove"/> instance describes if <see cref="MainCopy"/> is capturing <see cref="SecondaryCopy"/>
     /// via En Passant.</summary>
     /// <value><see langword="true"/> if capturing via En Passant; otherwise, <see langword="false"/>.</value>
     public bool CapturingViaEnPassant
@@ -79,12 +79,12 @@ public class MovementInformation
         }
     }
     /// <summary>
-    /// Gets a value that describes if the <see cref="MovementInformation"/> instance involves promoting a pawn.
+    /// Gets a value that describes if the <see cref="ChessMove"/> instance involves promoting a pawn.
     /// </summary>
     public bool PromotingPawn { get; }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="MovementInformation"/> class.
+    /// Initializes a new instance of the <see cref="ChessMove"/> class.
     /// </summary>
     /// <param name="mainCopy">Copy of piece doing the move.</param>
     /// <param name="secondaryCopy">Copy or null of secondary piece being acted upon.</param>
@@ -95,7 +95,7 @@ public class MovementInformation
     /// <param name="castlingWithSecondary"><see langword="true"/> if <paramref name="mainCopy"/> should castle with <paramref name="secondaryCopy"/>; otherwise, <see langword="false"/>   </param>
     /// <param name="newType">PieceType to convert <paramref name="mainCopy"/> to.</param>
     /// <exception cref="ArgumentException"></exception>
-    public MovementInformation(ChessPiece mainCopy, Coords newMainCoords, ChessPiece? secondaryCopy = null, Coords? newSecondaryCoords = null, bool enPassantCapturePossible = false, bool capturingSecondary = false, bool castlingWithSecondary = false, bool promotingPawn = false, PieceType? newType = null)
+    public ChessMove(ChessPiece mainCopy, Coords newMainCoords, ChessPiece? secondaryCopy = null, Coords? newSecondaryCoords = null, bool enPassantCapturePossible = false, bool capturingSecondary = false, bool castlingWithSecondary = false, bool promotingPawn = false, PieceType? newType = null)
     {
         if (mainCopy.IsCopy && (secondaryCopy?.IsCopy ?? true))
         {

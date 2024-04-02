@@ -2,7 +2,7 @@
 namespace Pieces;
 
 using Chess_GUi;
-using static Pieces.Server;
+using static Pieces.ChessServer;
 using System.Net.Sockets;
 public class Player
 {
@@ -12,7 +12,7 @@ public class Player
     /// <summary>Port to connect to <see cref="_connectedServer"/> on.</summary>
     private readonly int? _hostPort = null;
 
-    /// <summary>Connection to the server if it exists used by the <see cref="Server"/> class.</summary>
+    /// <summary>Connection to the server if it exists used by the <see cref="ChessServer"/> class.</summary>
     public TcpClient Client
     {
         get { return _client ?? throw new NullReferenceException(nameof(_client)); }
@@ -20,11 +20,11 @@ public class Player
     }
     private TcpClient? _client;
 
-    /// <summary>Server connected to the current <see cref="Player"/> instance.</summary>
+    /// <summary>ChessServer connected to the current <see cref="Player"/> instance.</summary>
     private TcpClient? _connectedServer;
 
     /// <summary>Stores a list of games that the user is involved in.</summary>
-    private readonly Dictionary<int, GameEnvironment> _activeGames = new();
+    private readonly Dictionary<int, ChessGame> _activeGames = new();
     /// <summary>
     /// Gets or sets a value that will limit the user from sending messages to <see cref="_connectedServer"/>.
     /// </summary>
@@ -120,7 +120,7 @@ public class Player
                         {
                             if (!gamesToIgnore.Contains(serverSideGameID))
                             {
-                                var newGame = new GameEnvironment(serverSideGameID, (Team)response.AssignedTeam!);
+                                var newGame = new ChessGame(serverSideGameID, (Team)response.AssignedTeam!);
                                 _activeGames.Add(serverSideGameID, newGame);
                                 _gui.AddGame(newGame);
                             }
@@ -145,7 +145,7 @@ public class Player
                         {
                             gamesToIgnore.Add(serverSideGameID);
                         }
-                        else if (response.CMD == CommandType.NewMove && _activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGame))
+                        else if (response.CMD == CommandType.NewMove && _activeGames.TryGetValue(serverSideGameID, out ChessGame? targetedGame))
                         {
                             if (!await TryUpdateGameInstanceAsync(targetedGame, response.MoveDetails!, guiAlreadyUpdated: false, submitToServer: false))
                             {
@@ -190,12 +190,12 @@ public class Player
     /// Submits move to Local game instance, updates graphics if needed and optionally submits <paramref name="newMove"/> to the server.
     /// </summary>
     /// <param name="targetGame">Game that chanes will target.</param>
-    /// <param name="newMove">MovementInformation used to update <paramref name="targetGame"/>.</param>
+    /// <param name="newMove">ChessMove used to update <paramref name="targetGame"/>.</param>
     /// <param name="guiAlreadyUpdated"><see langword="true"/> if the GameBoard doesn't need to visually updated to reflect <paramref name="newMove"/>; otherwise, <see langword="false"/>.</param>
     /// <param name="submitToServer"><see langword="true"/> if <paramref name="newMove"/> should be sent to <see cref="_connectedServer"/>; otherwise, <see langword="false"/>.</param>
     /// <exception cref="IOException"></exception>
     /// <exception cref="InvalidOperationException">Game is no longer being tracked by this <see cref="Player"/> instance.</exception>
-    public async Task<bool> TryUpdateGameInstanceAsync(GameEnvironment targetGame, MovementInformation newMove, bool guiAlreadyUpdated, bool submitToServer)
+    public async Task<bool> TryUpdateGameInstanceAsync(ChessGame targetGame, ChessMove newMove, bool guiAlreadyUpdated, bool submitToServer)
     {
         bool success = false;
         if (targetGame.SubmitFinalizedChange(newMove))
@@ -212,15 +212,15 @@ public class Player
         return success;
     }
     /// <summary>
-    /// Submits a chess movement <paramref name="move"/> to the <see cref="_connectedServer"/> and updates the relevant <see cref="GameEnvironment"/> instance.
+    /// Submits a chess movement <paramref name="move"/> to the <see cref="_connectedServer"/> and updates the relevant <see cref="ChessGame"/> instance.
     /// </summary>
     /// <param name="move">Chess movement to submit to the server.</param>
-    /// <param name="serverSideGameID">ID used to target a specific <see cref="GameEnvironment"/> instance.</param>
+    /// <param name="serverSideGameID">ID used to target a specific <see cref="ChessGame"/> instance.</param>
     /// <exception cref="IOException">The server can no longer be reached.</exception>
     /// <exception cref="InvalidOperationException">Game is no longer being tracked by this <see cref="Player"/> instance.</exception> 
-    public async Task SubmitMoveToServerAsync(MovementInformation move, int serverSideGameID)
+    public async Task SubmitMoveToServerAsync(ChessMove move, int serverSideGameID)
     {
-        if (_activeGames.TryGetValue(serverSideGameID, out GameEnvironment? targetedGameInstance))
+        if (_activeGames.TryGetValue(serverSideGameID, out ChessGame? targetedGameInstance))
         {
             if (_connectedServer is not null && _connectedServer.Connected && AllowedToMessageServer)
             {
@@ -244,7 +244,7 @@ public class Player
             else if ((_connectedServer?.Connected ?? false) == false || AllowedToMessageServer == false)
             {
                 AllowedToMessageServer = false;
-                throw new IOException("Server is no longer connected.");
+                throw new IOException("ChessServer is no longer connected.");
             }
         }
         else

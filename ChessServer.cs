@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Collections.Concurrent;
 
-public class Server
+public class ChessServer
 {
     /// <summary>Maximum number of users allowed to connect to connect to the server.</summary>
     private const int MaxConnectionCount = 20;
@@ -42,7 +42,7 @@ public class Server
     /// <summary>Initializes a new instance of the <see cref="Server"/> class.</summary>
     /// <param name="port">Port to create the server on.</param>
     /// <param name="ipAddress">ip address of server to create.</param>
-    public Server(int port, string ipAddress)
+    public ChessServer(int port, string ipAddress)
     {   // Set the TcpListener on port 13000.
         IPAddress localAddr = IPAddress.Parse(ipAddress);
         // TcpListener server = new TcpListener(port);
@@ -285,7 +285,7 @@ public class Server
                     {
                         var newGame = new TrackedGame(matchedPlayers[0], matchedPlayers[1]);
                         var playersAlertedForGame = new List<TrackedUser>(2);
-                        // Inform player code that it should start a GameEnvironment instance.
+                        // Inform player code that it should start a ChessGame instance.
                         foreach (KeyValuePair<Team, TrackedUser> playerDetail in newGame.AssociatedPlayers)
                         {
                             string nameOfOpponent = playerDetail.Key.Equals(Team.Black) ? newGame.WhitePlayer.UserName! : newGame.BlackPlayer.UserName!;
@@ -543,7 +543,7 @@ public class Server
                             // Send user response to the opposing player.                        
                             if (_startedGames.TryGetValue(clientResponse.GameIdentifier, out TrackedGame? currentGame) && currentGame.AssociatedPlayers.ContainsValue(connectedUser))
                             {
-                                TrackedUser opposingUser = currentGame.AssociatedPlayers[GameEnvironment.ReturnOppositeTeam(clientResponse.MoveDetails.SubmittingTeam)];
+                                TrackedUser opposingUser = currentGame.AssociatedPlayers[ChessGame.ReturnOppositeTeam(clientResponse.MoveDetails.SubmittingTeam)];
                                 try
                                 {
                                     await SendClientMessageAsync(clientResponse, opposingUser.UserClient, opposingUser.PersonalCTS.Token).ConfigureAwait(false);
@@ -726,7 +726,7 @@ public class Server
         public TrackedUser WhitePlayer { get => AssociatedPlayers[Team.White]; }
         /// <summary>Gets the <see cref="TrackedUser"/> associated with <see cref="Team.Black"/>.</summary>
         public TrackedUser BlackPlayer { get => AssociatedPlayers[Team.Black]; }
-        /// <summary>Gets an identification code used to track relevant information for started <see cref="GameEnvironment"/> instances.</summary>
+        /// <summary>Gets an identification code used to track relevant information for started <see cref="ChessGame"/> instances.</summary>
         public int GameID { get; }
         /// <summary>Holds <see cref="TrackedUser"/> instances keyed to their assigned team.</summary>
         public Dictionary<Team, TrackedUser> AssociatedPlayers { get; }
