@@ -2,7 +2,7 @@
 namespace Pieces;
 
 /// <summary>
-/// Struct that contains information about a given chess movement.
+/// Class used to encapsulate a chess move.
 /// </summary>
 public class ChessMove
 {
