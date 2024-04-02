@@ -202,6 +202,7 @@ public class ChessGame
     /// <param name="moveInfo">Move that will be tested.</param>
     /// <param name="teamToCheck">Used to determines which Team should be queried for a checked state.</param>
     /// <returns><see langword="true"/> if the king associated with <paramref name="teamToCheck"/> will be checked; otherwise, <see langword="false"/>.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if unable to execute the instructions provided by <paramref name="moveInfo"/>.</exception> 
     private bool WillChangeResultInCheck(ChessMove moveInfo, Team teamToCheck)
     {
         EditGameBoard(moveInfo, false);
