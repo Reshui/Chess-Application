@@ -91,7 +91,7 @@ public class ChessMove
     /// <param name="newMainCoords">Coordinates to move <paramref name="mainCopy"/> to.</param>
     /// <param name="newSecondaryCoords">Coordinates to move <paramref name="secondaryCopy"/> to.</param>
     /// <param name="enPassantCapturePossible"><see langword="true"/> if <paramref name="mainCopy"/> is captureable via En Passant; otherwise, ><see langword="false"/>.</param>
-    /// <param name="capturingSecondary"></param>
+    /// <param name="capturingSecondary"><see langword="true"/> if <paramref name="secondaryCopy"/> is being captured; otherwise, <see langword="false"/>.</param>
     /// <param name="castlingWithSecondary"><see langword="true"/> if <paramref name="mainCopy"/> should castle with <paramref name="secondaryCopy"/>; otherwise, <see langword="false"/>   </param>
     /// <param name="newType">PieceType to convert <paramref name="mainCopy"/> to.</param>
     /// <exception cref="ArgumentException"></exception>
