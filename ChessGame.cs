@@ -424,59 +424,17 @@ public class ChessGame
             // If castling vector, determine if it is possible to castle.
             if (piece.IsKing() && Math.Abs(movementVector.X) == 2)
             {
-                if (piece.TimesMoved != 0 || IsTeamInCheck(piece.AssignedTeam)) continue;
                 // A castleDirection of -1 means it's towards the left.
                 int castleDirection = (int)movementVector.X / 2;
-                int friendlySpecialLine = piece.CurrentRow;
+                ChessPiece? pairedRook = GameBoard[piece.CurrentRow, castleDirection == 1 ? 7 : 0];
 
-                int rookColumn = castleDirection == -1 ? 0 : GameBoard.GetUpperBound(1);
+                if (CanKingCastleWithRook(piece.AssignedTeam, pairedRook))
+                {
+                    var newKingLocation = Vector2.Add(piece.CurrentLocation, movementVector);
+                    var newRookLocation = Vector2.Add(piece.CurrentLocation, new Vector2(castleDirection, 0));
 
-                ChessPiece? pairedRook = GameBoard[friendlySpecialLine, rookColumn];
-
-                // Ensure that the king hasn't been moved and isn't already in check.
-                if (pairedRook is not null && pairedRook.AssignedType == PieceType.Rook && pairedRook.TimesMoved == 0)
-                {   // Now check to make sure that all spaces between the king and that rook are clear.
-                    int lesserColumnIndex = Math.Min(rookColumn, piece.CurrentColumn);
-                    int greaterColumnIndex = Math.Max(rookColumn, piece.CurrentColumn);
-                    bool castlePathIsClear = true;
-                    // Ensure that squares between the King and Rook are empty.
-                    for (int columnIndex = lesserColumnIndex + 1; columnIndex < greaterColumnIndex; ++columnIndex)
-                    {
-                        if (GameBoard[friendlySpecialLine, columnIndex] is not null)
-                        {
-                            castlePathIsClear = false;
-                            break;
-                        }
-                    }
-
-                    if (castlePathIsClear)
-                    {
-                        bool canCastle = true;
-                        var singleSquareMovement = new Vector2(castleDirection, 0);
-                        // Initialize movement at the current location for addition purposes in the following loop.
-                        Vector2 movement = piece.CurrentLocation;
-                        // Ensure that the King will not be moving into or through check.
-                        for (int i = 0; i < 2; ++i)
-                        {
-                            movement = Vector2.Add(movement, singleSquareMovement);
-                            var singleSquareMovementInfo = new ChessMove(copyOfPiece, new Coords(movement));
-
-                            if (WillChangeResultInCheck(singleSquareMovementInfo, piece.AssignedTeam))
-                            {
-                                canCastle = false;
-                                break;
-                            }
-                        }
-
-                        if (canCastle)
-                        {
-                            var newKingLocation = Vector2.Add(piece.CurrentLocation, movementVector);
-                            var newRookLocation = Vector2.Add(piece.CurrentLocation, new Vector2(castleDirection, 0));
-
-                            var moveInfo = new ChessMove(copyOfPiece, new Coords(newKingLocation), pairedRook.Copy(), new Coords(newRookLocation), castlingWithSecondary: true);
-                            viableMoves.Add(moveInfo);
-                        }
-                    }
+                    var moveInfo = new ChessMove(copyOfPiece, new Coords(newKingLocation), pairedRook!.Copy(), new Coords(newRookLocation), castlingWithSecondary: true);
+                    viableMoves.Add(moveInfo);
                 }
             }
             else
@@ -556,6 +514,52 @@ public class ChessGame
             }
         }
         return viableMoves;
+    }
+
+    /// <summary>
+    /// Determines if castling conditions have been met.
+    /// </summary>
+    /// <param name="queriedTeam">Used to retrieve the king that will be checked for castling moves.</param>
+    /// <param name="rookToCastleWith">Rook that will be used to castle with.</param>
+    /// <param name="castleDirection">Direction to castle in.</param>
+    /// <returns><see langword="true"/>if a king can castle with <paramref name="rookToCastleWith"/>; otherwise, <see langword="false"/>.</returns>
+    private bool CanKingCastleWithRook(Team queriedTeam, ChessPiece? rookToCastleWith)
+    {
+        ChessPiece king = ReturnKing(queriedTeam).Copy();
+        if (rookToCastleWith is null || king.TimesMoved != 0 || IsTeamInCheck(king.AssignedTeam)) return false;
+
+        // Ensure that the king hasn't been moved and isn't already in check.
+        if (queriedTeam == rookToCastleWith.AssignedTeam && rookToCastleWith.AssignedType == PieceType.Rook && rookToCastleWith.TimesMoved == 0)
+        {   // Now check to make sure that all spaces between the king and that rook are clear.
+            int lesserColumnIndex = Math.Min(rookToCastleWith.CurrentColumn, king.CurrentColumn);
+            int greaterColumnIndex = Math.Max(rookToCastleWith.CurrentColumn, king.CurrentColumn);
+            int friendlySpecialLine = king.CurrentRow;
+            // Ensure that squares between the King and Rook are empty.
+            for (int columnIndex = lesserColumnIndex + 1; columnIndex < greaterColumnIndex; ++columnIndex)
+            {
+                if (GameBoard[friendlySpecialLine, columnIndex] is not null)
+                {
+                    return false;
+                }
+            }
+
+            var singleSquareMovement = new Vector2(rookToCastleWith.CurrentColumn < king.CurrentColumn ? -1 : 1, 0);
+            // Initialize movement at the current location for addition purposes in the following loop.
+            Vector2 movement = king.CurrentLocation;
+            // Ensure that the King will not be moving into or through check.
+            for (byte i = 0; i < 2; ++i)
+            {
+                movement = Vector2.Add(movement, singleSquareMovement);
+                var singleSquareMovementInfo = new ChessMove(king, new Coords(movement));
+
+                if (WillChangeResultInCheck(singleSquareMovementInfo, king.AssignedTeam))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
     }
 
     /// <summary>Changes the <see cref="MatchState"/> property to the input parameter <paramref name="newState"/> and ends the game.</summary>
