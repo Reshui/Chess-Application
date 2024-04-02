@@ -250,7 +250,8 @@ public class ChessPiece
         {
             CanBeCapturedViaEnPassant = _enPassantCapturePossible,
             ID = ID,
-            IsCopy = true
+            IsCopy = true,
+            TimesMoved = TimesMoved
         };
     }
 
