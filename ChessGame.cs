@@ -525,7 +525,7 @@ public class ChessGame
     /// <returns><see langword="true"/>if a king can castle with <paramref name="rookToCastleWith"/>; otherwise, <see langword="false"/>.</returns>
     private bool CanKingCastleWithRook(Team queriedTeam, ChessPiece? rookToCastleWith)
     {
-        ChessPiece king = ReturnKing(queriedTeam).Copy();
+        ChessPiece king = ReturnKing(queriedTeam);
         if (rookToCastleWith is null || king.TimesMoved != 0 || IsTeamInCheck(king.AssignedTeam)) return false;
 
         // Ensure that the king hasn't been moved and isn't already in check.
@@ -546,11 +546,12 @@ public class ChessGame
             var singleSquareMovement = new Vector2(rookToCastleWith.CurrentColumn < king.CurrentColumn ? -1 : 1, 0);
             // Initialize movement at the current location for addition purposes in the following loop.
             Vector2 movement = king.CurrentLocation;
+            var copyOfKing = king.Copy();
             // Ensure that the King will not be moving into or through check.
             for (byte i = 0; i < 2; ++i)
             {
                 movement = Vector2.Add(movement, singleSquareMovement);
-                var singleSquareMovementInfo = new ChessMove(king, new Coords(movement));
+                var singleSquareMovementInfo = new ChessMove(copyOfKing, new Coords(movement));
 
                 if (WillChangeResultInCheck(singleSquareMovementInfo, king.AssignedTeam))
                 {
