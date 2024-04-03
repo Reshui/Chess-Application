@@ -474,22 +474,13 @@ public class ChessGame
                             else
                             {
                                 pawnAttackVector = true;
-                                #region Check for possible En Passant captures.
-                                if (piece.TimesMoved is 2 or 3 && piece.TryGetHostileChessPiece(GameBoard[piece.CurrentRow, column], out ChessPiece? captureablePawn))
+                                // Check for possible En Passant captures.
+                                if (piece.TimesMoved is 2 or 3 && piece.TryGetHostileChessPiece(GameBoard[piece.CurrentRow, column], out ChessPiece? captureablePawn)
+                                    && captureablePawn is not null && captureablePawn.AssignedType.Equals(PieceType.Pawn) && captureablePawn.CanBeCapturedViaEnPassant)
                                 {
-                                    if (captureablePawn is not null && captureablePawn.AssignedType.Equals(PieceType.Pawn)
-                                    && captureablePawn.CanBeCapturedViaEnPassant)
-                                    {
-                                        var enPassantCapture = new ChessMove(copyOfPiece, new Coords(calculatedPosition), captureablePawn.Copy(),
-                                            new Coords(ChessPiece.s_capturedLocation), capturingSecondary: true);
-
-                                        if (!WillChangeResultInCheck(enPassantCapture, piece.AssignedTeam))
-                                        {
-                                            viableMoves.Add(enPassantCapture);
-                                        }
-                                    }
+                                    canCaptureEnemy = true;
+                                    captureablePiece = captureablePawn;
                                 }
-                                #endregion
                             }
                         }
                         // Special notes for pawns: if pawnAttackVector = true, then the only way to move to that space is if canCaptureEnemy == true.
