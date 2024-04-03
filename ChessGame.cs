@@ -267,6 +267,7 @@ public class ChessGame
     /// <param name ="move">Contains details for a given move.</param>
     /// <param name="moveIsFinal"><see cref="true"/> if <paramref name="move"/> being submitted as the final move for the current turn.</param>
     /// <exception cref="InvalidOperationException">Thrown if <see cref="_tempMoveSaved"/> is <see langword="true"/>.</exception>
+    /// <exception cref="KeyNotFoundException">Thrown if a ChessPiece's team or ID cannot be found.</exception>
     private void EditGameBoard(ChessMove move, bool moveIsFinal)
     {
         if (_tempMoveSaved) throw new InvalidOperationException("There is a temporary move reflected in the current state of the board. Undo it before proceeding.");
@@ -293,6 +294,7 @@ public class ChessGame
     /// Undoes the instructions provided by the most recent <see cref="ChessMove"/> instance stored in <see cref="_gameMoves"/>.
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown if <see cref="_gameMoves"/> is empty.</exception>
+    /// <exception cref="KeyNotFoundException">Thrown if a ChessPiece's team or ID cannot be found.</exception>
     private void UndoGameBoardEdit()
     {
         ChessMove movementToUndo = _gameMoves.Pop();
@@ -563,7 +565,7 @@ public class ChessGame
     /// <param name="move">Data used to help retrieve a chess piece.</param>
     /// <param name="wantPrimary"><see langword="true"/> if you want the <see cref="ChessPiece"/> that shares the same ID  with <paramref name="move"/>..MainCopy; otherwise, the secondary piece will be retrieved.</param>
     /// <returns>A <see cref="ChessPiece"/> instance.</returns>
-    /// <exception cref="KeyNotFoundException"></exception>
+    /// <exception cref="KeyNotFoundException">Thrown if a ChessPiece's team or ID cannot be found.</exception>
     /// <exception cref="NullReferenceException"></exception>
     private ChessPiece GetPieceFromMovement(ChessMove move, bool wantPrimary)
     {
