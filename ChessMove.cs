@@ -52,7 +52,7 @@ public class ChessMove
     {
         get
         {
-            if (CapturingSecondary && SecondaryCopy is not null && !new Coords(SecondaryCopy.CurrentLocation).Equals(NewMainCoords))
+            if (CapturingSecondary && SecondaryCopy is not null && !SecondaryCopy.CurrentLocation.Equals(MainNewLocation) && SecondaryCopy.CanBeCapturedViaEnPassant && MainCopy.AssignedType == PieceType.Pawn)
             {
                 return true;
             }
