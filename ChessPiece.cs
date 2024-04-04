@@ -90,7 +90,6 @@ public class ChessPiece
     /// Gets or sets a value representing whether or not the current <see cref="ChessPiece"/> instance is vulnerable to En Passant.
     /// </summary>
     /// <value><see langword="true"/> if a pawn can be captured via En Passant; otherwise, <see langword="false"/>.</value>
-
     [JsonInclude]
     public bool CanBeCapturedViaEnPassant
     {
@@ -257,7 +256,8 @@ public class ChessPiece
             CanBeCapturedViaEnPassant = _enPassantCapturePossible,
             ID = ID,
             IsCopy = true,
-            TimesMoved = TimesMoved
+            TimesMoved = TimesMoved,
+            Captured = Captured
         };
     }
 
