@@ -71,22 +71,27 @@ public class ChessPiece
     /// Gets or sets an enum to describe what type of chess piece this instance will act as.
     /// </summary>
     /// <value>One of (King,Pawn,Queen,Bishop,Rook,Knight).</value>
+    [JsonInclude]
     public PieceType AssignedType { get; private set; }
 
     /// <summary>Gets or sets a <see cref="Team"/> enum for the current instance.</summary>
     /// <remarks>Must be either Team.(White/Black)</remarks>
     /// <value>The current Team that this <see cref="ChessPiece"/> is on.</value>
+    [JsonInclude]
     public Team AssignedTeam
     {
         get => _assignedTeam ?? throw new NullReferenceException($"Attempted to access {nameof(AssignedTeam)}. Backing field {nameof(_assignedTeam)} is null.");
-        set { _assignedTeam ??= value; }
+        private set { _assignedTeam ??= value; }
     }
     private Team? _assignedTeam = null;
     private bool _enPassantCapturePossible = false;
+
     /// <summary>
     /// Gets or sets a value representing whether or not the current <see cref="ChessPiece"/> instance is vulnerable to En Passant.
     /// </summary>
     /// <value><see langword="true"/> if a pawn can be captured via En Passant; otherwise, <see langword="false"/>.</value>
+
+    [JsonInclude]
     public bool CanBeCapturedViaEnPassant
     {
         get => _enPassantCapturePossible;
@@ -109,6 +114,7 @@ public class ChessPiece
     /// <summary>Gets or sets the number of times the current <see cref="ChessPiece"/> instance has been moved.</summary>
     /// <value>Integer reprensentation of how many times the current <see cref="ChessPiece"/> instance has been moved.</value>
     /// <remarks>Incremented by 1 whenever moved.</remarks>
+    [JsonInclude]
     public int TimesMoved
     {
         get => _timesMoved;
@@ -127,7 +133,7 @@ public class ChessPiece
     /// <value><see langword="true"/> if the piece has been captured; otherwise, <see langword="false"/>.</value>
     public bool Captured { get; set; }
 
-    /// <summary>Gets a string to serve as a key for <see cref="GameEnvironment._teamPieces"/>.</summary>
+    /// <summary>Gets a string to serve as a key for <see cref="ChessGame._teamPieces"/>.</summary>
     public string ID
     {
         get => _id ?? throw new NullReferenceException($"{nameof(_id)} is null.");
