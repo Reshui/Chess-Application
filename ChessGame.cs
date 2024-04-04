@@ -203,6 +203,7 @@ public class ChessGame
     /// <param name="teamToCheck">Used to determines which Team should be queried for a checked state.</param>
     /// <returns><see langword="true"/> if the king associated with <paramref name="teamToCheck"/> will be checked; otherwise, <see langword="false"/>.</returns>
     /// <exception cref="InvalidOperationException">Thrown if unable to execute the instructions provided by <paramref name="moveInfo"/>.</exception> 
+    /// <exception cref="KeyNotFoundException">Thrown if a ChessPiece's team or ID cannot be found.</exception>
     private bool WillChangeResultInCheck(ChessMove moveInfo, Team teamToCheck)
     {
         EditGameBoard(moveInfo, false);
@@ -361,8 +362,7 @@ public class ChessGame
     /// with the opposite <see cref="Team"/>.
     /// </summary>
     /// <returns><see langword="true"/> if <paramref name="newMove"/> was successfully submitted; otherwise, <see langword="false"/>.</returns>
-    /// <param name="newMove"><see cref="ChessMove"/> to submit to <see cref="GameBoard"/>.</param>
-    /// <param name="piecesAlreadyMovedOnGUI"><see langword="true"/> if chesspieces on the GUI have already been updated; otherwise, <see langword="false"/>.</param>
+    /// <param name="newMove"><see cref="ChessMove"/> to submit to <see cref="GameBoard"/>.</param>    
     public bool SubmitFinalizedChange(ChessMove newMove)
     {
         bool success = false;
