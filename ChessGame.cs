@@ -288,6 +288,7 @@ public class ChessGame
         }
 
         ChessPiece pieceToChange = GetPieceFromMovement(move, true);
+
         if (move.EnPassantCapturePossible)
         {
             pieceToChange.EnableEnPassantCaptures();
@@ -296,6 +297,7 @@ public class ChessGame
         {
             pieceToChange.ChangePieceType((PieceType)move.NewType);
         }
+
         pieceToChange.IncreaseMovementCount();
         AdjustChessPieceLocation(pieceToChange, move.MainNewLocation);
 
@@ -313,16 +315,31 @@ public class ChessGame
         ChessMove movementToUndo = _gameMoves.Pop();
         ChessPiece mainChessPiece = GetPieceFromMovement(movementToUndo, true);
 
-        if (movementToUndo.EnPassantCapturePossible) mainChessPiece.DisableEnPassantCaptures();
-        else if (movementToUndo.NewType is not null) mainChessPiece.ChangePieceType(movementToUndo.MainCopy.AssignedType);
+        if (movementToUndo.EnPassantCapturePossible)
+        {
+            mainChessPiece.DisableEnPassantCaptures();
+        }
+        else if (movementToUndo.NewType is not null)
+        {
+            mainChessPiece.ChangePieceType(movementToUndo.MainCopy.AssignedType);
+        }
+
         mainChessPiece.DecreaseMovementCount();
         AdjustChessPieceLocation(mainChessPiece, movementToUndo.MainCopy.CurrentLocation);
 
         if (movementToUndo.SecondaryCopy is not null)
         {
             ChessPiece pieceTwo = GetPieceFromMovement(movementToUndo, false);
-            if (movementToUndo.CastlingWithSecondary) pieceTwo.DecreaseMovementCount();
-            else if (movementToUndo.CapturingSecondary) pieceTwo.Captured = false;
+
+            if (movementToUndo.CastlingWithSecondary)
+            {
+                pieceTwo.DecreaseMovementCount();
+            }
+            else if (movementToUndo.CapturingSecondary)
+            {
+                pieceTwo.Captured = false;
+            }
+
             AdjustChessPieceLocation(pieceTwo, movementToUndo.SecondaryCopy.CurrentLocation);
         }
         _tempMoveSaved = false;
