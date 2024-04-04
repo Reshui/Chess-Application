@@ -282,7 +282,7 @@ public class ChessGame
 
         ChessPiece pieceToChange = GetPieceFromMovement(move, true);
         if (move.EnPassantCapturePossible) pieceToChange.EnableEnPassantCaptures();
-        else if (move.NewType is not null) pieceToChange.ChangePieceType((PieceType)move.NewType);
+        else if (move.PromotingPawn && move.NewType is not null) pieceToChange.ChangePieceType((PieceType)move.NewType);
         pieceToChange.IncreaseMovementCount();
         AdjustChessPieceLocation(pieceToChange, move.MainNewLocation);
 
