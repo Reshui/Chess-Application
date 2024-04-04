@@ -79,7 +79,7 @@ public class ChessPiece
     public Team AssignedTeam
     {
         get => _assignedTeam ?? throw new NullReferenceException($"Attempted to access {nameof(AssignedTeam)}. Backing field {nameof(_assignedTeam)} is null.");
-        private set { _assignedTeam ??= value; }
+        set { _assignedTeam ??= value; }
     }
     private Team? _assignedTeam = null;
     private bool _enPassantCapturePossible = false;
