@@ -275,14 +275,26 @@ public class ChessGame
         if (move.SecondaryCopy is not null && move.SecondaryNewLocation is not null)
         {
             ChessPiece secondaryOnBoard = GetPieceFromMovement(move, false);
-            if (move.CastlingWithSecondary) secondaryOnBoard.IncreaseMovementCount();
-            else if (move.CapturingSecondary) secondaryOnBoard.Captured = true;
+            if (move.CastlingWithSecondary)
+            {
+                secondaryOnBoard.IncreaseMovementCount();
+            }
+            else if (move.CapturingSecondary)
+            {
+                secondaryOnBoard.Captured = true;
+            }
             AdjustChessPieceLocation(secondaryOnBoard, (Vector2)move.SecondaryNewLocation);
         }
 
         ChessPiece pieceToChange = GetPieceFromMovement(move, true);
-        if (move.EnPassantCapturePossible) pieceToChange.EnableEnPassantCaptures();
-        else if (move.PromotingPawn && move.NewType is not null) pieceToChange.ChangePieceType((PieceType)move.NewType);
+        if (move.EnPassantCapturePossible)
+        {
+            pieceToChange.EnableEnPassantCaptures();
+        }
+        else if (move.PromotingPawn && move.NewType is not null)
+        {
+            pieceToChange.ChangePieceType((PieceType)move.NewType);
+        }
         pieceToChange.IncreaseMovementCount();
         AdjustChessPieceLocation(pieceToChange, move.MainNewLocation);
 
