@@ -506,8 +506,8 @@ public class ChessGame
                             {
                                 pawnAttackVector = true;
                                 // Check for possible En Passant captures.
-                                if (piece.TimesMoved is 2 or 3 && piece.TryGetHostileChessPiece(GameBoard[piece.CurrentRow, column], out ChessPiece? captureablePawn)
-                                    && captureablePawn is not null && captureablePawn.AssignedType.Equals(PieceType.Pawn) && captureablePawn.CanBeCapturedViaEnPassant)
+                                if (piece.TimesMoved is 2 or 3 && targetSquareIsEmpty && piece.TryGetHostileChessPiece(GameBoard[piece.CurrentRow, column], out ChessPiece? captureablePawn)
+                                    && captureablePawn is not null && captureablePawn.CanBeCapturedViaEnPassant)
                                 {
                                     canCaptureEnemy = true;
                                     captureablePiece = captureablePawn;
