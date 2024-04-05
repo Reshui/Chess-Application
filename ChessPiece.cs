@@ -314,7 +314,7 @@ public class ChessPiece
 
     /// <summary>Determines if two <see cref="ChessPiece"/> are on the same team.</summary>
     /// <param name="chessPieceToTest">Chess piece that is tested.</param>
-    /// <returns><see cref="true"/> if <paramref name="chessPieceToTest"/> has the same <see cref="AssignedTeam"/> value; otherwise, <see cref="false"/>.</returns>
+    /// <returns><see langword="true"/> if <paramref name="chessPieceToTest"/> has the same <see cref="AssignedTeam"/> value; otherwise, <see langword="false"/>.</returns>
     public bool OnSameTeam(ChessPiece chessPieceToTest) => AssignedTeam == chessPieceToTest.AssignedTeam;
 
     /// <summary>
