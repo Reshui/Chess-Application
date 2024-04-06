@@ -17,7 +17,7 @@ public class ServerCommand
     public ChessMove? MoveDetails { get; set; } = null;
     /// <summary>Optional field used to assign a client-side <see cref="Player"/> to a given team.</summary>
     public Team? AssignedTeam { get; set; } = null;
-    /// <summary>Specifies which instance of a <see cref="GameEnvironment"/> is being communicated with.</summary>
+    /// <summary>Specifies which instance of a <see cref="ChessGame"/> is being communicated with.</summary>
     public int GameIdentifier { get; set; } = 0;
     /// <summary>Optional parameter used to assign a name to a <see cref="Player"/> instance.</summary>
     public string? Name { get; set; }
