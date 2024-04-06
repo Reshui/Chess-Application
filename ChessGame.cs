@@ -497,7 +497,7 @@ public class ChessGame
                                     if (piece.TimesMoved != 0 || GameBoard[initialRowJumped, piece.CurrentColumn] is not null) break;
                                     movementWillExposeToEnPassant = true;
                                 }
-                                else if (row == (piece.AssignedTeam.Equals(Team.White) ? 7 : 0) && targetSquareIsEmpty)
+                                else if (row == (piece.AssignedTeam == Team.White ? 7 : 0))
                                 {
                                     promptUserForPawnPromotion = true;
                                 }
