@@ -1,4 +1,4 @@
-namespace Pieces;
+namespace Chess_GUi;
 
 using System.Net.Sockets;
 using System.Net;
@@ -12,19 +12,19 @@ public class ChessServer
     private const int MaxConnectionCount = 20;
 
     /// <summary>List of connected <see cref="TcpClient"/> instances to the current <see cref="Server"/> instance.</summary>
-    private readonly ConcurrentDictionary<int, TrackedUser> _connectedPlayers = new();
+    private readonly ConcurrentDictionary<int, TrackedUser> _connectedPlayers = [];
 
     /// <summary>Listens for user responses and connections.</summary>
     private readonly TcpListener _gameServer;
 
     /// <summary>Dictionary of <see cref="TrackedGame"/> instances that have been started.</summary>
-    private readonly ConcurrentDictionary<int, TrackedGame> _startedGames = new();
+    private readonly ConcurrentDictionary<int, TrackedGame> _startedGames = [];
 
     /// <summary>Stores players that are currently waiting for a game.</summary>
-    private ConcurrentQueue<TrackedUser> _waitingForGameLobby = new();
+    private ConcurrentQueue<TrackedUser> _waitingForGameLobby = [];
 
     /// <summary>Stores Tasks that listen for <see cref="TrackedUser"/> responses.</summary>
-    private readonly ConcurrentDictionary<int, Task> _clientListeningTasks = new();
+    private readonly ConcurrentDictionary<int, Task> _clientListeningTasks = [];
 
     /// <summary>Token source used to shutdown all server functions.</summary>
     public readonly CancellationTokenSource ServerShutDownCancelSource = new();
@@ -37,7 +37,7 @@ public class ChessServer
     private readonly List<Task> _serverTasks = new() { Capacity = 2 };
 
     /// <summary>A series of commands that signal the server that a given game has ended.</summary>
-    private static readonly CommandType[] _endGameCommands = { CommandType.DeclareLoss, CommandType.DeclareWin, CommandType.DeclareStaleMate };
+    private static readonly CommandType[] _endGameCommands = [CommandType.DeclareLoss, CommandType.DeclareWin, CommandType.DeclareStaleMate];
 
     /// <summary>Initializes a new instance of the <see cref="Server"/> class.</summary>
     /// <param name="port">Port to create the server on.</param>
@@ -408,9 +408,9 @@ public class ChessServer
         string message = JsonSerializer.Serialize(commandToSend);
         byte[] msg = Encoding.ASCII.GetBytes(message);
 
-        List<byte> constructedMessage = BitConverter.GetBytes(msg.Length).ToList();
+        List<byte> constructedMessage = [.. BitConverter.GetBytes(msg.Length)];
         constructedMessage.AddRange(msg);
-        byte[] msgConverted = constructedMessage.ToArray();
+        byte[] msgConverted = [.. constructedMessage];
 
         await client.GetStream().WriteAsync(msgConverted.AsMemory(0, msgConverted.Length), token).ConfigureAwait(false);
     }
@@ -737,8 +737,8 @@ public class ChessServer
         /// <summary>Dictionary used to keep track of winners and losers.</summary>
         public Dictionary<Team, GameState> GameState { get; } = new()
         {
-            {Team.Black,Pieces.GameState.Playing },
-            {Team.White,Pieces.GameState.Playing }
+            {Team.Black,Chess_GUi.GameState.Playing },
+            {Team.White,Chess_GUi.GameState.Playing }
         };
 
         /// <summary>Initializes a new instance of the <see cref="TrackedGame"/> class.</summary>       

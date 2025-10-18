@@ -1,5 +1,5 @@
 ﻿using System.Numerics;
-namespace Pieces;
+namespace Chess_GUi;
 
 /// <summary>
 /// Class used to encapsulate a chess move.

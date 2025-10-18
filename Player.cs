@@ -1,49 +1,48 @@
+namespace Chess_GUi;
 
-namespace Pieces;
-
-using Chess_GUi;
-using static Pieces.ChessServer;
+using static Chess_GUi.ChessServer;
 using System.Net.Sockets;
-public class Player
+/// <summary>
+/// Client-side constructor.
+/// </summary>
+public class Player(Form1 gui, string userName, CancellationTokenSource cancelSource, int portToConnectTo, string serverAddress) : IDisposable
 {
     /// <summary>IP address of <see cref="_connectedServer"/>.</summary>
-    private readonly string? _hostAddress = null;
+    private readonly string? _hostAddress = serverAddress;
 
     /// <summary>Port to connect to <see cref="_connectedServer"/> on.</summary>
-    private readonly int? _hostPort = null;
-
-    /// <summary>Connection to the server if it exists used by the <see cref="ChessServer"/> class.</summary>
-    public TcpClient Client
-    {
-        get { return _client ?? throw new NullReferenceException(nameof(_client)); }
-        init => _client = value;
-    }
-    private TcpClient? _client;
+    private readonly int? _hostPort = portToConnectTo;
 
     /// <summary>ChessServer connected to the current <see cref="Player"/> instance.</summary>
     private TcpClient? _connectedServer;
 
     /// <summary>Stores a list of games that the user is involved in.</summary>
-    private readonly Dictionary<int, ChessGame> _activeGames = new();
+    private readonly Dictionary<int, ChessGame> _activeGames = [];
+
     /// <summary>
     /// Gets or sets a value that will limit the user from sending messages to <see cref="_connectedServer"/>.
     /// </summary>
     /// <value><see langword="true"/> if messages shouldn't be sent to the server; otherwise, <see langword="false"/>.</value>
     private bool AllowedToMessageServer { get; set; } = false;
+
     /// <summary>ID used by server to track players.</summary>
     public int ServerAssignedID { get; private set; }
 
     /// <summary>Gets the player name assigned to this instance</summary>
-    public string? Name { get; }
+    public string? Name { get; } = userName;
 
     /// <summary>TokenSource used to stop server listening tasks.</summary>
-    public readonly CancellationTokenSource PersonalSource;
+    public readonly CancellationTokenSource PersonalSource = cancelSource;
 
     /// <summary>Form object used to visually represent games.</summary>
-    private readonly Form1 _gui;
+    private readonly Form1 _gui = gui;
 
     /// <summary>List used to track long-running asynchronous tasks started by the Player instance.</summary>
     private Task? _listenForServerTask;
+
+    /// <summary>
+    /// Gets or sets the Task that periodically pings the connected server to ensure connection is still alive.
+    /// </summary>
     public Task? PingConnectedClientTask { get; set; }
 
     /// <summary>
@@ -51,17 +50,6 @@ public class Player
     /// </summary>
     /// <value><see langword="true"/> if <see cref="CloseConnectionToServerAsync"/> has been called from <see cref="_gui"/>; otherwise, <see langword="false"/>.</value>
     public bool UserWantsToQuit { get; private set; } = false;
-    /// <summary>
-    /// Client-side constructor.
-    /// </summary>
-    public Player(Form1 gui, string userName, CancellationTokenSource cancelSource, int portToConnectTo, string serverAddress)
-    {
-        _hostPort = portToConnectTo;
-        _hostAddress = serverAddress;
-        Name = userName;
-        _gui = gui;
-        PersonalSource = cancelSource;
-    }
 
     /// <summary>Joins a server and starts asynchronous tasks.</summary>
     /// <returns><see langword="true"/> if server was joined successfully; otherwise, <see langword="false"/>.</returns>
@@ -105,12 +93,12 @@ public class Player
 
                 foreach (ServerCommand commandToSend in new ServerCommand[2] { registerCommand, lfgCommand })
                 {
-                    await SendClientMessageAsync(commandToSend, _connectedServer, PersonalSource.Token);//.ConfigureAwait(false);
+                    await SendClientMessageAsync(commandToSend, _connectedServer, PersonalSource.Token).ConfigureAwait(false);
                 }
 
                 while (!token.IsCancellationRequested)
                 {
-                    response = await RecieveCommandFromStreamAsync(stream, token);//.ConfigureAwait(false);
+                    response = await RecieveCommandFromStreamAsync(stream, token).ConfigureAwait(false);
 
                     if (response is not null)
                     {
@@ -118,15 +106,11 @@ public class Player
 
                         if (response.CMD == CommandType.StartGameInstance)
                         {
-                            if (!gamesToIgnore.Contains(serverSideGameID))
+                            if (!gamesToIgnore.Remove(serverSideGameID))
                             {
                                 var newGame = new ChessGame(serverSideGameID, (Team)response.AssignedTeam!);
                                 _activeGames.Add(serverSideGameID, newGame);
                                 _gui.AddGame(newGame);
-                            }
-                            else
-                            {
-                                gamesToIgnore.Remove(serverSideGameID);
                             }
                         }
                         else if (response.CMD == CommandType.ServerIsShuttingDown)
@@ -135,9 +119,9 @@ public class Player
                             PersonalSource.Cancel();
                             Console.WriteLine("Host has disconnected.");
                         }
-                        else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames.ContainsKey(serverSideGameID))
+                        else if (response.CMD == CommandType.OpponentClientDisconnected && _activeGames.TryGetValue(serverSideGameID, out ChessGame? value))
                         {
-                            _activeGames[serverSideGameID].ChangeGameState(GameState.OpponentDisconnected);
+                            value.ChangeGameState(GameState.OpponentDisconnected);
                             _gui.DisableGame(serverSideGameID);
                             _activeGames.Remove(serverSideGameID);
                         }
@@ -150,7 +134,7 @@ public class Player
                             if (!await TryUpdateGameInstanceAsync(targetedGame, response.MoveDetails!, guiAlreadyUpdated: false, submitToServer: false))
                             {
                                 var invalidMoveFromOpponent = new ServerCommand(CommandType.InvalidMove, targetedGame.GameID, response.MoveDetails);
-                                await SendClientMessageAsync(invalidMoveFromOpponent, _connectedServer, PersonalSource.Token);//.ConfigureAwait(false);
+                                await SendClientMessageAsync(invalidMoveFromOpponent, _connectedServer, PersonalSource.Token).ConfigureAwait(false);
                             }
                         }
                         else if (response.CMD == CommandType.InvalidMove && _activeGames.Remove(serverSideGameID, out targetedGame))
@@ -311,6 +295,33 @@ public class Player
         {
             var lfgCommand = new ServerCommand(CommandType.LookingForGame);
             await SendClientMessageAsync(lfgCommand, _connectedServer, PersonalSource.Token).ConfigureAwait(false);
+        }
+    }
+
+    // Detect redundant Dispose() calls.
+    private bool _isDisposed;
+
+    public void Dispose()
+    {
+        //throw new NotImplementedException();
+        Dispose(true);
+        //Client.Dispose();
+        GC.SuppressFinalize(this);
+    }
+    // Protected implementation of Dispose pattern.
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_isDisposed)
+        {
+            _isDisposed = true;
+
+            if (disposing)
+            {
+                // Dispose managed state.
+                _connectedServer?.Dispose();
+                _connectedServer = null;
+                PersonalSource.Dispose();
+            }
         }
     }
 }

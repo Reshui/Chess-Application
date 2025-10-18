@@ -1,20 +1,15 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Reflection;
-using Pieces;
+using Chess_GUi;
+using System.ComponentModel;
 
 namespace Chess_GUi
 {
-    public readonly struct OriginalBackColor
+    public readonly struct OriginalBackColor(PictureBox square)
     {
-        public OriginalBackColor(PictureBox square)
-        {
-            SquareChanged = square;
-            //OriginalImage = square.Image;
-            OriginalColor = square.BackColor;
-        }
-        public PictureBox SquareChanged { get; init; }
-        public Color OriginalColor { get; init; }
+        public PictureBox SquareChanged { get; init; } = square;
+        public Color OriginalColor { get; init; } = square.BackColor;
     }
     public class BoardGUI : UserControl
     {
@@ -31,7 +26,7 @@ namespace Chess_GUi
         private readonly ChessGame _currentGame;
 
         /// <summary>List of squares that a piece friendly to <see cref="_player"/> can move to.</summary>
-        private List<PictureBox> _validMovementSquares = new();
+        private List<PictureBox> _validMovementSquares = [];
 
         /// <summary>Valid square that a chess piece can move to.</summary>
         private PictureBox? _chessPieceDestinationSquare = null;
@@ -43,7 +38,7 @@ namespace Chess_GUi
         private readonly Player _player;
 
         /// <summary>List of squares within <see cref="_pictureSquares"/> that have undergone a temporary visual change.</summary>
-        private List<OriginalBackColor> _changedSquares = new();
+        private List<OriginalBackColor> _changedSquares = [];
 
         /// <summary>List of available moves to the currently selected piece friendly to the <see cref="_player"/>.</summary>
         private List<ChessMove>? _movesAvailableToPiece;
@@ -56,12 +51,16 @@ namespace Chess_GUi
 
         /// <summary>If <see langword="true"/> then <see cref="_previousFriendlySquare"/> and <see cref="_chessPieceDestinationSquare"/> will be set to <see langword="null"/> when <see cref="BoardGUI.SquareClickedEvent(object, EventArgs)"/> is called.</summary>
         private bool _resetSquareAssignments;
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool InteractionsDisabled { get; set; } = false;
         public GameState StateOfGame { get => _currentGame.MatchState; }
 
         public static string PathToResources { get; } = Path.Combine(Assembly.GetExecutingAssembly().Location, "..\\..\\..\\..\\Resources\\");
 
         private ChessMove? _moveToSubmit = null;
+        private static readonly int[] startingLinesArray = [0, 7];
+
         public BoardGUI(Player user, ChessGame newGame, string nameOfGui)
         {
             Name = nameOfGui;
@@ -102,7 +101,7 @@ namespace Chess_GUi
                 Name = "PromotionPanel"
             };
 
-            foreach (PieceType chessType in Enum.GetValues(typeof(PieceType)))
+            foreach (PieceType chessType in Enum.GetValues<PieceType>())
             {
                 if (chessType != PieceType.King && chessType != PieceType.Pawn)
                 {
@@ -122,7 +121,7 @@ namespace Chess_GUi
             CreateBoard();
 
             ConfirmMoveBTN.Click += new EventHandler(this.ConfirmMoveClickedEvent!);
-            Controls.AddRange(new Control[] { _mainBoard, ConfirmMoveBTN, _promotionPanel });
+            Controls.AddRange([_mainBoard, ConfirmMoveBTN, _promotionPanel]);
         }
 
         /// <summary>
@@ -191,7 +190,7 @@ namespace Chess_GUi
         /// </summary>
         private void SquareClickedEvent(object sender, EventArgs e)
         {
-            Controls["PromotionPanel"].Visible = false;
+            Controls["PromotionPanel"]!.Visible = false;
             if (InteractionsDisabled) return;
             if (_resetSquareAssignments)
             {
@@ -211,8 +210,8 @@ namespace Chess_GUi
             Color userSelectedMoveColor = ColorTranslator.FromHtml("#A1C17A");
 
             // PictureBox.Name is a string containing the row and column coordinates: {row}{column}.
-            int[] coords = (from cc in selectedSquare!.Name
-                            select int.Parse(cc.ToString())).ToArray();
+            int[] coords = [.. (from cc in selectedSquare!.Name
+                            select int.Parse(cc.ToString()))];
 
             ChessPiece? selectedPiece = _currentGame.GameBoard[coords[0], coords[1]];
 
@@ -233,13 +232,13 @@ namespace Chess_GUi
 
                 ResetSquareColors();
                 // List of squares that can be moved to. 
-                _validMovementSquares = (from move in _movesAvailableToPiece
+                _validMovementSquares = [.. (from move in _movesAvailableToPiece
                                          let labelName = $"{move.NewMainCoords.RowIndex}{move.NewMainCoords.ColumnIndex}"
-                                         select _mainBoard.Controls[labelName] as PictureBox).ToList();
+                                         select _mainBoard.Controls[labelName] as PictureBox)];
 
                 // Create a list of structs that will be used to revert any changes in borderstyle or backColor.
-                _changedSquares = (from square in _validMovementSquares
-                                   select new OriginalBackColor(square)).ToList();
+                _changedSquares = [.. (from square in _validMovementSquares
+                                   select new OriginalBackColor(square))];
 
                 _changedSquares.Add(new OriginalBackColor(selectedSquare));
                 // Highlight the selected chess piece.
@@ -290,7 +289,7 @@ namespace Chess_GUi
                                  select cm).First();
                 if (_moveToSubmit.PromotingPawn)
                 {
-                    Controls["PromotionPanel"].Visible = true;
+                    Controls["PromotionPanel"]!.Visible = true;
                 }
                 else
                 {
@@ -330,7 +329,7 @@ namespace Chess_GUi
         {
             // Ensure the user can no longer submit a move.
             ConfirmMoveBTN.Visible = false;
-            Controls["PromotionPanel"].Visible = false;
+            Controls["PromotionPanel"]!.Visible = false;
 
             _resetSquareAssignments = true;
             _validMovementSquares.Clear();
@@ -355,7 +354,7 @@ namespace Chess_GUi
             if (!InteractionsDisabled)
             {
                 // If a pawn reaches the opposite side of the board, prompt the user to select a different piece type.
-                if (_moveToSubmit.PromotingPawn && _moveToSubmit.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(_moveToSubmit.NewMainCoords.RowIndex))
+                if (_moveToSubmit.PromotingPawn && _moveToSubmit.MainCopy.AssignedType == PieceType.Pawn && startingLinesArray.Contains(_moveToSubmit.NewMainCoords.RowIndex))
                 {
                     _pictureSquares[_moveToSubmit.NewMainCoords.RowIndex, _moveToSubmit.NewMainCoords.ColumnIndex].Image = Image.FromFile(PathToResources + $"\\{_moveToSubmit.MainCopy.AssignedTeam}_{_moveToSubmit.NewType}.jpg");
                 }
@@ -424,7 +423,7 @@ namespace Chess_GUi
             ChessPiece mainPiece = newMove.MainCopy;
             PictureBox mainBox = _pictureSquares[mainPiece.CurrentRow, mainPiece.CurrentColumn];
 
-            if (newMove.PromotingPawn && newMove.MainCopy.AssignedType == PieceType.Pawn && new int[] { 0, 7 }.Contains(newMove.NewMainCoords.RowIndex))
+            if (newMove.PromotingPawn && newMove.MainCopy.AssignedType == PieceType.Pawn && startingLinesArray.Contains(newMove.NewMainCoords.RowIndex))
             {
                 _pictureSquares[newMove.NewMainCoords.RowIndex, newMove.NewMainCoords.ColumnIndex].Image = Image.FromFile(PathToResources + $"{newMove.MainCopy.AssignedTeam}_{newMove.NewType}.jpg");
             }

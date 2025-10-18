@@ -1,4 +1,4 @@
-using Pieces;
+using Chess_GUi;
 
 namespace Chess_GUi
 {
@@ -19,7 +19,7 @@ namespace Chess_GUi
         /// <summary>
         /// Dictionary used to keep track of started games.
         /// </summary>
-        private readonly Dictionary<string, BoardGUI> _boardGuiByName = new();
+        private readonly Dictionary<string, BoardGUI> _boardGuiByName = [];
 
         // public event StartServerHandlerAsync ServerStart;
         public Form1()
@@ -62,7 +62,7 @@ namespace Chess_GUi
                     }
                     _localPlayer = null;
 
-                    var btn = panel1.Controls["LFG"];
+                    var btn = panel1.Controls["LFG"]!;
                     btn.Visible = false;
                     btn.Enabled = false;
 
@@ -105,8 +105,8 @@ namespace Chess_GUi
 
                     JoinServer.Enabled = false;
                     StartServer.Enabled = false;
-                    panel1.Controls["LFG"].Enabled = true;
-                    panel1.Controls["LFG"].Visible = true;
+                    panel1.Controls["LFG"]!.Enabled = true;
+                    panel1.Controls["LFG"]!.Visible = true;
                 }
                 else
                 {
@@ -131,7 +131,7 @@ namespace Chess_GUi
                 // Added the created GUI to the control.
                 MainView.Controls.Add(trackedChessBoardGUI);
                 trackedChessBoardGUI.Size = MainView.Size;
-                MainView.Controls[trackedChessBoardGUI.Name].BringToFront();
+                MainView.Controls[trackedChessBoardGUI.Name]!.BringToFront();
                 GameTracker.Items.Add(trackedChessBoardGUI.Name);
             }
         }
@@ -216,11 +216,11 @@ namespace Chess_GUi
 
             JoinServer.Enabled = true;
             StartServer.Enabled = true;
-            panel1.Controls["LFG"].Visible = false;
+            panel1.Controls["LFG"]!.Visible = false;
         }
         private void GameTracker_SelectedIndexChanged(object sender, EventArgs e)
         {
-            MainView.Controls[GameTracker.SelectedItem as string].BringToFront();
+            MainView.Controls[GameTracker.SelectedItem as string]!.BringToFront();
         }
         public static string PublicIPAddress()
         {

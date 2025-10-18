@@ -1,4 +1,4 @@
-﻿namespace Pieces;
+﻿namespace Chess_GUi;
 
 /// <summary>
 /// Enums used by either the Server or Client to help evaluate recieved data.

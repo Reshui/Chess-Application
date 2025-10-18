@@ -1,4 +1,4 @@
-namespace Pieces;
+namespace Chess_GUi;
 
 using System.Numerics;
 

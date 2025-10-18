@@ -1,7 +1,7 @@
 using System.Numerics;
 using System.Text.Json.Serialization;
 
-namespace Pieces;
+namespace Chess_GUi;
 
 public enum PieceType
 {
@@ -41,7 +41,7 @@ public class ChessPiece
         }
         private set => _directionVectors = value;
     }
-    private List<Vector2> _directionVectors = new();
+    private List<Vector2> _directionVectors = [];
 
     [JsonIgnore]
     /// <summary>Current location of this <see cref="ChessPiece"/> instance within the current board.</summary>
@@ -108,7 +108,7 @@ public class ChessPiece
     /// <summary>
     /// An array of PieceType enums for chess pieces that can move via vector propagation.
     /// </summary>
-    private readonly static PieceType[] _multiSquareCapable = { PieceType.Queen, PieceType.Rook, PieceType.Bishop };
+    private readonly static PieceType[] _multiSquareCapable = [PieceType.Queen, PieceType.Rook, PieceType.Bishop];
 
     /// <summary>Gets or sets the number of times the current <see cref="ChessPiece"/> instance has been moved.</summary>
     /// <value>Integer reprensentation of how many times the current <see cref="ChessPiece"/> instance has been moved.</value>
@@ -230,7 +230,7 @@ public class ChessPiece
     public static List<Vector2> KnightDirectionVectors()
     {
         var knightMoveSet = new List<Vector2>();
-        int[] horizontalMovements = { 2, -2, 1, -1 };
+        int[] horizontalMovements = [2, -2, 1, -1];
 
         foreach (int horizontalScalar in horizontalMovements)
         {
